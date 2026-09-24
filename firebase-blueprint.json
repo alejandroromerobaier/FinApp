@@ -1,0 +1,65 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account information and preferences.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Display name of the user." },
+        "email": { "type": "string", "format": "email", "description": "Primary email address." },
+        "photoURL": { "type": "string", "format": "uri", "description": "Profile picture URL." },
+        "role": { "type": "string", "enum": ["admin", "user"], "description": "User role." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Account creation timestamp." }
+      },
+      "required": ["name", "email", "createdAt"]
+    },
+    "Category": {
+      "title": "Transaction Category",
+      "description": "Categories for classifying income and expenses.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the category." },
+        "icon": { "type": "string", "description": "Lucide icon name." },
+        "color": { "type": "string", "description": "Tailwind color class for the icon background." },
+        "type": { "type": "string", "enum": ["expense", "income"], "description": "Whether it's for expenses or income." },
+        "ownerId": { "type": "string", "description": "UID of the user who created this category (null for system defaults)." }
+      },
+      "required": ["name", "icon", "color", "type"]
+    },
+    "Project": {
+      "title": "Shared Project",
+      "description": "Collaborative spaces for shared expenses.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the project." },
+        "icon": { "type": "string", "description": "Lucide icon name." },
+        "ownerId": { "type": "string", "description": "UID of the project creator." },
+        "memberIds": { "type": "array", "items": { "type": "string" }, "description": "List of UIDs of members." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Project creation timestamp." }
+      },
+      "required": ["name", "icon", "ownerId", "memberIds", "createdAt"]
+    },
+    "Transaction": {
+      "title": "Financial Transaction",
+      "description": "Individual income or expense records.",
+      "type": "object",
+      "properties": {
+        "amount": { "type": "number", "description": "Transaction amount in cents." },
+        "categoryId": { "type": "string", "description": "ID of the associated category." },
+        "date": { "type": "string", "format": "date-time", "description": "Transaction date." },
+        "description": { "type": "string", "description": "Optional note or description." },
+        "type": { "type": "string", "enum": ["expense", "income"], "description": "Transaction type." },
+        "projectId": { "type": "string", "description": "ID of the project (null if personal)." },
+        "authorId": { "type": "string", "description": "UID of the user who created the record." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Record creation timestamp." }
+      },
+      "required": ["amount", "categoryId", "date", "type", "authorId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": { "schema": "User", "description": "User profiles." },
+    "/categories/{categoryId}": { "schema": "Category", "description": "Transaction categories." },
+    "/projects/{projectId}": { "schema": "Project", "description": "Shared project spaces." },
+    "/transactions/{transactionId}": { "schema": "Transaction", "description": "Financial records." }
+  }
+}

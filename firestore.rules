@@ -1,0 +1,169 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields: name (string), email (string), photoURL (string), createdAt (timestamp)
+    //
+    // Collection: categories
+    // Fields: name (string), icon (string), color (string), type (string), ownerId (string|null)
+    //
+    // Collection: projects
+    // Fields: name (string), icon (string), ownerId (string), memberIds (list), 
+    //         pendingEmails (list), createdAt (timestamp), updatedAt (timestamp)
+    //
+    // Collection: transactions
+    // Fields: amount (number), categoryId (string), date (timestamp), description (string), 
+    //         type (string), projectId (string|null), authorId (string), createdAt (timestamp)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "alejandroromerobaier@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isProjectMember(projectId) {
+      return isAuthenticated() && 
+        request.auth.uid in get(/databases/$(database)/documents/projects/$(projectId)).data.memberIds;
+    }
+
+    function isPendingMember(projectId) {
+      let project = get(/databases/$(database)/documents/projects/$(projectId)).data;
+      return isAuthenticated() && 
+             'pendingEmails' in project && 
+             request.auth.token.email.toLowerCase() in project.pendingEmails;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['name', 'email', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.email is string && data.email.size() > 5 && data.email.size() < 100 &&
+             (!('role' in data) || data.role in ['admin', 'user']);
+    }
+
+    function isValidCategory(data) {
+      return data.keys().hasAll(['name', 'icon', 'color', 'type']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 50 &&
+             data.type in ['expense', 'income'];
+    }
+
+    function isValidProject(data) {
+      return data.keys().hasAll(['name', 'icon', 'ownerId', 'memberIds', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.memberIds is list && data.memberIds.size() > 0 && data.memberIds.size() <= 20;
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['amount', 'categoryId', 'date', 'type', 'authorId', 'createdAt']) &&
+             data.amount is number && data.amount != 0 &&
+             data.type in ['expense', 'income'] &&
+             data.authorId == request.auth.uid;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow list: if isAuthenticated(); // Needed for finding users by email
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
+                    (!('role' in request.resource.data) || request.resource.data.role == 'user' || isAdmin());
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && 
+                    (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /categories/{categoryId} {
+      // allow read: if isAuthenticated() && (resource.data.ownerId == null || resource.data.ownerId == request.auth.uid || isAdmin());
+      // Replaced with safer but more inclusive rule for shared projects
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (
+        isAdmin() || 
+        (isValidCategory(request.resource.data) && (
+          (request.resource.data.scope == 'system' && request.resource.data.ownerId == null) ||
+          (request.resource.data.ownerId == request.auth.uid)
+        ))
+      );
+      allow update: if isAuthenticated() && (
+        isAdmin() || 
+        (isValidCategory(request.resource.data) && (
+          (resource.data.scope == 'system' && resource.data.ownerId == null) ||
+          (resource.data.ownerId == request.auth.uid)
+        ))
+      );
+      allow delete: if isAuthenticated() && (isAdmin() || resource.data.ownerId == request.auth.uid);
+    }
+
+    match /projects/{projectId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid in resource.data.memberIds ||
+        ('pendingEmails' in resource.data && 
+         request.auth.token.email.toLowerCase() in resource.data.pendingEmails) ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && (isAdmin() || (isValidProject(request.resource.data) && request.resource.data.ownerId == request.auth.uid));
+      allow update: if isAuthenticated() && (
+        request.auth.uid in resource.data.memberIds ||
+        ('pendingEmails' in resource.data && 
+         request.auth.token.email.toLowerCase() in resource.data.pendingEmails) ||
+        isAdmin()
+      );
+      allow delete: if isAuthenticated() && (isAdmin() || resource.data.ownerId == request.auth.uid);
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && (
+        (resource.data.projectId == null && resource.data.authorId == request.auth.uid) ||
+        (resource.data.projectId != null && isProjectMember(resource.data.projectId)) ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && (isAdmin() || (isValidTransaction(request.resource.data) && (
+        request.resource.data.projectId == null || isProjectMember(request.resource.data.projectId)
+      )));
+      allow update, delete: if isAuthenticated() && (isAdmin() || resource.data.authorId == request.auth.uid);
+    }
+    // Notifications
+    match /notifications/{notifId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId 
+                      || request.auth != null; // Allow other users to send notifications (sharing)
+      allow update: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    // Budgets
+    match /budgets/{budgetId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        (resource.data.projectId != null && (resource.data.projectId == "personal" || isProjectMember(resource.data.projectId))) ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.userId == request.auth.uid &&
+        (request.resource.data.projectId == null || request.resource.data.projectId == "personal" || isProjectMember(request.resource.data.projectId))
+      );
+      allow update, delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        (resource.data.projectId != null && (resource.data.projectId == "personal" || isProjectMember(resource.data.projectId))) ||
+        isAdmin()
+      );
+    }
+  }
+}

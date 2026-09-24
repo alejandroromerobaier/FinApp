@@ -1,0 +1,9 @@
+
+[1m[37m===[39m Deploying to 'gen-lang-client-0187524364'...[22m
+
+[36m[1mi [22m[39m deploying [1mfirestore[22m
+[36m[1mi  firestore:[22m[39m ensuring required API [1mfirestore.googleapis.com[22m is enabled...
+[36m[1mi  firestore:[22m[39m ensuring required API [1mfirestore.googleapis.com[22m is enabled...
+[36m[1mi  firestore:[22m[39m Creating the new Firestore database (default)...
+
+[1m[31mError:[39m[22m Request to https://firestore.googleapis.com/v1/projects/gen-lang-client-0187524364/databases?databaseId=%28default%29 had HTTP Error: 403, This API method requires billing to be enabled. Please enable billing on project gen-lang-client-0187524364 by visiting https://console.developers.google.com/billing/enable?project=gen-lang-client-0187524364 then retry. If you enabled billing for this project recently, wait a few minutes for the action to propagate to our systems and retry.
