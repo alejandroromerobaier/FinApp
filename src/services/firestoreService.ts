@@ -584,15 +584,13 @@ export const getTransactions = (projectId: string | null, callback: (transaction
   if (projectId) {
     q = query(
       collection(db, 'transactions'),
-      where('projectId', '==', projectId),
-      orderBy('date', 'desc')
+      where('projectId', '==', projectId)
     );
   } else {
     q = query(
       collection(db, 'transactions'),
       where('authorId', '==', auth.currentUser.uid),
-      where('projectId', '==', null),
-      orderBy('date', 'desc')
+      where('projectId', '==', null)
     );
   }
 
@@ -602,6 +600,7 @@ export const getTransactions = (projectId: string | null, callback: (transaction
       ...doc.data(),
       date: safeToDate(doc.data().date)
     }));
+    transactions.sort((a, b) => b.date.getTime() - a.date.getTime());
     callback(transactions);
   }, (error) => {
     handleFirestoreError(error, OperationType.LIST, 'transactions');
@@ -630,8 +629,7 @@ export const getGlobalTransactions = (projectIds: string[], callback: (transacti
   const qPersonal = query(
     collection(db, 'transactions'),
     where('authorId', '==', uid),
-    where('projectId', '==', null),
-    orderBy('date', 'desc')
+    where('projectId', '==', null)
   );
 
   const unsubscribePersonal = onSnapshot(qPersonal, (snapshot) => {
@@ -653,8 +651,7 @@ export const getGlobalTransactions = (projectIds: string[], callback: (transacti
     projectIds.slice(0, 10).forEach(projectId => {
       const qProject = query(
         collection(db, 'transactions'),
-        where('projectId', '==', projectId),
-        orderBy('date', 'desc')
+        where('projectId', '==', projectId)
       );
       
       const unsub = onSnapshot(qProject, (snapshot) => {

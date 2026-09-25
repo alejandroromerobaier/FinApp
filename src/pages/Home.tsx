@@ -75,8 +75,30 @@ export const Home: React.FC = () => {
       currentExpenses: number;
       currency: string;
       name: string;
-    }> = {};
-    
+    }> = {
+      personal: {
+        income: 0,
+        expenses: 0,
+        total: 0,
+        currentIncome: 0,
+        currentExpenses: 0,
+        currency: profile?.currency || 'ARS',
+        name: 'Personal'
+      }
+    };
+
+    projects.forEach(p => {
+      projectTotals[p.id] = {
+        income: 0,
+        expenses: 0,
+        total: 0,
+        currentIncome: 0,
+        currentExpenses: 0,
+        currency: p.currency || profile?.currency || 'ARS',
+        name: p.name
+      };
+    });
+
     // Use the global budget month for calculations
     const activeDate = parseLocalMonth(budgetMonth);
     const activeMonth = activeDate.getMonth();
