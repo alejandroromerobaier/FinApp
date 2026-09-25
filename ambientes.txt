@@ -1,0 +1,27 @@
+🚀 Entornos Disponibles
+1. Entorno de QA (Pruebas)
+URL de QA: https://gen-lang-client-0187524364--qa-gyewxn6z.web.app
+Comando para desplegar a QA:
+bash
+
+
+npm run deploy:qa
+Propósito: Probar nuevos cambios en cualquier dispositivo (PC o teléfono) sin alterar la web oficial de producción.
+2. Entorno de Producción (Sitio Oficial)
+URL de Producción: https://gen-lang-client-0187524364.web.app
+Comando para desplegar a Producción:
+bash
+
+
+npm run deploy:prod
+Propósito: Desplegar los cambios finales cuando estén aprobados en QA.
+🌿 Flujo de Trabajo en Git
+Rama dev (Desarrollo y QA):
+Actualmente activa. Todos los nuevos desarrollos y pruebas se hacen en esta rama.
+Se sube a GitHub con git push origin dev.
+Rama main (Producción):
+Se utiliza para almacenar únicamente el código estable desplegado en Producción.
+Proceso de trabajo recomendado:
+Realizamos cambios en la rama dev.
+Ejecutamos npm run deploy:qa y probamos en la URL de QA.
+Al confirmar que todo está OK, fusionamos dev en main y ejecutamos npm run deploy:prod.

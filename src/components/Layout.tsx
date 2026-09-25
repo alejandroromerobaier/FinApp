@@ -18,11 +18,15 @@ import logo from '../assets/logo.png';
 import { useData } from '../lib/DataContext';
 import { useNavigate } from 'react-router-dom';
 
+import { VoiceExpenseModal } from './VoiceExpenseModal';
+import { Sparkles, Mic } from 'lucide-react';
+
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { notifications, markAsRead } = useData();
   const [showNotifs, setShowNotifs] = React.useState(false);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = React.useState(false);
   
   const isAuthPage = location.pathname === '/login';
   const isAddPage = location.pathname === '/add';
@@ -47,6 +51,14 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             <span className="text-lg sm:text-xl font-extrabold tracking-tight text-on-surface font-headline cursor-pointer" onClick={() => navigate('/')}>FinApp</span>
           </div>
           <div className="flex items-center gap-2 relative">
+            <button
+              onClick={() => setIsVoiceModalOpen(true)}
+              className="p-2 sm:px-3 sm:py-2 text-primary bg-primary/10 hover:bg-primary/20 transition-all rounded-full flex items-center gap-1.5 border border-primary/20 shadow-sm active:scale-95"
+              title="Dictar gasto por voz con IA"
+            >
+              <Sparkles size={16} className="text-primary" />
+              <span className="text-[11px] font-black uppercase tracking-wider hidden sm:inline">Voz IA</span>
+            </button>
             <button 
               onClick={() => setShowNotifs(!showNotifs)}
               className={cn(
@@ -209,6 +221,12 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
            </NavLink>
         </aside>
       )}
+
+      {/* AI Voice Expense Modal */}
+      <VoiceExpenseModal 
+        isOpen={isVoiceModalOpen} 
+        onClose={() => setIsVoiceModalOpen(false)} 
+      />
     </div>
   );
 };
