@@ -26,7 +26,7 @@ const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => 
 
 export const VoiceExpenseModal: React.FC<VoiceExpenseModalProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
-  const { categories, projects } = useData();
+  const { categories, projects, transactions } = useData();
   const { profile } = useAuth();
 
   const [isListening, setIsListening] = useState(false);
@@ -121,7 +121,7 @@ export const VoiceExpenseModal: React.FC<VoiceExpenseModalProps> = ({ isOpen, on
 
     try {
       const activeProjects = projects.filter(p => (p as any).status !== 'inactive');
-      const result = await parseVoiceTextToTransaction(transcript, categories, activeProjects);
+      const result = await parseVoiceTextToTransaction(transcript, categories, activeProjects, transactions);
       setParsedTx(result);
     } catch (err: any) {
       console.error('Error analyzing voice text:', err);
