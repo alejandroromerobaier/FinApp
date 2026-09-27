@@ -144,6 +144,7 @@ export const SharedProjects: React.FC = () => {
       if (editingProject) {
         if (editingProject.isPersonal) {
           await updateUserProfile(user!.uid, {
+            currency: formData.currency,
             personalShowInHome: formData.showInHome,
             personalShowInExpenseSelector: formData.showInExpenseSelector,
             personalStatus: formData.status,
@@ -398,7 +399,7 @@ export const SharedProjects: React.FC = () => {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
-                {!editingProject?.isPersonal && (
+                {!editingProject?.isPersonal ? (
                   <>
                     <div>
                       <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-3 ml-1">Nombre del Proyecto</label>
@@ -451,6 +452,24 @@ export const SharedProjects: React.FC = () => {
                       </div>
                     </div>
                   </>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-3 ml-1">Preferencia de Moneda (Personal)</label>
+                    <select 
+                      value={formData.currency}
+                      onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                      className="w-full bg-[#F2F2F7] border-none rounded-2xl p-4 text-lg font-bold focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="ARS">Peso Argentino (ARS)</option>
+                      <option value="USD">Dólar (USD)</option>
+                      <option value="EUR">Euro (EUR)</option>
+                      <option value="BRL">Real (BRL)</option>
+                      <option value="CLP">Peso Chileno (CLP)</option>
+                      <option value="UYU">Peso Uruguayo (UYU)</option>
+                      <option value="COP">Peso Colombiano (COP)</option>
+                      <option value="MXN">Peso Mexicano (MXN)</option>
+                    </select>
+                  </div>
                 )}
 
                 {/* Display configuration (Always visible) */}
