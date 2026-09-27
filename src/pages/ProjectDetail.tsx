@@ -17,6 +17,8 @@ const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => 
   return <Icon size={size} />;
 };
 
+import { isProjectOwner } from './SharedProjects';
+
 export const ProjectDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -32,7 +34,7 @@ export const ProjectDetail: React.FC = () => {
   const [inviteError, setInviteError] = useState<string | null>(null);
 
   const project = useMemo(() => projects.find(p => p.id === id), [projects, id]);
-  const isOwner = project?.ownerId === currentUser?.uid;
+  const isOwner = isProjectOwner(project, currentUser?.uid);
 
   useEffect(() => {
     if (!id) return;
