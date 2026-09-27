@@ -371,12 +371,16 @@ export const getProjects = (callback: (projects: any[]) => void) => {
   
   const q = query(
     collection(db, 'projects'), 
-    where('memberIds', 'array-contains', auth.currentUser.uid),
-    orderBy('createdAt', 'desc')
+    where('memberIds', 'array-contains', auth.currentUser.uid)
   );
   
   return onSnapshot(q, (snapshot) => {
     const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    projects.sort((a, b) => {
+      const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+      const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+      return timeB - timeA;
+    });
     callback(projects);
   }, (error) => {
     handleFirestoreError(error, OperationType.LIST, 'projects');

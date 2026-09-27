@@ -17,6 +17,17 @@ const PROJECT_ICONS = [
   { id: 'landmark', icon: Landmark, label: 'Inversiones' },
 ];
 
+export const isProjectOwner = (project: any, userId?: string): boolean => {
+  if (!userId || !project) return false;
+  if (project.ownerId) {
+    return project.ownerId === userId;
+  }
+  if (Array.isArray(project.memberIds) && project.memberIds.length > 0) {
+    return project.memberIds[0] === userId;
+  }
+  return false;
+};
+
 export const SharedProjects: React.FC = () => {
   const navigate = useNavigate();
   const { projects, loading } = useData();
@@ -42,7 +53,7 @@ export const SharedProjects: React.FC = () => {
   const [inviteError, setInviteError] = useState('');
   const [saveError, setSaveError] = useState('');
 
-  const myProjects = useMemo(() => projects.filter(p => p.ownerId === user?.uid).map(p => ({
+  const myProjects = useMemo(() => projects.filter(p => isProjectOwner(p, user?.uid)).map(p => ({
     ...p,
     status: p.status || 'active'
   })), [projects, user]);
@@ -62,7 +73,7 @@ export const SharedProjects: React.FC = () => {
   }), [profile, user]);
 
   const allMyManageable = useMemo(() => [personalProject, ...myProjects], [personalProject, myProjects]);
-  const sharedWithMe = useMemo(() => projects.filter(p => p.ownerId !== user?.uid).map(p => ({
+  const sharedWithMe = useMemo(() => projects.filter(p => !isProjectOwner(p, user?.uid)).map(p => ({
     ...p,
     status: p.status || 'active'
   })), [projects, user]);
@@ -313,7 +324,7 @@ export const SharedProjects: React.FC = () => {
               <ProjectCard 
                 key={project.id} 
                 project={project} 
-                isOwner={false}
+                isOwner={isProjectOwner(project, user?.uid)}
                 isDefault={(profile?.defaultProjectId || 'personal') === project.id}
                 onEdit={() => handleOpenModal(project)}
                 onInvite={() => handleOpenInvite(project)}
