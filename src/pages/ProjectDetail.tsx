@@ -139,15 +139,13 @@ export const ProjectDetail: React.FC = () => {
             <h2 className="text-2xl font-extrabold text-on-surface font-headline leading-tight">{project.name}</h2>
           </div>
         </div>
-        {isOwner && (
-          <button 
-            onClick={() => setIsInviteModalOpen(true)}
-            className="bg-primary/10 text-primary p-3 rounded-2xl hover:bg-primary/20 transition-colors flex items-center gap-2"
-          >
-            <UserPlus size={20} />
-            <span className="hidden sm:inline font-bold text-sm">Invitar</span>
-          </button>
-        )}
+        <button 
+          onClick={() => setIsInviteModalOpen(true)}
+          className="bg-primary/10 text-primary p-3 rounded-2xl hover:bg-primary/20 transition-colors flex items-center gap-2"
+        >
+          <UserPlus size={20} />
+          <span className="hidden sm:inline font-bold text-sm">Invitar</span>
+        </button>
       </div>
 
       {/* Hero Stats */}

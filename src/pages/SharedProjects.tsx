@@ -315,6 +315,8 @@ export const SharedProjects: React.FC = () => {
                 project={project} 
                 isOwner={false}
                 isDefault={(profile?.defaultProjectId || 'personal') === project.id}
+                onEdit={() => handleOpenModal(project)}
+                onInvite={() => handleOpenInvite(project)}
                 onToggleStatus={() => handleToggleStatus(project)}
                 onView={() => navigate(`/project/${project.id}`)}
                 onLeave={() => handleLeave(project.id)}
@@ -695,29 +697,34 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, isOwner, isDefault, 
               <Power size={20} />
             </button>
           )}
-          {isOwner ? (
-            <>
-              <button 
-                onClick={onInvite}
-                className="p-2.5 text-black/20 hover:text-secondary hover:bg-secondary/5 rounded-xl transition-all"
-                title="Invitar colaborador"
-              >
-                <Share2 size={20} />
-              </button>
-              <button 
-                onClick={onEdit}
-                className="p-2.5 text-black/20 hover:text-primary hover:bg-primary/5 rounded-xl transition-all"
-              >
-                <Edit3 size={20} />
-              </button>
-              <button 
-                onClick={onDelete}
-                className="p-2.5 text-black/20 hover:text-error hover:bg-error/5 rounded-xl transition-all"
-              >
-                <Trash2 size={20} />
-              </button>
-            </>
-          ) : (
+          {onInvite && (
+            <button 
+              onClick={onInvite}
+              className="p-2.5 text-black/20 hover:text-secondary hover:bg-secondary/5 rounded-xl transition-all"
+              title="Invitar colaborador"
+            >
+              <Share2 size={20} />
+            </button>
+          )}
+          {onEdit && (
+            <button 
+              onClick={onEdit}
+              className="p-2.5 text-black/20 hover:text-primary hover:bg-primary/5 rounded-xl transition-all"
+              title="Editar proyecto"
+            >
+              <Edit3 size={20} />
+            </button>
+          )}
+          {isOwner && onDelete && (
+            <button 
+              onClick={onDelete}
+              className="p-2.5 text-black/20 hover:text-error hover:bg-error/5 rounded-xl transition-all"
+              title="Eliminar proyecto"
+            >
+              <Trash2 size={20} />
+            </button>
+          )}
+          {!isOwner && onLeave && (
             <button 
               onClick={onLeave}
               className="p-2.5 text-black/20 hover:text-error hover:bg-error/5 rounded-xl transition-all"
