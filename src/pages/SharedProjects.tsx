@@ -375,7 +375,7 @@ export const SharedProjects: React.FC = () => {
       {/* Create/Edit Modal */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -387,38 +387,45 @@ export const SharedProjects: React.FC = () => {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl relative z-10 overflow-hidden"
+              className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl relative z-10 flex flex-col max-h-[90vh] overflow-hidden"
             >
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-2xl font-extrabold text-on-surface font-headline">
-                  {editingProject ? 'Editar Proyecto' : 'Nuevo Proyecto'}
-                </h2>
-                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-black/5 rounded-full transition-colors">
-                  <X size={24} />
+              {/* Fixed Header */}
+              <div className="flex justify-between items-center px-6 py-5 border-b border-black/5 shrink-0 bg-white">
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-extrabold text-on-surface font-headline">
+                    {editingProject ? (editingProject.isPersonal ? 'Editar Proyecto Personal' : 'Editar Proyecto') : 'Nuevo Proyecto'}
+                  </h2>
+                  <p className="text-xs text-on-surface-variant/60 font-bold uppercase tracking-wider mt-0.5">
+                    {editingProject?.isPersonal ? 'Configura tu billetera principal' : 'Configura los detalles y visibilidad'}
+                  </p>
+                </div>
+                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-black/5 rounded-full transition-colors text-on-surface-variant">
+                  <X size={20} />
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Scrollable Form Body */}
+              <form id="project-form" onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto flex-1">
                 {!editingProject?.isPersonal ? (
                   <>
                     <div>
-                      <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-3 ml-1">Nombre del Proyecto</label>
+                      <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-2 ml-1">Nombre del Proyecto</label>
                       <input 
                         type="text" 
                         required
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         placeholder="Ej: Viaje a Córdoba, Gastos Casa..."
-                        className="w-full bg-[#F2F2F7] border-none rounded-2xl p-4 text-lg font-bold focus:ring-2 focus:ring-primary/20 transition-all"
+                        className="w-full bg-[#F2F2F7] border-none rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all text-on-surface"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-3 ml-1">Preferencia de Moneda</label>
+                      <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-2 ml-1">Preferencia de Moneda</label>
                       <select 
                         value={formData.currency}
                         onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                        className="w-full bg-[#F2F2F7] border-none rounded-2xl p-4 text-lg font-bold focus:ring-2 focus:ring-primary/20 transition-all appearance-none"
+                        className="w-full bg-[#F2F2F7] border-none rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer text-on-surface"
                       >
                         <option value="ARS">Peso Argentino (ARS)</option>
                         <option value="USD">Dólar (USD)</option>
@@ -432,7 +439,7 @@ export const SharedProjects: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-3 ml-1">Icono</label>
+                      <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-2 ml-1">Icono del Proyecto</label>
                       <div className="grid grid-cols-4 gap-3">
                         {PROJECT_ICONS.map((item) => (
                           <button
@@ -446,7 +453,7 @@ export const SharedProjects: React.FC = () => {
                                 : "bg-[#F2F2F7] border-transparent text-black/40 hover:bg-black/5"
                             )}
                           >
-                            <item.icon size={24} />
+                            <item.icon size={22} />
                           </button>
                         ))}
                       </div>
@@ -454,11 +461,11 @@ export const SharedProjects: React.FC = () => {
                   </>
                 ) : (
                   <div>
-                    <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-3 ml-1">Preferencia de Moneda (Personal)</label>
+                    <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-2 ml-1">Preferencia de Moneda (Personal)</label>
                     <select 
                       value={formData.currency}
                       onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                      className="w-full bg-[#F2F2F7] border-none rounded-2xl p-4 text-lg font-bold focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer"
+                      className="w-full bg-[#F2F2F7] border-none rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer text-on-surface"
                     >
                       <option value="ARS">Peso Argentino (ARS)</option>
                       <option value="USD">Dólar (USD)</option>
@@ -472,18 +479,20 @@ export const SharedProjects: React.FC = () => {
                   </div>
                 )}
 
-                {/* Display configuration (Always visible) */}
-                <div className="pt-4 mt-4 border-t border-black/5 space-y-6">
-                  <div className="flex items-center justify-between">
+                {/* Display configuration */}
+                <div className="pt-4 border-t border-black/5 space-y-5">
+                  <span className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-[0.2em] block mb-2">Configuración y Visibilidad</span>
+
+                  <div className="flex items-center justify-between bg-surface-container-low p-3.5 rounded-2xl border border-on-surface/5">
                     <div>
-                      <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-1 ml-1">Visibilidad en la Home</label>
-                      <p className="text-xs text-black/40 ml-1">Mostrar tarjeta en la pantalla principal</p>
+                      <label className="block text-xs font-bold text-on-surface mb-0.5">Visibilidad en la Home</label>
+                      <p className="text-[11px] text-on-surface-variant/60 font-medium">Mostrar tarjeta en la pantalla principal</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, showInHome: !formData.showInHome })}
                       className={cn(
-                        "w-12 h-6 rounded-full transition-all relative",
+                        "w-12 h-6 rounded-full transition-all relative shrink-0 ml-3",
                         formData.showInHome ? "bg-primary" : "bg-black/10"
                       )}
                     >
@@ -494,16 +503,16 @@ export const SharedProjects: React.FC = () => {
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between bg-surface-container-low p-3.5 rounded-2xl border border-on-surface/5">
                     <div>
-                      <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-1 ml-1">Visibilidad al Cargar Gastos</label>
-                      <p className="text-xs text-black/40 ml-1">Mostrar en selector al registrar un movimiento</p>
+                      <label className="block text-xs font-bold text-on-surface mb-0.5">Visibilidad al Cargar Gastos</label>
+                      <p className="text-[11px] text-on-surface-variant/60 font-medium">Mostrar en selector al registrar gasto</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, showInExpenseSelector: !formData.showInExpenseSelector })}
                       className={cn(
-                        "w-12 h-6 rounded-full transition-all relative",
+                        "w-12 h-6 rounded-full transition-all relative shrink-0 ml-3",
                         formData.showInExpenseSelector ? "bg-primary" : "bg-black/10"
                       )}
                     >
@@ -514,16 +523,16 @@ export const SharedProjects: React.FC = () => {
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between bg-surface-container-low p-3.5 rounded-2xl border border-on-surface/5">
                     <div>
-                      <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-1 ml-1">Preinicialización</label>
-                      <p className="text-xs text-black/40 ml-1">Usar por defecto al cargar gastos</p>
+                      <label className="block text-xs font-bold text-on-surface mb-0.5">Preinicialización</label>
+                      <p className="text-[11px] text-on-surface-variant/60 font-medium">Usar por defecto al cargar movimientos</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, isDefaultProject: !formData.isDefaultProject })}
                       className={cn(
-                        "w-12 h-6 rounded-full transition-all relative",
+                        "w-12 h-6 rounded-full transition-all relative shrink-0 ml-3",
                         formData.isDefaultProject ? "bg-primary" : "bg-black/10"
                       )}
                     >
@@ -534,16 +543,16 @@ export const SharedProjects: React.FC = () => {
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between bg-surface-container-low p-3.5 rounded-2xl border border-on-surface/5">
                     <div>
-                      <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-1 ml-1">Estado del Proyecto</label>
-                      <p className="text-xs text-black/40 ml-1">Proyecto Activo o Inactivo (Archivado)</p>
+                      <label className="block text-xs font-bold text-on-surface mb-0.5">Estado del Proyecto</label>
+                      <p className="text-[11px] text-on-surface-variant/60 font-medium">Proyecto Activo o Archivados</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, status: formData.status === 'active' ? 'inactive' : 'active' })}
                       className={cn(
-                        "px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all border",
+                        "px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all border shrink-0 ml-3",
                         formData.status === 'active' 
                           ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
                           : "bg-slate-100 text-slate-600 border-slate-200"
@@ -554,11 +563,11 @@ export const SharedProjects: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-3 ml-1">Posición en la Home</label>
+                    <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-2 ml-1">Posición en la Home</label>
                     <select 
                       value={formData.homeOrder}
                       onChange={(e) => setFormData({ ...formData, homeOrder: parseInt(e.target.value) })}
-                      className="w-full bg-[#F2F2F7] border-none rounded-2xl p-4 text-lg font-bold focus:ring-2 focus:ring-primary/20 transition-all appearance-none"
+                      className="w-full bg-[#F2F2F7] border-none rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer text-on-surface"
                     >
                       {Array.from({ length: editingProject ? projectsCount : projectsCount + 1 }, (_, i) => i + 1).map(num => (
                         <option key={num} value={num}>{num}ª Posición</option>
@@ -566,15 +575,18 @@ export const SharedProjects: React.FC = () => {
                     </select>
                   </div>
                 </div>
+              </form>
 
+              {/* Fixed Footer */}
+              <div className="p-6 pt-4 border-t border-black/5 bg-white shrink-0 flex flex-col gap-2">
                 {saveError && (
-                  <p className="text-error text-xs font-bold text-center mt-2 p-3 bg-error/10 rounded-xl uppercase tracking-wider">{saveError}</p>
+                  <p className="text-rose-600 text-xs font-bold text-center p-2.5 bg-rose-500/10 rounded-xl uppercase tracking-wider">{saveError}</p>
                 )}
-
                 <button 
                   type="submit"
+                  form="project-form"
                   disabled={isSaving}
-                  className="w-full bg-primary text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-primary/20 hover:opacity-90 transition-all active:scale-[0.98] mt-4 disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full bg-primary text-white py-4 rounded-2xl font-bold text-base shadow-xl shadow-primary/20 hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {isSaving ? (
                     <>
@@ -585,7 +597,7 @@ export const SharedProjects: React.FC = () => {
                     editingProject ? 'Guardar Cambios' : 'Crear Proyecto'
                   )}
                 </button>
-              </form>
+              </div>
             </motion.div>
           </div>
         )}
@@ -606,7 +618,7 @@ export const SharedProjects: React.FC = () => {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl relative z-10 overflow-hidden"
+              className="bg-white w-full max-w-md rounded-[2.5rem] p-6 sm:p-8 shadow-2xl relative z-10 flex flex-col max-h-[90vh] overflow-y-auto"
             >
               <div className="flex justify-between items-center mb-8">
                 <h2 className="text-2xl font-extrabold text-on-surface font-headline">
