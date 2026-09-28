@@ -133,6 +133,15 @@ export const AddExpense: React.FC = () => {
             setAuthorId(t.authorId);
             setPaymentMethod(t.paymentMethod || 'Efectivo');
             setClassification(t.classification || 'variable');
+
+            if (t.projectId) {
+              setDestination('shared');
+              setSelectedProjectId(t.projectId);
+            } else {
+              setDestination('personal');
+              setSelectedProjectId(null);
+            }
+
             const cat = allCategories.find(c => c.id === t.categoryId);
             if (cat) setSelectedCategory(cat);
           }
