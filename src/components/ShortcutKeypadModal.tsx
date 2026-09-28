@@ -92,7 +92,7 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
         {/* Backdrop */}
         <motion.div 
           initial={{ opacity: 0 }}
@@ -102,25 +102,25 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
           className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         />
 
-        {/* Modal Container */}
+        {/* Modal Container (Centered, elevated z-index, PWA-safe) */}
         <motion.div 
-          initial={{ y: '100%', opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: '100%', opacity: 0 }}
+          initial={{ scale: 0.95, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.95, opacity: 0, y: 20 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="bg-surface w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl relative z-10 flex flex-col overflow-hidden border border-on-surface/10"
+          className="bg-surface w-full max-w-md rounded-[2.5rem] shadow-2xl relative z-10 flex flex-col overflow-hidden border border-on-surface/10 max-h-[85vh] my-auto"
         >
-          {/* Header */}
-          <div className="flex justify-between items-center px-6 py-4 border-b border-on-surface/5 bg-surface shrink-0">
-            <div className="flex items-center gap-3 min-w-0 flex-1">
+          {/* Header with Save Button on Top Right */}
+          <div className="flex justify-between items-center px-5 py-4 border-b border-on-surface/5 bg-surface shrink-0">
+            <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
               <div className={cn(
-                "w-11 h-11 rounded-2xl flex items-center justify-center text-white shadow-md shrink-0",
+                "w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-md shrink-0",
                 category?.color || 'bg-amber-500'
               )}>
-                <ShortcutIconComponent name={shortcut.icon} size={22} />
+                <ShortcutIconComponent name={shortcut.icon} size={20} />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="font-extrabold text-on-surface text-base sm:text-lg font-headline truncate leading-tight">
+                <h3 className="font-extrabold text-on-surface text-base font-headline truncate leading-tight">
                   {shortcut.name}
                 </h3>
                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
@@ -141,13 +141,32 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
               </div>
             </div>
 
-            <button 
-              type="button"
-              onClick={onClose}
-              className="p-2 hover:bg-on-surface/5 rounded-full transition-colors text-on-surface-variant shrink-0 ml-2"
-            >
-              <X size={20} />
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {!showSuccess && (
+                <button 
+                  type="submit"
+                  form="shortcut-expense-form"
+                  disabled={isSubmitting || parsedAmount <= 0}
+                  className="bg-primary hover:opacity-90 text-white px-4 py-2 rounded-xl font-extrabold text-xs shadow-md shadow-primary/20 transition-all active:scale-95 disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Check size={16} strokeWidth={3} />
+                      <span>Guardar</span>
+                    </>
+                  )}
+                </button>
+              )}
+              <button 
+                type="button"
+                onClick={onClose}
+                className="p-2 hover:bg-on-surface/5 rounded-full transition-colors text-on-surface-variant shrink-0"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
 
           {/* Form with Native Input */}
@@ -156,7 +175,7 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
               <motion.div 
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="py-4 flex flex-col items-center justify-center text-emerald-600 space-y-2"
+                className="py-6 flex flex-col items-center justify-center text-emerald-600 space-y-2"
               >
                 <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-600">
                   <Check size={36} strokeWidth={3} />
@@ -168,13 +187,13 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
               </motion.div>
             </div>
           ) : (
-            <form onSubmit={handleConfirm} className="p-6 space-y-5 bg-surface pb-8 sm:pb-6">
+            <form id="shortcut-expense-form" onSubmit={handleConfirm} className="p-6 space-y-5 bg-surface">
               <div className="text-center space-y-1">
                 <label className="block text-xs font-black uppercase tracking-widest text-on-surface-variant/50">
                   Ingresa el Monto ({currency})
                 </label>
                 <p className="text-[11px] text-on-surface-variant/60 font-medium">
-                  Usa el teclado de tu dispositivo para ingresar el importe
+                  Toca arriba en <span className="font-bold text-primary">"Guardar"</span> o confirma en tu teclado
                 </p>
               </div>
 
@@ -207,11 +226,11 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
                 </p>
               )}
 
-              {/* Confirm CTA Button */}
+              {/* Form Body Action Button */}
               <button 
                 type="submit"
                 disabled={isSubmitting || parsedAmount <= 0}
-                className="w-full bg-primary text-white py-4 rounded-2xl font-extrabold text-lg font-headline shadow-xl shadow-primary/20 hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full bg-primary text-white py-4 rounded-2xl font-extrabold text-base font-headline shadow-xl shadow-primary/20 hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer mt-2"
               >
                 {isSubmitting ? (
                   <>
@@ -220,7 +239,7 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
                   </>
                 ) : (
                   <>
-                    <Check size={22} strokeWidth={3} />
+                    <Check size={20} strokeWidth={3} />
                     <span>Confirmar Gasto</span>
                   </>
                 )}
