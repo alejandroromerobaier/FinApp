@@ -7,7 +7,9 @@ import {
   getCategoriesByIds,
   getNotifications,
   markNotificationRead,
-  getBudgets
+  getBudgets,
+  getShortcuts,
+  Shortcut
 } from '../services/firestoreService';
 import { useAuth } from './AuthContext';
 import { getLocalMonth } from './dateUtils';
@@ -67,6 +69,7 @@ export interface DataContextType {
   loading: boolean;
   notifications: any[];
   budgets: Budget[];
+  shortcuts: Shortcut[];
   budgetMonth: string;
   setBudgetMonth: (month: string) => void;
   markAsRead: (id: string) => Promise<void>;
@@ -85,6 +88,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userEmails, setUserEmails] = useState<Record<string, string>>({});
   const [notifications, setNotifications] = useState<any[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [shortcuts, setShortcuts] = useState<Shortcut[]>([]);
   const [budgetMonth, setBudgetMonth] = useState(getLocalMonth());
   const [loading, setLoading] = useState(true);
   const [showBalances, setShowBalances] = useState(() => {
@@ -96,6 +100,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (!user) {
       setNotifications([]);
+      setShortcuts([]);
       return;
     }
 
@@ -104,8 +109,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setNotifications(data);
     });
 
+    // Sync shortcuts
+    const unsubscribeShortcuts = getShortcuts((data: Shortcut[]) => {
+      setShortcuts(data);
+    });
+
     return () => {
       unsubscribeNotifs();
+      unsubscribeShortcuts();
     };
   }, [user]);
 
@@ -286,6 +297,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       userEmails,
       notifications,
       budgets,
+      shortcuts,
       budgetMonth,
       setBudgetMonth,
       markAsRead,

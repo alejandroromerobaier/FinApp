@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { User as UserIcon, LayoutGrid, Tag, CreditCard, Calendar, LogOut, ChevronRight, Mail, BarChart3, Target, Globe } from 'lucide-react';
+import { User as UserIcon, LayoutGrid, Tag, CreditCard, Calendar, LogOut, ChevronRight, Mail, BarChart3, Target, Globe, Zap } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useAuth } from '../lib/AuthContext';
@@ -87,6 +87,13 @@ export const Settings: React.FC = () => {
             title="Gestión de Presupuestos" 
             subtitle="Límites mensuales por categoría" 
             iconColor="bg-amber-50 text-amber-700"
+          />
+          <SettingsLink 
+            to="/shortcuts" 
+            icon={<Zap size={20} />} 
+            title="Atajos de Gastos" 
+            subtitle="Accesos rápidos con 1 clic" 
+            iconColor="bg-amber-500/10 text-amber-600"
           />
           <SettingsLink 
             to="/reports" 

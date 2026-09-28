@@ -1129,6 +1129,70 @@ export const deleteBudget = async (categoryId: string, month: string, projectId:
   }
 };
 
+// --- Expense Shortcuts ---
+
+export interface Shortcut {
+  id: string;
+  name: string;
+  icon: string;
+  projectId: string;
+  categoryId: string;
+  paymentMethod: string;
+  defaultAmount?: number | null;
+  userId: string;
+  createdAt?: any;
+}
+
+export const getShortcuts = (callback: (shortcuts: Shortcut[]) => void) => {
+  if (!auth.currentUser) return () => {};
+
+  const q = query(
+    collection(db, 'shortcuts'),
+    where('userId', '==', auth.currentUser.uid)
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const shortcuts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Shortcut));
+    callback(shortcuts);
+  }, (error) => {
+    console.error('Error fetching shortcuts:', error);
+  });
+};
+
+export const createShortcut = async (shortcutData: Omit<Shortcut, 'id' | 'userId'>) => {
+  try {
+    if (!auth.currentUser) return;
+    const docRef = await addDoc(collection(db, 'shortcuts'), {
+      ...shortcutData,
+      userId: auth.currentUser.uid,
+      createdAt: serverTimestamp()
+    });
+    return docRef;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, 'shortcuts');
+  }
+};
+
+export const updateShortcut = async (id: string, shortcutData: Partial<Shortcut>) => {
+  try {
+    const shortcutRef = doc(db, 'shortcuts', id);
+    await updateDoc(shortcutRef, {
+      ...shortcutData,
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `shortcuts/${id}`);
+  }
+};
+
+export const deleteShortcut = async (id: string) => {
+  try {
+    await deleteDoc(doc(db, 'shortcuts', id));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `shortcuts/${id}`);
+  }
+};
+
 // --- Connection Test ---
 export const testConnection = async () => {
   try {

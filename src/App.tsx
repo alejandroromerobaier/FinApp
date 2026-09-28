@@ -12,6 +12,7 @@ import { Settings } from './pages/Settings';
 import { History } from './pages/History';
 import { Reports } from './pages/Reports';
 import { Budgets } from './pages/Budgets';
+import { ManageShortcuts } from './pages/ManageShortcuts';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 import { DataProvider } from './lib/DataContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -56,6 +57,7 @@ function AppContent() {
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/reports" element={<Reports />} />
                   <Route path="/budgets" element={<Budgets />} />
+                  <Route path="/shortcuts" element={<ManageShortcuts />} />
                   <Route path="/project-demo" element={<ProjectDetail />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
