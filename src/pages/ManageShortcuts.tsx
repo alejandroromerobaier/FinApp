@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Zap, PlusCircle, Edit3, Trash2, X, ArrowLeft, Check, 
   Coffee, Car, Utensils, ShoppingBag, Home, Briefcase, 
   Heart, Plane, Landmark, Bus, Smartphone, Gift, Tag, 
   Wallet, Scissors, Film, Ticket, Wifi, CreditCard, Play,
-  MoreHorizontal, Loader2, DollarSign, Clock
+  MoreHorizontal, Loader2, DollarSign, Clock, ChevronDown
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn, formatCurrency } from '@/src/lib/utils';
@@ -49,6 +49,7 @@ export const ManageShortcuts: React.FC = () => {
   const { shortcuts, categories, projects, loading } = useData();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingShortcut, setEditingShortcut] = useState<Shortcut | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -62,7 +63,14 @@ export const ManageShortcuts: React.FC = () => {
   const [classification, setClassification] = useState<'fixed' | 'variable'>('variable');
   const [defaultAmount, setDefaultAmount] = useState<string>('');
 
-  const expenseCategories = categories.filter(c => c.type === 'expense');
+  // Include expense categories and any custom user categories
+  const expenseCategories = useMemo(() => {
+    return categories.filter(c => c.type !== 'income');
+  }, [categories]);
+
+  const selectedCategory = useMemo(() => {
+    return categories.find(c => c.id === categoryId) || expenseCategories[0];
+  }, [categories, categoryId, expenseCategories]);
 
   const handleOpenModal = (shortcut?: Shortcut) => {
     if (shortcut) {
@@ -89,7 +97,8 @@ export const ManageShortcuts: React.FC = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !categoryId) return;
+    const finalCatId = categoryId || expenseCategories[0]?.id;
+    if (!name.trim() || !finalCatId) return;
 
     setIsSaving(true);
     try {
@@ -98,7 +107,7 @@ export const ManageShortcuts: React.FC = () => {
         name: name.trim(),
         icon,
         projectId,
-        categoryId,
+        categoryId: finalCatId,
         paymentMethod,
         classification,
         defaultAmount: parsedAmount && !isNaN(parsedAmount) && parsedAmount > 0 ? parsedAmount : null
@@ -333,7 +342,7 @@ export const ManageShortcuts: React.FC = () => {
                 {/* Selector de Icono */}
                 <div>
                   <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2 ml-1">
-                    Icono
+                    Icono del Atajo
                   </label>
                   <div className="grid grid-cols-6 sm:grid-cols-8 gap-2 max-h-40 overflow-y-auto p-2 bg-surface-container-low rounded-2xl border border-on-surface/5">
                     {Object.keys(SHORTCUT_ICONS).map((iconName) => (
@@ -342,7 +351,7 @@ export const ManageShortcuts: React.FC = () => {
                         type="button"
                         onClick={() => setIcon(iconName)}
                         className={cn(
-                          "aspect-square rounded-xl flex items-center justify-center transition-all border",
+                          "aspect-square rounded-xl flex items-center justify-center transition-all border cursor-pointer",
                           icon === iconName 
                             ? "bg-primary text-white border-primary shadow-md shadow-primary/20 scale-105" 
                             : "bg-surface hover:bg-on-surface/5 text-on-surface-variant border-transparent"
@@ -354,23 +363,38 @@ export const ManageShortcuts: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Categoría */}
+                {/* Categoría de Gasto (Visual Selector + Modal) */}
                 <div>
                   <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2 ml-1">
-                    Categoría de Gasto
+                    Categoría del Gasto
                   </label>
-                  <select 
-                    required
-                    value={categoryId}
-                    onChange={(e) => setCategoryId(e.target.value)}
-                    className="w-full bg-surface-container-low border-none rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer text-on-surface"
+                  <button 
+                    type="button"
+                    onClick={() => setShowCategoryModal(true)}
+                    className="w-full bg-surface-container-low border-2 border-transparent hover:border-primary/20 rounded-2xl p-4 flex items-center justify-between transition-all cursor-pointer text-on-surface group"
                   >
-                    {expenseCategories.map(cat => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
+                    <div className="flex items-center gap-3">
+                      {selectedCategory ? (
+                        <>
+                          <div className={cn(
+                            "w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-sm shrink-0",
+                            selectedCategory.color || 'bg-amber-500'
+                          )}>
+                            <ShortcutIconComponent name={selectedCategory.icon} size={20} />
+                          </div>
+                          <span className="font-extrabold text-base">{selectedCategory.name}</span>
+                          {selectedCategory.ownerId && (
+                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600">
+                              Tuya
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-on-surface-variant/40 font-bold">Seleccionar Categoría...</span>
+                      )}
+                    </div>
+                    <ChevronDown size={20} className="text-on-surface-variant/40 group-hover:text-primary transition-colors" />
+                  </button>
                 </div>
 
                 {/* Proyecto */}
@@ -492,6 +516,79 @@ export const ManageShortcuts: React.FC = () => {
                     editingShortcut ? 'Guardar Cambios' : 'Crear Atajo'
                   )}
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Visual Category Selection Modal */}
+      <AnimatePresence>
+        {showCategoryModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowCategoryModal(false)}
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-surface w-full max-w-md rounded-[2.5rem] p-6 shadow-2xl relative z-10 flex flex-col max-h-[85vh] overflow-hidden border border-on-surface/10"
+            >
+              <div className="flex justify-between items-center mb-4 pb-3 border-b border-on-surface/5">
+                <div>
+                  <h3 className="text-xl font-extrabold text-on-surface font-headline">Seleccionar Categoría</h3>
+                  <p className="text-xs text-on-surface-variant/60 font-medium">Categorías de gasto del sistema y creadas por ti</p>
+                </div>
+                <button 
+                  onClick={() => setShowCategoryModal(false)} 
+                  className="p-2 hover:bg-on-surface/5 rounded-full text-on-surface-variant"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto p-1 max-h-[60vh]">
+                {expenseCategories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => {
+                      setCategoryId(cat.id);
+                      if (!editingShortcut) {
+                        setIcon(cat.icon || 'Coffee');
+                      }
+                      setShowCategoryModal(false);
+                    }}
+                    className={cn(
+                      "p-3.5 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all cursor-pointer text-center group",
+                      categoryId === cat.id 
+                        ? "bg-primary/10 border-primary shadow-sm" 
+                        : "bg-surface-container-low border-transparent hover:bg-on-surface/5"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-md transition-transform group-active:scale-90",
+                      cat.color || 'bg-amber-500'
+                    )}>
+                      <ShortcutIconComponent name={cat.icon} size={24} />
+                    </div>
+                    <div className="w-full text-center">
+                      <span className="text-xs font-bold text-on-surface truncate block">
+                        {cat.name}
+                      </span>
+                      {cat.ownerId && (
+                        <span className="text-[8px] font-black uppercase text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded inline-block mt-0.5">
+                          Personal
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
               </div>
             </motion.div>
           </div>
