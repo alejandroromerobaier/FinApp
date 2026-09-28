@@ -165,5 +165,12 @@ service cloud.firestore {
         isAdmin()
       );
     }
+
+    // Expense Shortcuts
+    match /shortcuts/{shortcutId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
   }
 }
