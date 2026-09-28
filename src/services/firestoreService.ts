@@ -1138,6 +1138,7 @@ export interface Shortcut {
   projectId: string;
   categoryId: string;
   paymentMethod: string;
+  classification?: 'fixed' | 'variable';
   defaultAmount?: number | null;
   userId: string;
   createdAt?: any;

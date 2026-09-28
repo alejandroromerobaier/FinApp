@@ -5,7 +5,7 @@ import {
   Coffee, Car, Utensils, ShoppingBag, Home, Briefcase, 
   Heart, Plane, Landmark, Bus, Smartphone, Gift, Tag, 
   Wallet, Scissors, Film, Ticket, Wifi, CreditCard, Play,
-  MoreHorizontal, Loader2, DollarSign
+  MoreHorizontal, Loader2, DollarSign, Clock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn, formatCurrency } from '@/src/lib/utils';
@@ -43,14 +43,6 @@ export const ShortcutIconComponent = ({ name, size = 20, className }: { name: st
   return <Icon size={size} className={className} />;
 };
 
-const PAYMENT_METHODS = [
-  'Efectivo',
-  'Tarjeta de Débito',
-  'Tarjeta de Crédito',
-  'Transferencia',
-  'Mercado Pago'
-];
-
 export const ManageShortcuts: React.FC = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
@@ -66,7 +58,8 @@ export const ManageShortcuts: React.FC = () => {
   const [icon, setIcon] = useState('Coffee');
   const [projectId, setProjectId] = useState('personal');
   const [categoryId, setCategoryId] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('Efectivo');
+  const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Tarjeta'>('Efectivo');
+  const [classification, setClassification] = useState<'fixed' | 'variable'>('variable');
   const [defaultAmount, setDefaultAmount] = useState<string>('');
 
   const expenseCategories = categories.filter(c => c.type === 'expense');
@@ -78,7 +71,8 @@ export const ManageShortcuts: React.FC = () => {
       setIcon(shortcut.icon || 'Coffee');
       setProjectId(shortcut.projectId || 'personal');
       setCategoryId(shortcut.categoryId);
-      setPaymentMethod(shortcut.paymentMethod || 'Efectivo');
+      setPaymentMethod((shortcut.paymentMethod as any) === 'Tarjeta' ? 'Tarjeta' : 'Efectivo');
+      setClassification(shortcut.classification || 'variable');
       setDefaultAmount(shortcut.defaultAmount ? String(shortcut.defaultAmount) : '');
     } else {
       setEditingShortcut(null);
@@ -87,6 +81,7 @@ export const ManageShortcuts: React.FC = () => {
       setProjectId('personal');
       setCategoryId(expenseCategories[0]?.id || '');
       setPaymentMethod('Efectivo');
+      setClassification('variable');
       setDefaultAmount('');
     }
     setIsModalOpen(true);
@@ -105,6 +100,7 @@ export const ManageShortcuts: React.FC = () => {
         projectId,
         categoryId,
         paymentMethod,
+        classification,
         defaultAmount: parsedAmount && !isNaN(parsedAmount) && parsedAmount > 0 ? parsedAmount : null
       };
 
@@ -182,7 +178,7 @@ export const ManageShortcuts: React.FC = () => {
           <div>
             <h3 className="text-lg font-bold text-on-surface font-headline">Aún no tienes atajos creados</h3>
             <p className="text-xs text-on-surface-variant max-w-sm mx-auto mt-1">
-              Los atajos te permiten precargar la categoría, proyecto y método de pago para que al tocar un botón solo ingreses el monto.
+              Los atajos te permiten precargar la categoría, proyecto, método de pago y tipo de gasto (Fijo/Variable) para registrar gastos en 1 clic.
             </p>
           </div>
           <button 
@@ -200,6 +196,8 @@ export const ManageShortcuts: React.FC = () => {
             const project = shortcut.projectId === 'personal' 
               ? { name: 'Personal' } 
               : projects.find(p => p.id === shortcut.projectId);
+
+            const isFixed = shortcut.classification === 'fixed';
 
             return (
               <motion.div 
@@ -220,12 +218,19 @@ export const ManageShortcuts: React.FC = () => {
                       <h3 className="font-extrabold text-on-surface text-lg font-headline truncate group-hover:text-primary transition-colors">
                         {shortcut.name}
                       </h3>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                         <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg bg-on-surface/5 text-on-surface-variant">
                           {category?.name || 'Categoría'}
                         </span>
                         <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg bg-primary/10 text-primary">
                           {project?.name || 'Personal'}
+                        </span>
+                        <span className={cn(
+                          "text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg flex items-center gap-1",
+                          isFixed ? "bg-primary/10 text-primary" : "bg-orange-500/10 text-orange-600"
+                        )}>
+                          {isFixed ? <Clock size={10} /> : <Zap size={10} />}
+                          {isFixed ? 'Fijo' : 'Var'}
                         </span>
                       </div>
                     </div>
@@ -251,9 +256,9 @@ export const ManageShortcuts: React.FC = () => {
                 </div>
 
                 <div className="flex items-center justify-between pt-3 border-t border-on-surface/5 text-xs text-on-surface-variant">
-                  <div className="flex items-center gap-1.5 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                    <span>{shortcut.paymentMethod}</span>
+                  <div className="flex items-center gap-1.5 font-bold">
+                    {shortcut.paymentMethod === 'Tarjeta' ? <CreditCard size={14} className="text-primary" /> : <Wallet size={14} className="text-emerald-600" />}
+                    <span>{shortcut.paymentMethod || 'Efectivo'}</span>
                   </div>
                   <div className="font-bold font-headline text-on-surface">
                     {shortcut.defaultAmount && shortcut.defaultAmount > 0 ? (
@@ -392,15 +397,59 @@ export const ManageShortcuts: React.FC = () => {
                   <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2 ml-1">
                     Método de Pago
                   </label>
-                  <select 
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full bg-surface-container-low border-none rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer text-on-surface"
-                  >
-                    {PAYMENT_METHODS.map(pm => (
-                      <option key={pm} value={pm}>{pm}</option>
+                  <div className="flex gap-3">
+                    {(['Efectivo', 'Tarjeta'] as const).map((method) => (
+                      <button
+                        key={method}
+                        type="button"
+                        onClick={() => setPaymentMethod(method)}
+                        className={cn(
+                          "flex-1 py-3.5 px-3 rounded-2xl font-black text-xs transition-all uppercase tracking-widest flex items-center justify-center gap-2 border-2 cursor-pointer",
+                          paymentMethod === method 
+                            ? "bg-primary/10 border-primary text-primary shadow-inner" 
+                            : "bg-surface-container-low border-transparent text-on-surface-variant/40 hover:bg-on-surface/5"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-6 h-6 rounded-lg flex items-center justify-center",
+                          paymentMethod === method ? "bg-primary text-white" : "bg-on-surface-variant/10 text-on-surface-variant/40"
+                        )}>
+                          {method === 'Efectivo' ? <Wallet size={14} /> : <CreditCard size={14} />}
+                        </div>
+                        {method}
+                      </button>
                     ))}
-                  </select>
+                  </div>
+                </div>
+
+                {/* Clasificación de Gasto (Fijo / Variable) */}
+                <div>
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2 ml-1">
+                    Clasificación del Gasto
+                  </label>
+                  <div className="flex gap-3">
+                    {(['variable', 'fixed'] as const).map((item) => (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => setClassification(item)}
+                        className={cn(
+                          "flex-1 py-3.5 px-3 rounded-2xl font-black text-xs transition-all uppercase tracking-widest flex items-center justify-center gap-2 border-2 cursor-pointer",
+                          classification === item 
+                            ? "bg-primary/10 border-primary text-primary shadow-inner" 
+                            : "bg-surface-container-low border-transparent text-on-surface-variant/40 hover:bg-on-surface/5"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-6 h-6 rounded-lg flex items-center justify-center",
+                          classification === item ? "bg-primary text-white" : "bg-on-surface-variant/10 text-on-surface-variant/40"
+                        )}>
+                          {item === 'fixed' ? <Clock size={14} /> : <Zap size={14} />}
+                        </div>
+                        {item === 'fixed' ? 'Fijo' : 'Variable'}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Monto Por Defecto (Opcional) */}
