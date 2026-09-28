@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Delete, Check, Loader2, Zap } from 'lucide-react';
+import { X, Delete, Check, Loader2, Zap, Clock } from 'lucide-react';
 import { Shortcut, addTransaction } from '../services/firestoreService';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
@@ -101,6 +101,7 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
         categoryColor: category?.color || 'bg-slate-400',
         projectId: shortcut.projectId === 'personal' ? null : shortcut.projectId,
         paymentMethod: shortcut.paymentMethod || 'Efectivo',
+        classification: shortcut.classification || 'variable',
       });
 
       setShowSuccess(true);
@@ -154,7 +155,14 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
                     {project?.name || 'Personal'}
                   </span>
                   <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-on-surface/5 text-on-surface-variant">
-                    {shortcut.paymentMethod}
+                    {shortcut.paymentMethod || 'Efectivo'}
+                  </span>
+                  <span className={cn(
+                    "text-[9px] font-black uppercase px-2 py-0.5 rounded-md flex items-center gap-1",
+                    shortcut.classification === 'fixed' ? "bg-primary/10 text-primary" : "bg-orange-500/10 text-orange-600"
+                  )}>
+                    {shortcut.classification === 'fixed' ? <Clock size={9} /> : <Zap size={9} />}
+                    {shortcut.classification === 'fixed' ? 'Fijo' : 'Var'}
                   </span>
                 </div>
               </div>
