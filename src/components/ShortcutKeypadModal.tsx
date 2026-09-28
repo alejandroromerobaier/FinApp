@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Delete, Check, Loader2, Zap, Clock } from 'lucide-react';
+import { X, Check, Loader2, Zap, Clock, Wallet, CreditCard } from 'lucide-react';
 import { Shortcut, addTransaction } from '../services/firestoreService';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
@@ -17,20 +17,28 @@ interface ShortcutKeypadModalProps {
 export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortcut, onClose, onSuccess }) => {
   const { categories, projects } = useData();
   const { profile } = useAuth();
-  const [amountStr, setAmountStr] = useState<string>('');
+  const [amount, setAmount] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (shortcut) {
       if (shortcut.defaultAmount && shortcut.defaultAmount > 0) {
-        setAmountStr(String(shortcut.defaultAmount));
+        setAmount(String(shortcut.defaultAmount));
       } else {
-        setAmountStr('');
+        setAmount('');
       }
       setErrorMsg('');
       setShowSuccess(false);
+
+      // Focus input for mobile native keyboard
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }, 150);
     }
   }, [shortcut]);
 
@@ -42,45 +50,10 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
     : projects.find(p => p.id === shortcut.projectId);
 
   const currency = project?.currency || profile?.currency || 'ARS';
+  const parsedAmount = parseFloat(amount.replace(',', '.')) || 0;
 
-  const handleKeyPress = (val: string) => {
-    if (showSuccess) return;
-
-    if (val === 'C') {
-      setAmountStr('');
-      return;
-    }
-
-    if (val === 'BACKSPACE') {
-      setAmountStr(prev => prev.slice(0, -1));
-      return;
-    }
-
-    if (val === '00') {
-      if (!amountStr || amountStr === '0') return;
-      if (amountStr.length >= 9) return;
-      setAmountStr(prev => prev + '00');
-      return;
-    }
-
-    if (val === '.') {
-      if (amountStr.includes('.')) return;
-      setAmountStr(prev => (prev === '' ? '0.' : prev + '.'));
-      return;
-    }
-
-    // Number digit
-    if (amountStr === '0') {
-      setAmountStr(val);
-    } else {
-      if (amountStr.length >= 10) return;
-      setAmountStr(prev => prev + val);
-    }
-  };
-
-  const parsedAmount = parseFloat(amountStr) || 0;
-
-  const handleConfirm = async () => {
+  const handleConfirm = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (parsedAmount <= 0) {
       setErrorMsg('Ingresa un monto válido mayor a 0.');
       return;
@@ -129,25 +102,25 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
           className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         />
 
-        {/* Modal Container (Optimized for iOS WebKit & Safe Area) */}
+        {/* Modal Container */}
         <motion.div 
           initial={{ y: '100%', opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: '100%', opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="bg-surface w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl relative z-10 flex flex-col overflow-y-auto border border-on-surface/10 max-h-[95dvh] max-h-[95vh]"
+          className="bg-surface w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl relative z-10 flex flex-col overflow-hidden border border-on-surface/10"
         >
           {/* Header */}
-          <div className="flex justify-between items-center px-5 py-3.5 border-b border-on-surface/5 bg-surface shrink-0 sticky top-0 z-20">
+          <div className="flex justify-between items-center px-6 py-4 border-b border-on-surface/5 bg-surface shrink-0">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <div className={cn(
-                "w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-md shrink-0",
+                "w-11 h-11 rounded-2xl flex items-center justify-center text-white shadow-md shrink-0",
                 category?.color || 'bg-amber-500'
               )}>
-                <ShortcutIconComponent name={shortcut.icon} size={20} />
+                <ShortcutIconComponent name={shortcut.icon} size={22} />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="font-extrabold text-on-surface text-base font-headline truncate leading-tight">
+                <h3 className="font-extrabold text-on-surface text-base sm:text-lg font-headline truncate leading-tight">
                   {shortcut.name}
                 </h3>
                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
@@ -169,6 +142,7 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
             </div>
 
             <button 
+              type="button"
               onClick={onClose}
               className="p-2 hover:bg-on-surface/5 rounded-full transition-colors text-on-surface-variant shrink-0 ml-2"
             >
@@ -176,107 +150,82 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
             </button>
           </div>
 
-          {/* Body / Display */}
-          <div className="p-4 sm:p-5 text-center bg-surface flex flex-col items-center justify-center shrink-0">
-            {showSuccess ? (
+          {/* Form with Native Input */}
+          {showSuccess ? (
+            <div className="p-8 text-center bg-surface flex flex-col items-center justify-center">
               <motion.div 
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="py-6 flex flex-col items-center justify-center text-emerald-600 space-y-2"
+                className="py-4 flex flex-col items-center justify-center text-emerald-600 space-y-2"
               >
-                <div className="w-14 h-14 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-600">
-                  <Check size={32} strokeWidth={3} />
+                <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-600">
+                  <Check size={36} strokeWidth={3} />
                 </div>
-                <h4 className="text-lg font-extrabold font-headline">¡Gasto Registrado!</h4>
+                <h4 className="text-xl font-extrabold font-headline">¡Gasto Registrado!</h4>
                 <p className="text-sm font-bold text-on-surface">
                   {formatCurrency(parsedAmount, currency)} en {shortcut.name}
                 </p>
               </motion.div>
-            ) : (
-              <>
-                <span className="text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/50 mb-0.5 block">
-                  Monto ({currency})
-                </span>
-                
-                <div className="w-full bg-surface-container-low py-3 px-4 rounded-2xl border border-on-surface/5 flex items-center justify-center my-1 shadow-inner">
-                  <span className="text-2xl sm:text-3xl font-black font-headline text-on-surface tracking-tight">
-                    {formatCurrency(parsedAmount, currency)}
-                  </span>
-                </div>
-
-                {errorMsg && (
-                  <p className="text-xs font-bold text-rose-600 bg-rose-500/10 px-3 py-1 rounded-xl uppercase tracking-wider mt-1">
-                    {errorMsg}
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Keypad Grid & Action Button */}
-          {!showSuccess && (
-            <div className="p-4 pt-1 sm:p-5 sm:pt-2 bg-surface space-y-3 pb-8 sm:pb-6">
-              <div className="grid grid-cols-3 gap-2">
-                {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'BACKSPACE'].map((key) => {
-                  if (key === 'BACKSPACE') {
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => handleKeyPress('BACKSPACE')}
-                        className="h-11 sm:h-14 bg-surface-container-low hover:bg-on-surface/10 rounded-xl sm:rounded-2xl flex items-center justify-center font-bold text-on-surface-variant text-lg active:scale-95 transition-all shadow-sm cursor-pointer"
-                      >
-                        <Delete size={20} />
-                      </button>
-                    );
-                  }
-
-                  if (key === 'C') {
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => handleKeyPress('C')}
-                        className="h-11 sm:h-14 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded-xl sm:rounded-2xl flex items-center justify-center font-black text-base active:scale-95 transition-all cursor-pointer"
-                      >
-                        C
-                      </button>
-                    );
-                  }
-
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => handleKeyPress(key)}
-                      className="h-11 sm:h-14 bg-surface-container-low hover:bg-on-surface/10 text-on-surface rounded-xl sm:rounded-2xl flex items-center justify-center font-black text-xl font-headline active:scale-95 transition-all shadow-sm cursor-pointer"
-                    >
-                      {key}
-                    </button>
-                  );
-                })}
+            </div>
+          ) : (
+            <form onSubmit={handleConfirm} className="p-6 space-y-5 bg-surface pb-8 sm:pb-6">
+              <div className="text-center space-y-1">
+                <label className="block text-xs font-black uppercase tracking-widest text-on-surface-variant/50">
+                  Ingresa el Monto ({currency})
+                </label>
+                <p className="text-[11px] text-on-surface-variant/60 font-medium">
+                  Usa el teclado de tu dispositivo para ingresar el importe
+                </p>
               </div>
 
-              {/* Confirm CTA (Ensured visible above iOS safe area) */}
+              {/* Native Input Field */}
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-on-surface-variant/40 font-headline">
+                  $
+                </span>
+                <input 
+                  ref={inputRef}
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]*[.,]?[0-9]*"
+                  value={amount}
+                  onChange={(e) => {
+                    let val = e.target.value.replace(',', '.');
+                    val = val.replace(/[^0-9.]/g, '');
+                    const parts = val.split('.');
+                    if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                    setAmount(val);
+                  }}
+                  placeholder="0.00"
+                  className="w-full bg-surface-container-low border-2 border-transparent focus:border-primary/30 rounded-2xl py-4 pl-10 pr-4 text-3xl font-black font-headline text-center text-on-surface focus:ring-0 transition-all placeholder:text-on-surface-variant/20 shadow-inner"
+                />
+              </div>
+
+              {errorMsg && (
+                <p className="text-xs font-bold text-rose-600 bg-rose-500/10 px-3 py-2 rounded-xl uppercase tracking-wider text-center">
+                  {errorMsg}
+                </p>
+              )}
+
+              {/* Confirm CTA Button */}
               <button 
-                type="button"
-                onClick={handleConfirm}
+                type="submit"
                 disabled={isSubmitting || parsedAmount <= 0}
-                className="w-full bg-primary text-white py-3.5 rounded-2xl font-extrabold text-base font-headline shadow-xl shadow-primary/20 hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer mt-1"
+                className="w-full bg-primary text-white py-4 rounded-2xl font-extrabold text-lg font-headline shadow-xl shadow-primary/20 hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Guardando...</span>
+                    <span>Guardando gasto...</span>
                   </>
                 ) : (
                   <>
-                    <Check size={20} strokeWidth={3} />
+                    <Check size={22} strokeWidth={3} />
                     <span>Confirmar Gasto</span>
                   </>
                 )}
               </button>
-            </div>
+            </form>
           )}
         </motion.div>
       </div>
