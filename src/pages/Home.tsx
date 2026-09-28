@@ -29,15 +29,18 @@ import {
   Clock,
   ChevronLeft,
   Eye,
-  EyeOff
+  EyeOff,
+  Plus
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import logo from '../assets/logo.png';
 import { formatCurrency, cn } from '@/src/lib/utils';
 import { useAuth } from '../lib/AuthContext';
 import { useData } from '../lib/DataContext';
-import { getTransactions, cleanupDuplicateCategories } from '../services/firestoreService';
+import { getTransactions, cleanupDuplicateCategories, Shortcut } from '../services/firestoreService';
 import { formatDisplayDate, getLocalMonth, parseLocalMonth } from '../lib/dateUtils';
+import { ShortcutKeypadModal } from '../components/ShortcutKeypadModal';
+import { ShortcutIconComponent } from './ManageShortcuts';
 
 const ICON_MAP: Record<string, any> = {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
@@ -53,10 +56,11 @@ export const Home: React.FC = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const { 
-    categories, projects, transactions, userNames, loading: dataLoading, 
+    categories, projects, transactions, userNames, shortcuts, loading: dataLoading, 
     budgetMonth, setBudgetMonth, showBalances, toggleShowBalances 
   } = useData();
   const [loading, setLoading] = useState(true);
+  const [selectedShortcut, setSelectedShortcut] = useState<Shortcut | null>(null);
 
   useEffect(() => {
     if (!dataLoading) {
@@ -361,6 +365,87 @@ export const Home: React.FC = () => {
           </motion.div>
         ))}
       </div>
+
+      {/* Quick Expense Shortcuts */}
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-3 px-1">
+          <div className="flex items-center gap-2">
+            <Zap size={18} className="text-amber-500 fill-amber-500/20" />
+            <h3 className="text-sm font-black text-on-surface font-headline tracking-tight uppercase">Atajos Rápidos</h3>
+          </div>
+          <button 
+            onClick={() => navigate('/shortcuts')}
+            className="text-primary font-black text-xs uppercase tracking-widest hover:underline"
+          >
+            {shortcuts.length > 0 ? 'Administrar' : 'Crear Atajos'}
+          </button>
+        </div>
+
+        {shortcuts.length === 0 ? (
+          <div className="bg-surface-container-lowest border border-dashed border-on-surface/10 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold shrink-0">
+                <Zap size={20} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-on-surface">Crea accesos rápidos de gasto</p>
+                <p className="text-[10px] text-on-surface-variant font-medium">Registra tus gastos frecuentes en 1 clic</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => navigate('/shortcuts')}
+              className="bg-primary/10 text-primary text-xs font-black px-3.5 py-2 rounded-xl hover:bg-primary/20 transition-all shrink-0 active:scale-95"
+            >
+              ＋ Nuevo
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none pt-1 -mx-1 px-1">
+            {shortcuts.map((shortcut) => {
+              const category = categories.find(c => c.id === shortcut.categoryId);
+              return (
+                <button
+                  key={shortcut.id}
+                  onClick={() => setSelectedShortcut(shortcut)}
+                  className="bg-surface-container-lowest hover:bg-on-surface/5 border border-on-surface/5 p-3 rounded-2xl flex items-center gap-3 shrink-0 active:scale-95 transition-all shadow-sm group min-w-[140px]"
+                >
+                  <div className={cn(
+                    "w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm shrink-0",
+                    category?.color || 'bg-amber-500'
+                  )}>
+                    <ShortcutIconComponent name={shortcut.icon} size={20} />
+                  </div>
+                  <div className="text-left min-w-0 pr-1">
+                    <p className="font-extrabold text-xs text-on-surface truncate group-hover:text-primary transition-colors max-w-[100px]">
+                      {shortcut.name}
+                    </p>
+                    <p className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-wider mt-0.5 truncate">
+                      {shortcut.defaultAmount && shortcut.defaultAmount > 0 
+                        ? formatCurrency(shortcut.defaultAmount, profile?.currency) 
+                        : (category?.name || 'Gasto')}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+            
+            <button
+              onClick={() => navigate('/shortcuts')}
+              className="bg-surface-container-low hover:bg-on-surface/10 border border-dashed border-on-surface/10 p-3 rounded-2xl flex items-center justify-center gap-1.5 shrink-0 active:scale-95 transition-all text-on-surface-variant text-xs font-bold px-3.5 h-[50px]"
+              title="Crear nuevo atajo"
+            >
+              <Plus size={16} />
+              <span>Nuevo</span>
+            </button>
+          </div>
+        )}
+      </section>
+
+      {/* Keypad Modal */}
+      <ShortcutKeypadModal 
+        shortcut={selectedShortcut}
+        onClose={() => setSelectedShortcut(null)}
+      />
 
       {/* Recent Activity */}
       <section>
