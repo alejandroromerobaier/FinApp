@@ -391,15 +391,15 @@ export const SharedProjects: React.FC = () => {
             >
               {/* Fixed Header */}
               <div className="flex justify-between items-center px-6 py-5 border-b border-black/5 shrink-0 bg-white">
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-extrabold text-on-surface font-headline">
+                <div className="min-w-0 flex-1 mr-3">
+                  <h2 className="text-xl sm:text-2xl font-extrabold text-on-surface font-headline truncate">
                     {editingProject ? (editingProject.isPersonal ? 'Editar Proyecto Personal' : 'Editar Proyecto') : 'Nuevo Proyecto'}
                   </h2>
-                  <p className="text-xs text-on-surface-variant/60 font-bold uppercase tracking-wider mt-0.5">
+                  <p className="text-xs text-on-surface-variant/60 font-bold uppercase tracking-wider mt-0.5 truncate">
                     {editingProject?.isPersonal ? 'Configura tu billetera principal' : 'Configura los detalles y visibilidad'}
                   </p>
                 </div>
-                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-black/5 rounded-full transition-colors text-on-surface-variant">
+                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-black/5 rounded-full transition-colors text-on-surface-variant shrink-0">
                   <X size={20} />
                 </button>
               </div>
@@ -620,11 +620,11 @@ export const SharedProjects: React.FC = () => {
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="bg-white w-full max-w-md rounded-[2.5rem] p-6 sm:p-8 shadow-2xl relative z-10 flex flex-col max-h-[90vh] overflow-y-auto"
             >
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-2xl font-extrabold text-on-surface font-headline">
+              <div className="flex justify-between items-center mb-6 gap-3 shrink-0">
+                <h2 className="text-xl sm:text-2xl font-extrabold text-on-surface font-headline truncate min-w-0 flex-1">
                   Invitar Colaborador
                 </h2>
-                <button onClick={() => setIsInviteModalOpen(false)} className="p-2 hover:bg-black/5 rounded-full transition-colors">
+                <button onClick={() => setIsInviteModalOpen(false)} className="p-2 hover:bg-black/5 rounded-full transition-colors shrink-0">
                   <X size={24} />
                 </button>
               </div>
@@ -686,93 +686,93 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, isOwner, isDefault, 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className={cn(
-        "bg-white rounded-[2rem] p-8 border border-black/5 shadow-sm hover:shadow-md transition-all group",
+        "bg-white rounded-[2rem] p-5 sm:p-8 border border-black/5 shadow-sm hover:shadow-md transition-all group",
         isInactive && "opacity-75 bg-slate-50/50"
       )}
     >
-      <div className="flex justify-between items-start mb-6">
-        <div className="flex items-center gap-5">
+      <div className="flex justify-between items-start gap-3 mb-6">
+        <div className="flex items-center gap-3 sm:gap-5 min-w-0 flex-1">
           <div className={cn(
-            "w-16 h-16 rounded-[22px] flex items-center justify-center",
+            "w-12 h-12 sm:w-16 sm:h-16 rounded-[18px] sm:rounded-[22px] flex items-center justify-center shrink-0",
             isInactive ? "bg-slate-200 text-slate-500" : isOwner ? "bg-primary/5 text-primary" : "bg-secondary/5 text-secondary"
           )}>
-            <Icon size={32} strokeWidth={2.5} />
+            <Icon className="w-6 h-6 sm:w-8 sm:h-8" strokeWidth={2.5} />
           </div>
-          <div>
-            <h3 className="text-2xl font-extrabold text-on-surface tracking-tight font-headline group-hover:text-primary transition-colors">{project.name}</h3>
-            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-xl sm:text-2xl font-extrabold text-on-surface tracking-tight font-headline group-hover:text-primary transition-colors truncate">{project.name}</h3>
+            <div className="flex items-center gap-1.5 sm:gap-2 mt-1.5 flex-wrap">
               <span className={cn(
-                "text-[10px] font-extrabold px-2.5 py-1 rounded-lg uppercase tracking-wider",
+                "text-[10px] font-extrabold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg uppercase tracking-wider shrink-0",
                 isOwner ? "bg-primary/10 text-primary" : "bg-secondary/10 text-secondary"
               )}>
                 {isOwner ? 'PROPIETARIO' : 'COLABORADOR'}
               </span>
               {isInactive && (
-                <span className="bg-slate-200 text-slate-700 text-[10px] font-extrabold px-2.5 py-1 rounded-lg uppercase tracking-wider flex items-center gap-1">
+                <span className="bg-slate-200 text-slate-700 text-[10px] font-extrabold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg uppercase tracking-wider flex items-center gap-1 shrink-0">
                   <Archive size={10} />
                   INACTIVO
                 </span>
               )}
               {isDefault && !isInactive && (
-                <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2.5 py-1 rounded-lg uppercase tracking-wider flex items-center gap-1">
+                <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg uppercase tracking-wider flex items-center gap-1 shrink-0">
                   <Star size={10} className="fill-amber-800" />
                   PREDETERMINADO
                 </span>
               )}
-              <span className="text-black/40 text-sm font-medium flex items-center gap-1.5 ml-1">
+              <span className="text-black/40 text-xs sm:text-sm font-medium flex items-center gap-1 shrink-0">
                 <Users size={14} />
-                {project.memberIds?.length || 1} colaboradores
+                {project.memberIds?.length || 1}
               </span>
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
           {onToggleStatus && (
             <button 
               onClick={onToggleStatus}
               className={cn(
-                "p-2.5 rounded-xl transition-all",
+                "p-2 sm:p-2.5 rounded-xl transition-all shrink-0",
                 isInactive ? "text-emerald-600 hover:bg-emerald-50" : "text-black/20 hover:text-slate-600 hover:bg-black/5"
               )}
               title={isInactive ? "Reactivar proyecto" : "Inactivar / Archivar proyecto"}
             >
-              <Power size={20} />
+              <Power size={18} className="sm:w-5 sm:h-5" />
             </button>
           )}
           {onInvite && (
             <button 
               onClick={onInvite}
-              className="p-2.5 text-black/20 hover:text-secondary hover:bg-secondary/5 rounded-xl transition-all"
+              className="p-2 sm:p-2.5 text-black/20 hover:text-secondary hover:bg-secondary/5 rounded-xl transition-all shrink-0"
               title="Invitar colaborador"
             >
-              <Share2 size={20} />
+              <Share2 size={18} className="sm:w-5 sm:h-5" />
             </button>
           )}
           {onEdit && (
             <button 
               onClick={onEdit}
-              className="p-2.5 text-black/20 hover:text-primary hover:bg-primary/5 rounded-xl transition-all"
+              className="p-2 sm:p-2.5 text-black/20 hover:text-primary hover:bg-primary/5 rounded-xl transition-all shrink-0"
               title="Editar proyecto"
             >
-              <Edit3 size={20} />
+              <Edit3 size={18} className="sm:w-5 sm:h-5" />
             </button>
           )}
           {isOwner && onDelete && (
             <button 
               onClick={onDelete}
-              className="p-2.5 text-black/20 hover:text-error hover:bg-error/5 rounded-xl transition-all"
+              className="p-2 sm:p-2.5 text-black/20 hover:text-error hover:bg-error/5 rounded-xl transition-all shrink-0"
               title="Eliminar proyecto"
             >
-              <Trash2 size={20} />
+              <Trash2 size={18} className="sm:w-5 sm:h-5" />
             </button>
           )}
           {!isOwner && onLeave && (
             <button 
               onClick={onLeave}
-              className="p-2.5 text-black/20 hover:text-error hover:bg-error/5 rounded-xl transition-all"
+              className="p-2 sm:p-2.5 text-black/20 hover:text-error hover:bg-error/5 rounded-xl transition-all shrink-0"
               title="Salir del proyecto"
             >
-              <X size={20} />
+              <X size={18} className="sm:w-5 sm:h-5" />
             </button>
           )}
         </div>
