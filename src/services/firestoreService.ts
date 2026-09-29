@@ -1141,6 +1141,7 @@ export interface Shortcut {
   classification?: 'fixed' | 'variable';
   defaultAmount?: number | null;
   userId: string;
+  order?: number;
   createdAt?: any;
 }
 
@@ -1154,6 +1155,7 @@ export const getShortcuts = (callback: (shortcuts: Shortcut[]) => void) => {
 
   return onSnapshot(q, (snapshot) => {
     const shortcuts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Shortcut));
+    shortcuts.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
     callback(shortcuts);
   }, (error) => {
     console.error('Error fetching shortcuts:', error);
@@ -1165,6 +1167,7 @@ export const createShortcut = async (shortcutData: Omit<Shortcut, 'id' | 'userId
     if (!auth.currentUser) return;
     const docRef = await addDoc(collection(db, 'shortcuts'), {
       ...shortcutData,
+      order: shortcutData.order !== undefined ? shortcutData.order : Date.now(),
       userId: auth.currentUser.uid,
       createdAt: serverTimestamp()
     });
@@ -1183,6 +1186,19 @@ export const updateShortcut = async (id: string, shortcutData: Partial<Shortcut>
     });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `shortcuts/${id}`);
+  }
+};
+
+export const updateShortcutOrders = async (orderedShortcuts: { id: string; order: number }[]) => {
+  try {
+    const batch = writeBatch(db);
+    orderedShortcuts.forEach(({ id, order }) => {
+      const ref = doc(db, 'shortcuts', id);
+      batch.update(ref, { order, updatedAt: serverTimestamp() });
+    });
+    await batch.commit();
+  } catch (error) {
+    console.error('Error updating shortcut orders:', error);
   }
 };
 

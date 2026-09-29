@@ -1,17 +1,18 @@
-import React, { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { motion, AnimatePresence, Reorder, useDragControls } from 'motion/react';
 import { 
   Zap, PlusCircle, Edit3, Trash2, X, ArrowLeft, Check, 
   Coffee, Car, Utensils, ShoppingBag, Home, Briefcase, 
   Heart, Plane, Landmark, Bus, Smartphone, Gift, Tag, 
   Wallet, Scissors, Film, Ticket, Wifi, CreditCard, Play,
-  MoreHorizontal, Loader2, DollarSign, Clock, ChevronDown
+  MoreHorizontal, Loader2, DollarSign, Clock, ChevronDown,
+  GripVertical, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn, formatCurrency } from '@/src/lib/utils';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
-import { createShortcut, updateShortcut, deleteShortcut, Shortcut } from '../services/firestoreService';
+import { createShortcut, updateShortcut, deleteShortcut, updateShortcutOrders, Shortcut } from '../services/firestoreService';
 
 export const SHORTCUT_ICONS: Record<string, any> = {
   Coffee,
@@ -43,16 +44,179 @@ export const ShortcutIconComponent = ({ name, size = 20, className }: { name: st
   return <Icon size={size} className={className} />;
 };
 
+interface ShortcutCardItemProps {
+  shortcut: Shortcut;
+  index: number;
+  total: number;
+  categories: any[];
+  projects: any[];
+  profile: any;
+  isDeleting: string | null;
+  onEdit: (shortcut: Shortcut) => void;
+  onDelete: (id: string) => void;
+  onMove: (index: number, direction: 'up' | 'down') => void;
+}
+
+const ShortcutCardItem: React.FC<ShortcutCardItemProps> = ({
+  shortcut,
+  index,
+  total,
+  categories,
+  projects,
+  profile,
+  isDeleting,
+  onEdit,
+  onDelete,
+  onMove
+}) => {
+  const dragControls = useDragControls();
+  const category = categories.find(c => c.id === shortcut.categoryId);
+  const project = shortcut.projectId === 'personal' 
+    ? { name: 'Personal' } 
+    : projects.find(p => p.id === shortcut.projectId);
+
+  const isFixed = shortcut.classification === 'fixed';
+
+  return (
+    <Reorder.Item
+      value={shortcut}
+      id={shortcut.id}
+      dragListener={false}
+      dragControls={dragControls}
+      className="bg-surface-container-lowest p-4 sm:p-5 rounded-[2rem] border border-on-surface/5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between space-y-4 group touch-pan-y"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 flex-1">
+          {/* Touch Drag Handle */}
+          <div 
+            onPointerDown={(e) => dragControls.start(e)}
+            className="p-2 -ml-1 text-on-surface-variant/40 hover:text-primary active:text-primary cursor-grab active:cursor-grabbing touch-none select-none rounded-xl hover:bg-on-surface/5 shrink-0"
+            title="Mantén presionado y arrastra para reordenar"
+          >
+            <GripVertical size={20} />
+          </div>
+
+          <div className={cn(
+            "w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center text-white shadow-md shrink-0",
+            category?.color || 'bg-amber-500'
+          )}>
+            <ShortcutIconComponent name={shortcut.icon} size={26} />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <h3 className="font-extrabold text-on-surface text-base sm:text-lg font-headline truncate group-hover:text-primary transition-colors">
+              {shortcut.name}
+            </h3>
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg bg-on-surface/5 text-on-surface-variant">
+                {category?.name || 'Categoría'}
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg bg-primary/10 text-primary">
+                {project?.name || 'Personal'}
+              </span>
+              <span className={cn(
+                "text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg flex items-center gap-1",
+                isFixed ? "bg-primary/10 text-primary" : "bg-orange-500/10 text-orange-600"
+              )}>
+                {isFixed ? <Clock size={10} /> : <Zap size={10} />}
+                {isFixed ? 'Fijo' : 'Var'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          <div className="flex flex-col gap-0.5 mr-1">
+            <button
+              type="button"
+              disabled={index === 0}
+              onClick={() => onMove(index, 'up')}
+              className="p-1 text-on-surface-variant/30 hover:text-primary disabled:opacity-20 transition-colors"
+              title="Subir posición"
+            >
+              <ArrowUp size={14} />
+            </button>
+            <button
+              type="button"
+              disabled={index === total - 1}
+              onClick={() => onMove(index, 'down')}
+              className="p-1 text-on-surface-variant/30 hover:text-primary disabled:opacity-20 transition-colors"
+              title="Bajar posición"
+            >
+              <ArrowDown size={14} />
+            </button>
+          </div>
+
+          <button 
+            onClick={() => onEdit(shortcut)}
+            className="p-2 text-on-surface-variant/40 hover:text-primary hover:bg-primary/5 rounded-xl transition-all"
+            title="Editar"
+          >
+            <Edit3 size={18} />
+          </button>
+          <button 
+            onClick={() => onDelete(shortcut.id)}
+            disabled={isDeleting === shortcut.id}
+            className="p-2 text-on-surface-variant/40 hover:text-rose-600 hover:bg-rose-500/10 rounded-xl transition-all disabled:opacity-50"
+            title="Eliminar"
+          >
+            {isDeleting === shortcut.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+          </button>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between pt-3 border-t border-on-surface/5 text-xs text-on-surface-variant">
+        <div className="flex items-center gap-1.5 font-bold">
+          {shortcut.paymentMethod === 'Tarjeta' ? <CreditCard size={14} className="text-primary" /> : <Wallet size={14} className="text-emerald-600" />}
+          <span>{shortcut.paymentMethod || 'Efectivo'}</span>
+        </div>
+        <div className="font-bold font-headline text-on-surface">
+          {shortcut.defaultAmount && shortcut.defaultAmount > 0 ? (
+            <span className="text-primary bg-primary/10 px-2.5 py-1 rounded-xl">
+              Default: {formatCurrency(shortcut.defaultAmount, profile?.currency)}
+            </span>
+          ) : (
+            <span className="text-on-surface-variant/60 italic">
+              Monto libre
+            </span>
+          )}
+        </div>
+      </div>
+    </Reorder.Item>
+  );
+};
+
 export const ManageShortcuts: React.FC = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const { shortcuts, categories, projects, loading } = useData();
 
+  const [items, setItems] = useState<Shortcut[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [editingShortcut, setEditingShortcut] = useState<Shortcut | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setItems(shortcuts);
+  }, [shortcuts]);
+
+  const handleReorder = (newItems: Shortcut[]) => {
+    setItems(newItems);
+    updateShortcutOrders(newItems.map((item, index) => ({ id: item.id, order: index })));
+  };
+
+  const handleMove = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= items.length) return;
+
+    const newItems = [...items];
+    const [moved] = newItems.splice(index, 1);
+    newItems.splice(targetIndex, 0, moved);
+
+    handleReorder(newItems);
+  };
 
   // Form State
   const [name, setName] = useState('');
@@ -110,7 +274,8 @@ export const ManageShortcuts: React.FC = () => {
         categoryId: finalCatId,
         paymentMethod,
         classification,
-        defaultAmount: parsedAmount && !isNaN(parsedAmount) && parsedAmount > 0 ? parsedAmount : null
+        defaultAmount: parsedAmount && !isNaN(parsedAmount) && parsedAmount > 0 ? parsedAmount : null,
+        order: editingShortcut?.order !== undefined ? editingShortcut.order : items.length
       };
 
       if (editingShortcut) {
@@ -165,7 +330,7 @@ export const ManageShortcuts: React.FC = () => {
               Atajos de Gastos
             </h1>
             <p className="text-xs sm:text-sm text-on-surface-variant mt-0.5">
-              Crea accesos rápidos para registrar tus gastos frecuentes en 1 clic.
+              Crea accesos rápidos y arrastra para ordenar cómo se ven en el Inicio.
             </p>
           </div>
         </div>
@@ -178,8 +343,8 @@ export const ManageShortcuts: React.FC = () => {
         </button>
       </div>
 
-      {/* Shortcuts Grid */}
-      {shortcuts.length === 0 ? (
+      {/* Shortcuts Reorderable List */}
+      {items.length === 0 ? (
         <div className="bg-surface-container-lowest border-2 border-dashed border-on-surface/10 rounded-[2.5rem] p-10 text-center space-y-4">
           <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto text-amber-500">
             <Zap size={32} />
@@ -187,7 +352,7 @@ export const ManageShortcuts: React.FC = () => {
           <div>
             <h3 className="text-lg font-bold text-on-surface font-headline">Aún no tienes atajos creados</h3>
             <p className="text-xs text-on-surface-variant max-w-sm mx-auto mt-1">
-              Los atajos te permiten precargar la categoría, proyecto, método de pago y tipo de gasto (Fijo/Variable) para registrar gastos en 1 clic.
+              Los atajos te permiten precargar la categoría, proyecto, método de pago y tipo de gasto para registrar en 1 clic.
             </p>
           </div>
           <button 
@@ -199,91 +364,36 @@ export const ManageShortcuts: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {shortcuts.map((shortcut) => {
-            const category = categories.find(c => c.id === shortcut.categoryId);
-            const project = shortcut.projectId === 'personal' 
-              ? { name: 'Personal' } 
-              : projects.find(p => p.id === shortcut.projectId);
+        <div>
+          {items.length > 1 && (
+            <p className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-widest mb-3 flex items-center gap-1.5 ml-1">
+              <GripVertical size={14} className="text-primary" />
+              Arrastra el icono táctil para ordenar los atajos del inicio
+            </p>
+          )}
 
-            const isFixed = shortcut.classification === 'fixed';
-
-            return (
-              <motion.div 
+          <Reorder.Group
+            axis="y"
+            values={items}
+            onReorder={handleReorder}
+            className="space-y-3"
+          >
+            {items.map((shortcut, index) => (
+              <ShortcutCardItem
                 key={shortcut.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-surface-container-lowest p-5 rounded-[2rem] border border-on-surface/5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4 group"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                    <div className={cn(
-                      "w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-md shrink-0",
-                      category?.color || 'bg-amber-500'
-                    )}>
-                      <ShortcutIconComponent name={shortcut.icon} size={28} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-extrabold text-on-surface text-lg font-headline truncate group-hover:text-primary transition-colors">
-                        {shortcut.name}
-                      </h3>
-                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg bg-on-surface/5 text-on-surface-variant">
-                          {category?.name || 'Categoría'}
-                        </span>
-                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg bg-primary/10 text-primary">
-                          {project?.name || 'Personal'}
-                        </span>
-                        <span className={cn(
-                          "text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg flex items-center gap-1",
-                          isFixed ? "bg-primary/10 text-primary" : "bg-orange-500/10 text-orange-600"
-                        )}>
-                          {isFixed ? <Clock size={10} /> : <Zap size={10} />}
-                          {isFixed ? 'Fijo' : 'Var'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button 
-                      onClick={() => handleOpenModal(shortcut)}
-                      className="p-2 text-on-surface-variant/40 hover:text-primary hover:bg-primary/5 rounded-xl transition-all"
-                      title="Editar"
-                    >
-                      <Edit3 size={18} />
-                    </button>
-                    <button 
-                      onClick={() => handleDelete(shortcut.id)}
-                      disabled={isDeleting === shortcut.id}
-                      className="p-2 text-on-surface-variant/40 hover:text-rose-600 hover:bg-rose-500/10 rounded-xl transition-all disabled:opacity-50"
-                      title="Eliminar"
-                    >
-                      {isDeleting === shortcut.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-on-surface/5 text-xs text-on-surface-variant">
-                  <div className="flex items-center gap-1.5 font-bold">
-                    {shortcut.paymentMethod === 'Tarjeta' ? <CreditCard size={14} className="text-primary" /> : <Wallet size={14} className="text-emerald-600" />}
-                    <span>{shortcut.paymentMethod || 'Efectivo'}</span>
-                  </div>
-                  <div className="font-bold font-headline text-on-surface">
-                    {shortcut.defaultAmount && shortcut.defaultAmount > 0 ? (
-                      <span className="text-primary bg-primary/10 px-2.5 py-1 rounded-xl">
-                        Default: {formatCurrency(shortcut.defaultAmount, profile?.currency)}
-                      </span>
-                    ) : (
-                      <span className="text-on-surface-variant/60 italic">
-                        Monto libre
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
+                shortcut={shortcut}
+                index={index}
+                total={items.length}
+                categories={categories}
+                projects={projects}
+                profile={profile}
+                isDeleting={isDeleting}
+                onEdit={handleOpenModal}
+                onDelete={handleDelete}
+                onMove={handleMove}
+              />
+            ))}
+          </Reorder.Group>
         </div>
       )}
 
