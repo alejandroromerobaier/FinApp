@@ -79,12 +79,51 @@ export const Reports: React.FC = () => {
     }
   }, [selectedProjectId, projects]);
 
+  const activeProjects = useMemo(() => {
+    return projects.filter(p => (p.status || 'active') !== 'inactive');
+  }, [projects]);
+
+  const isPersonalActive = (profile?.personalStatus || 'active') !== 'inactive';
+
+  const filteredTransactions = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    
+    let start = new Date(year, month, 1, 0, 0, 0, 0);
+    let end = new Date(year, month + 1, 0, 23, 59, 59, 999);
+
+    if (selectedPeriod === 'quarterly') {
+      const q = Math.floor(month / 3);
+      start = new Date(year, q * 3, 1, 0, 0, 0, 0);
+      end = new Date(year, (q + 1) * 3, 0, 23, 59, 59, 999);
+    } else if (selectedPeriod === 'semiannual') {
+      const s = Math.floor(month / 6);
+      start = new Date(year, s * 6, 1, 0, 0, 0, 0);
+      end = new Date(year, (s + 1) * 6, 0, 23, 59, 59, 999);
+    } else if (selectedPeriod === 'annual') {
+      start = new Date(year, 0, 1, 0, 0, 0, 0);
+      end = new Date(year, 11, 31, 23, 59, 59, 999);
+    }
+
+    return transactions.filter(t => {
+      if (t.projectId) {
+        const proj = projects.find(p => p.id === t.projectId);
+        if (proj && proj.status === 'inactive') return false;
+      } else {
+        if (!isPersonalActive) return false;
+      }
+
+      const td = t.date instanceof Date ? t.date : new Date(t.date);
+      const matchesPeriod = td >= start && td <= end;
+      const matchesProject = selectedProjectId === 'all' ? true : t.projectId === selectedProjectId;
+      return matchesPeriod && matchesProject;
+    });
+  }, [transactions, currentDate, selectedProjectId, selectedPeriod, projects, isPersonalActive]);
+
   const projectMembers = useMemo(() => {
     const emails = new Set<string>();
     const involvedProjects = projects.filter(p => 
-      transactions.some(t => t.projectId === p.id && 
-        new Date(t.date).getMonth() === currentDate.getMonth() && 
-        new Date(t.date).getFullYear() === currentDate.getFullYear())
+      filteredTransactions.some(t => t.projectId === p.id)
     );
     
     involvedProjects.forEach(p => {
@@ -96,8 +135,8 @@ export const Reports: React.FC = () => {
     });
     
     return Array.from(emails);
-  }, [projects, transactions, currentDate, userEmails, user]);
-  
+  }, [projects, filteredTransactions, userEmails, user]);
+
   // Fetch budgets for the entire selected period
   useEffect(() => {
     const fetchPeriodBudgets = async () => {
@@ -129,8 +168,6 @@ export const Reports: React.FC = () => {
         const projectIds = projects.map(p => p.id);
         const allBudgets: any[] = [];
         
-        // Fetch budgets for each month in the period
-        // Optimization: In a real app we might batch this, but since monthly/quarterly is 1-12 calls, it's fine for now.
         for (const m of months) {
           const monthBudgets = await getBudgetsOnce(m, projectIds);
           allBudgets.push(...monthBudgets);
@@ -144,49 +181,6 @@ export const Reports: React.FC = () => {
 
     fetchPeriodBudgets();
   }, [currentDate, selectedPeriod, projects]);
-
-
-
-  const activeProjects = useMemo(() => {
-    return projects.filter(p => (p.status || 'active') !== 'inactive');
-  }, [projects]);
-
-  const isPersonalActive = (profile?.personalStatus || 'active') !== 'inactive';
-
-  const filteredTransactions = useMemo(() => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    
-    let start = new Date(year, month, 1);
-    let end = new Date(year, month + 1, 0, 23, 59, 59, 999);
-
-    if (selectedPeriod === 'quarterly') {
-      const q = Math.floor(month / 3);
-      start = new Date(year, q * 3, 1);
-      end = new Date(year, (q + 1) * 3, 0, 23, 59, 59, 999);
-    } else if (selectedPeriod === 'semiannual') {
-      const s = Math.floor(month / 6);
-      start = new Date(year, s * 6, 1);
-      end = new Date(year, (s + 1) * 6, 0, 23, 59, 59, 999);
-    } else if (selectedPeriod === 'annual') {
-      start = new Date(year, 0, 1);
-      end = new Date(year, 12, 0, 23, 59, 59, 999);
-    }
-
-    return transactions.filter(t => {
-      if (t.projectId) {
-        const proj = projects.find(p => p.id === t.projectId);
-        if (proj && proj.status === 'inactive') return false;
-      } else {
-        if (!isPersonalActive) return false;
-      }
-
-      const td = new Date(t.date);
-      const matchesPeriod = td >= start && td <= end;
-      const matchesProject = selectedProjectId === 'all' ? true : t.projectId === selectedProjectId;
-      return matchesPeriod && matchesProject;
-    });
-  }, [transactions, currentDate, selectedProjectId, selectedPeriod, projects, isPersonalActive]);
 
   const stats = useMemo(() => {
     const currencyMap: Record<string, { income: number; expenses: number; fixed: number; variable: number; catMap: Record<string, number>; methods: Record<string, number>; projectSplit: { personal: number; shared: number } }> = {};
