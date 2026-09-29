@@ -191,7 +191,8 @@ export const generateProfessionalPDF = async (data: PDFReportData) => {
 
   doc.setTextColor(...primaryColor);
   doc.setFontSize(14);
-  doc.text('REGISTRO DE OPERACIONES (DETALLE MENSUAL)', margin, finalY);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`REGISTRO DE OPERACIONES (${(data.monthName || 'DETALLE').toUpperCase()})`, margin, finalY);
 
   const transRows = (data.transactions || [])
     .filter(t => {
@@ -199,9 +200,8 @@ export const generateProfessionalPDF = async (data: PDFReportData) => {
       const tCurrency = p?.currency || data.profileCurrency || 'ARS';
       return tCurrency === data.currency;
     })
-    .slice(0, 30)
     .map(t => [
-      new Date(t.date).toLocaleDateString(),
+      (t.date instanceof Date ? t.date : new Date(t.date)).toLocaleDateString('es-ES'),
       t.description || 'Sin descripción',
       (data.categories || []).find(c => c.id === t.categoryId)?.name || t.categoryName || 'Varios',
       t.type === 'income' ? 'N/A' : (t.classification === 'fixed' ? 'Fijo' : 'Var'),
