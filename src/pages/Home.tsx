@@ -44,7 +44,7 @@ import { ShortcutIconComponent } from './ManageShortcuts';
 
 const ICON_MAP: Record<string, any> = {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
-  Landmark, Tag, Gift, Briefcase, HomeIcon, Plane, Coffee, Zap, Smartphone, ShieldCheck
+  Landmark, Tag, Gift, Briefcase, Home: HomeIcon, HomeIcon, Plane, Coffee, Zap, Smartphone, ShieldCheck
 };
 
 const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => {
