@@ -21,6 +21,7 @@ export const SHORTCUT_ICONS: Record<string, any> = {
   ShoppingBag,
   Zap,
   Home,
+  HomeIcon: Home,
   Briefcase,
   Heart,
   Plane,
