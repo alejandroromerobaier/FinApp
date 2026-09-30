@@ -14,7 +14,6 @@
   --color-surface-container-low: #f2f4f6;
   --color-surface-container-lowest: #ffffff;
   --color-on-surface: #191c1e;
-  --color-on-surface: #191c1e;
   --color-on-surface-variant: #454652;
   --color-error: #ba1a1a;
   --color-error-container: #ffdad6;
@@ -23,6 +22,19 @@
 @layer base {
   @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
 
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html, body {
+    touch-action: manipulation;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  button, a, input, select, textarea, [role="button"] {
+    touch-action: manipulation;
+  }
+
   body {
     @apply bg-surface text-on-surface font-sans;
   }
@@ -30,12 +42,22 @@
 
 @layer utilities {
   .glass-header {
-    @apply bg-white/70 backdrop-blur-xl border-b border-on-surface/5;
+    @apply bg-white/80 backdrop-blur-xl border-b border-on-surface/5;
   }
+
+  .pt-safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .pb-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
   .no-scrollbar::-webkit-scrollbar,
   .scrollbar-none::-webkit-scrollbar {
     display: none;
   }
+
   .no-scrollbar,
   .scrollbar-none {
     -ms-overflow-style: none;
