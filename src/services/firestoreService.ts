@@ -629,19 +629,23 @@ export const getGlobalTransactions = (projectIds: string[], callback: (transacti
     callback(unique);
   };
 
-  // Personal transactions
+  // Personal transactions (authorId == uid, filter out any with explicit valid projectIds)
   const qPersonal = query(
     collection(db, 'transactions'),
-    where('authorId', '==', uid),
-    where('projectId', '==', null)
+    where('authorId', '==', uid)
   );
 
   const unsubscribePersonal = onSnapshot(qPersonal, (snapshot) => {
-    personalTransactions = snapshot.docs.map(doc => ({ 
-      id: doc.id, 
-      ...doc.data(),
-      date: safeToDate(doc.data().date)
-    }));
+    personalTransactions = snapshot.docs
+      .filter(doc => {
+        const pId = doc.data().projectId;
+        return !pId || pId === 'personal' || pId === 'null';
+      })
+      .map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(),
+        date: safeToDate(doc.data().date)
+      }));
     updateAll();
   }, (error) => {
     console.error("Personal transactions fetch error:", error);
@@ -868,8 +872,14 @@ export const addTransaction = async (transaction: any) => {
     transactionDate.setMinutes(now.getMinutes());
     transactionDate.setSeconds(now.getSeconds());
 
+    const rawProjectId = transaction.projectId;
+    const finalProjectId = (rawProjectId && typeof rawProjectId === 'string' && rawProjectId !== 'personal' && rawProjectId !== 'null' && rawProjectId.trim() !== '') 
+      ? rawProjectId.trim() 
+      : null;
+
     const docRef = await addDoc(collection(db, 'transactions'), {
       ...transaction,
+      projectId: finalProjectId,
       authorId: auth.currentUser?.uid,
       createdAt: serverTimestamp(),
       date: Timestamp.fromDate(transactionDate),
@@ -881,15 +891,15 @@ export const addTransaction = async (transaction: any) => {
     });
 
     // Notify collaborators if in a shared project
-    if (transaction.projectId) {
-      notifyCollaboratorsOnExpenseAdded({ id: docRef.id, ...transaction }).catch(err =>
+    if (finalProjectId) {
+      notifyCollaboratorsOnExpenseAdded({ id: docRef.id, ...transaction, projectId: finalProjectId }).catch(err =>
         console.error('Collaborator notification error:', err)
       );
     }
 
     // Check budget thresholds if expense
     if (transaction.type === 'expense') {
-      checkAndNotifyBudgetAlerts({ id: docRef.id, ...transaction, date: transactionDate }).catch(err =>
+      checkAndNotifyBudgetAlerts({ id: docRef.id, ...transaction, projectId: finalProjectId, date: transactionDate }).catch(err =>
         console.error('Budget alert error:', err)
       );
     }
@@ -916,9 +926,15 @@ export const updateTransaction = async (transactionId: string, transaction: any)
 
     // Remove the temporary originalDate before saving to Firestore
     const { originalDate, ...saveData } = transaction;
+
+    const rawProjectId = transaction.projectId;
+    const finalProjectId = (rawProjectId && typeof rawProjectId === 'string' && rawProjectId !== 'personal' && rawProjectId !== 'null' && rawProjectId.trim() !== '') 
+      ? rawProjectId.trim() 
+      : null;
     
     await updateDoc(transactionRef, {
       ...saveData,
+      projectId: finalProjectId,
       updatedAt: serverTimestamp(),
       date: Timestamp.fromDate(finalDate),
       paymentMethod: transaction.paymentMethod || 'Efectivo',
@@ -930,7 +946,7 @@ export const updateTransaction = async (transactionId: string, transaction: any)
 
     // Check budget thresholds if expense
     if (transaction.type === 'expense') {
-      checkAndNotifyBudgetAlerts({ id: transactionId, ...transaction, date: finalDate }).catch(err =>
+      checkAndNotifyBudgetAlerts({ id: transactionId, ...transaction, projectId: finalProjectId, date: finalDate }).catch(err =>
         console.error('Budget alert error:', err)
       );
     }

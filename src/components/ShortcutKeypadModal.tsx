@@ -44,10 +44,14 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
 
   if (!shortcut) return null;
 
+  const rawProjectId = shortcut.projectId;
+  const isPersonal = !rawProjectId || rawProjectId === 'personal' || rawProjectId === 'null' || rawProjectId.trim() === '';
+  const targetProjectId = isPersonal ? null : rawProjectId.trim();
+
   const category = categories.find(c => c.id === shortcut.categoryId);
-  const project = shortcut.projectId === 'personal' 
+  const project = isPersonal
     ? { name: 'Personal', currency: profile?.currency || 'ARS' } 
-    : projects.find(p => p.id === shortcut.projectId);
+    : projects.find(p => p.id === targetProjectId);
 
   const currency = project?.currency || profile?.currency || 'ARS';
   const parsedAmount = parseFloat(amount.replace(',', '.')) || 0;
@@ -72,7 +76,7 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
         categoryName: category?.name || 'Otros',
         categoryIcon: category?.icon || 'MoreHorizontal',
         categoryColor: category?.color || 'bg-slate-400',
-        projectId: shortcut.projectId === 'personal' ? null : shortcut.projectId,
+        projectId: targetProjectId,
         paymentMethod: shortcut.paymentMethod || 'Efectivo',
         classification: shortcut.classification || 'variable',
       });
