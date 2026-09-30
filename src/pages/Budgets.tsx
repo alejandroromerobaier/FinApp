@@ -34,6 +34,24 @@ export const Budgets: React.FC = () => {
     setLocalBudgets(initial);
   }, [budgets, selectedProjectId]);
 
+  // Filter active shared projects
+  const activeProjects = React.useMemo(() => {
+    return projects.filter(p => p.status !== 'inactive');
+  }, [projects]);
+
+  const isPersonalActive = (profile?.personalStatus || 'active') !== 'inactive';
+
+  // Ensure selectedProjectId is an active context
+  React.useEffect(() => {
+    if (selectedProjectId !== null && !activeProjects.some(p => p.id === selectedProjectId)) {
+      if (isPersonalActive) {
+        setSelectedProjectId(null);
+      } else if (activeProjects.length > 0) {
+        setSelectedProjectId(activeProjects[0].id);
+      }
+    }
+  }, [activeProjects, selectedProjectId, isPersonalActive]);
+
   const handleSave = async (categoryId: string, rawAmount: number | string, isDelete: boolean = false) => {
     setSavingMap(prev => ({ ...prev, [categoryId]: true }));
     const amount = typeof rawAmount === 'string' ? parseFloat(rawAmount.replace(',', '.')) || 0 : rawAmount;
@@ -76,7 +94,7 @@ export const Budgets: React.FC = () => {
       d.setMonth(d.getMonth() - 1);
       const prevMonthStr = getLocalMonth(d);
       
-      const projectIds = projects.map(p => p.id);
+      const projectIds = activeProjects.map(p => p.id);
       const prevBudgets = await getBudgetsOnce(prevMonthStr, projectIds);
       
       const filteredPrev = prevBudgets.filter(b => 
@@ -151,21 +169,23 @@ export const Budgets: React.FC = () => {
         </button>
       </section>
 
-      {/* Project Selector */}
+      {/* Project Selector (Only Active Projects) */}
       <section className="space-y-4">
         <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          <button
-            onClick={() => setSelectedProjectId(null)}
-            className={cn(
-              "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all",
-              selectedProjectId === null 
-                ? "bg-primary text-white shadow-lg shadow-primary/20" 
-                : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
-            )}
-          >
-            Personal
-          </button>
-          {projects.map(p => (
+          {isPersonalActive && (
+            <button
+              onClick={() => setSelectedProjectId(null)}
+              className={cn(
+                "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all",
+                selectedProjectId === null 
+                  ? "bg-primary text-white shadow-lg shadow-primary/20" 
+                  : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
+              )}
+            >
+              Personal
+            </button>
+          )}
+          {activeProjects.map(p => (
             <button
               key={p.id}
               onClick={() => setSelectedProjectId(p.id)}
