@@ -4,7 +4,7 @@ import { X, Check, Loader2, Zap, Clock, Wallet, CreditCard } from 'lucide-react'
 import { Shortcut, addTransaction } from '../services/firestoreService';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
-import { ShortcutIconComponent } from '../pages/ManageShortcuts';
+import { ShortcutIconComponent, ShortcutBadge } from '../pages/ManageShortcuts';
 import { formatCurrency, cn } from '../lib/utils';
 import { getLocalToday } from '../lib/dateUtils';
 
@@ -113,12 +113,7 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
           {/* Header with Save Button on Top Right */}
           <div className="flex justify-between items-center px-5 py-4 border-b border-on-surface/5 bg-surface shrink-0">
             <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
-              <div className={cn(
-                "w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-md shrink-0",
-                category?.color || 'bg-amber-500'
-              )}>
-                <ShortcutIconComponent name={shortcut.icon} size={20} />
-              </div>
+              <ShortcutBadge icon={shortcut.icon} size={20} containerClassName="w-10 h-10 rounded-2xl" />
               <div className="min-w-0 flex-1">
                 <h3 className="font-extrabold text-on-surface text-base font-headline truncate leading-tight">
                   {shortcut.name}

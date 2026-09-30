@@ -40,7 +40,7 @@ import { useData } from '../lib/DataContext';
 import { getTransactions, cleanupDuplicateCategories, Shortcut } from '../services/firestoreService';
 import { formatDisplayDate, getLocalMonth, parseLocalMonth } from '../lib/dateUtils';
 import { ShortcutKeypadModal } from '../components/ShortcutKeypadModal';
-import { ShortcutIconComponent } from './ManageShortcuts';
+import { ShortcutIconComponent, ShortcutBadge } from './ManageShortcuts';
 
 const ICON_MAP: Record<string, any> = {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
@@ -409,12 +409,7 @@ export const Home: React.FC = () => {
                   onClick={() => setSelectedShortcut(shortcut)}
                   className="bg-surface-container-lowest hover:bg-on-surface/5 border border-on-surface/5 p-3 rounded-2xl flex items-center gap-3 shrink-0 active:scale-95 transition-all shadow-sm group min-w-[140px]"
                 >
-                  <div className={cn(
-                    "w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm shrink-0",
-                    category?.color || 'bg-amber-500'
-                  )}>
-                    <ShortcutIconComponent name={shortcut.icon} size={20} />
-                  </div>
+                  <ShortcutBadge icon={shortcut.icon} size={20} containerClassName="w-10 h-10 rounded-xl" />
                   <div className="text-left min-w-0 pr-1">
                     <p className="font-extrabold text-xs text-on-surface truncate group-hover:text-primary transition-colors max-w-[100px]">
                       {shortcut.name}
