@@ -45,6 +45,26 @@ export const ShortcutIconComponent = ({ name, size = 20, className }: { name: st
   return <Icon size={size} className={className} />;
 };
 
+export const ShortcutBadge: React.FC<{
+  icon: string;
+  size?: number;
+  className?: string;
+  containerClassName?: string;
+}> = ({ icon, size = 20, className, containerClassName }) => {
+  return (
+    <div className={cn(
+      "relative flex items-center justify-center shrink-0 transition-all shadow-xs",
+      "bg-gradient-to-br from-amber-500/15 via-orange-500/10 to-amber-500/5 text-amber-600 dark:text-amber-400 border border-amber-500/25",
+      containerClassName || "w-10 h-10 rounded-xl"
+    )}>
+      <ShortcutIconComponent name={icon} size={size} className={className} />
+      <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 text-white rounded-full flex items-center justify-center shadow-xs">
+        <Zap size={8} className="fill-white" />
+      </span>
+    </div>
+  );
+};
+
 interface ShortcutCardItemProps {
   shortcut: Shortcut;
   index: number;
@@ -97,12 +117,11 @@ const ShortcutCardItem: React.FC<ShortcutCardItemProps> = ({
             <GripVertical size={20} />
           </div>
 
-          <div className={cn(
-            "w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center text-white shadow-md shrink-0",
-            category?.color || 'bg-amber-500'
-          )}>
-            <ShortcutIconComponent name={shortcut.icon} size={26} />
-          </div>
+          <ShortcutBadge 
+            icon={shortcut.icon} 
+            size={24} 
+            containerClassName="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl" 
+          />
 
           <div className="min-w-0 flex-1">
             <h3 className="font-extrabold text-on-surface text-base sm:text-lg font-headline truncate group-hover:text-primary transition-colors">
