@@ -35,9 +35,12 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
+import { RouteTracker } from './components/RouteTracker';
+
 function AppContent() {
   return (
     <Router>
+      <RouteTracker />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route
