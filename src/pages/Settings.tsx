@@ -43,12 +43,18 @@ const CURRENCIES = [
 ];
 
 const AVATAR_PRESETS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
+  { id: 'bot1', name: 'FinBot 3D', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=FinBot3D&backgroundColor=b6e3f4,c0aede,d1d4f9' },
+  { id: 'shape1', name: 'Esferas Esmeralda', url: 'https://api.dicebear.com/7.x/shapes/svg?seed=EmeraldGlass&backgroundColor=059669,10b981,34d399' },
+  { id: 'icon1', name: 'Crecimiento 3D', url: 'https://api.dicebear.com/7.x/icons/svg?seed=Finance3D&backgroundColor=2563eb,3b82f6' },
+  { id: 'ident1', name: 'Matriz Cripto', url: 'https://api.dicebear.com/7.x/identicon/svg?seed=CryptoMatrix&backgroundColor=7c3aed,8b5cf6' },
+  { id: 'bot2', name: 'Robot Dorado', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=GoldBot&backgroundColor=f59e0b,fbbf24' },
+  { id: 'shape2', name: 'Geometría Neón', url: 'https://api.dicebear.com/7.x/shapes/svg?seed=NeonGrid&backgroundColor=0284c7,38bdf8' },
+  { id: 'icon2', name: 'Bóveda de Seguridad', url: 'https://api.dicebear.com/7.x/icons/svg?seed=VaultShield&backgroundColor=0f172a,1e293b' },
+  { id: 'bot3', name: 'Cyber Investor', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=CyberInvestor&backgroundColor=ec4899,f472b6' },
+  { id: 'shape3', name: 'Formas Violeta', url: 'https://api.dicebear.com/7.x/shapes/svg?seed=RoyalGlass&backgroundColor=6d28d9,7c3aed' },
+  { id: 'icon3', name: 'Cohete 3D', url: 'https://api.dicebear.com/7.x/icons/svg?seed=RocketGoal&backgroundColor=ea580c,f97316' },
+  { id: 'ident2', name: 'Red Teal', url: 'https://api.dicebear.com/7.x/identicon/svg?seed=TealMatrix&backgroundColor=14b8a6,2dd4bf' },
+  { id: 'bot4', name: 'Quantum AI', url: 'https://api.dicebear.com/7.x/bottts/svg?seed=QuantumBot&backgroundColor=6366f1,818cf8' },
 ];
 
 export const Settings: React.FC = () => {
@@ -524,21 +530,31 @@ export const Settings: React.FC = () => {
 
                 {/* Avatar Presets Selection */}
                 <div className="space-y-2 pt-1">
-                  <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant px-1">
-                    Seleccionar Foto / Avatar
-                  </label>
-                  <div className="grid grid-cols-6 gap-2">
-                    {AVATAR_PRESETS.map((url, index) => (
+                  <div className="flex items-center justify-between px-1">
+                    <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                      Avatar Vectorial 3D
+                    </label>
+                    <span className="text-[10px] text-on-surface-variant/60 font-semibold">12 diseños modernos</span>
+                  </div>
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-2.5">
+                    {AVATAR_PRESETS.map((preset) => (
                       <button
-                        key={index}
+                        key={preset.id}
                         type="button"
-                        onClick={() => setEditPhotoURL(url)}
+                        onClick={() => setEditPhotoURL(preset.url)}
+                        title={preset.name}
                         className={cn(
-                          "w-11 h-11 rounded-2xl overflow-hidden border-2 transition-all p-0.5",
-                          editPhotoURL === url ? "border-primary scale-105 shadow-md" : "border-transparent opacity-70 hover:opacity-100"
+                          "w-12 h-12 rounded-2xl overflow-hidden border-2 transition-all p-1 flex items-center justify-center bg-surface-container-low group",
+                          editPhotoURL === preset.url 
+                            ? "border-primary scale-105 shadow-lg shadow-primary/20 ring-2 ring-primary/30" 
+                            : "border-on-surface/5 hover:border-primary/40 hover:scale-105"
                         )}
                       >
-                        <img src={url} alt={`Avatar ${index}`} className="w-full h-full object-cover rounded-xl" />
+                        <img 
+                          src={preset.url} 
+                          alt={preset.name} 
+                          className="w-full h-full object-contain rounded-xl transition-transform group-hover:scale-110" 
+                        />
                       </button>
                     ))}
                   </div>
