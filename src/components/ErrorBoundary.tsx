@@ -26,27 +26,28 @@ export class ErrorBoundary extends React.Component<Props, State> {
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error:', error, errorInfo);
 
-    // Auto-reload on stale deployment chunk errors
-    const isChunkError = 
-      error?.message?.includes('Failed to fetch dynamically imported module') ||
-      error?.message?.includes('Importing a module script failed') ||
+    const errStr = (error?.message || error?.toString() || String(error || '')).toLowerCase();
+    const isChunkError =
+      errStr.includes('failed to fetch') ||
+      errStr.includes('dynamically imported') ||
+      errStr.includes('module script') ||
       error?.name === 'ChunkLoadError';
 
     if (isChunkError && !sessionStorage.getItem('chunk_reload_attempted')) {
       sessionStorage.setItem('chunk_reload_attempted', 'true');
-      window.location.reload();
+      window.location.href = window.location.origin + window.location.pathname + '?v=' + Date.now();
     }
   }
 
   private handleReset = () => {
     sessionStorage.removeItem('chunk_reload_attempted');
     this.setState({ hasError: false, error: null });
-    window.location.href = '/';
+    window.location.href = window.location.origin + '/?v=' + Date.now();
   };
 
   private handleReload = () => {
     sessionStorage.removeItem('chunk_reload_attempted');
-    window.location.reload();
+    window.location.href = window.location.origin + window.location.pathname + '?v=' + Date.now();
   };
 
   public render() {
@@ -55,11 +56,13 @@ export class ErrorBoundary extends React.Component<Props, State> {
       let isFirestoreError = false;
       let isChunkError = false;
 
-      const rawMsg = this.state.error?.message || '';
+      const rawMsg = this.state.error?.message || this.state.error?.toString() || String(this.state.error || '');
+      const lowerMsg = rawMsg.toLowerCase();
 
       if (
-        rawMsg.includes('Failed to fetch dynamically imported module') ||
-        rawMsg.includes('Importing a module script failed') ||
+        lowerMsg.includes('failed to fetch') ||
+        lowerMsg.includes('dynamically imported') ||
+        lowerMsg.includes('module script') ||
         this.state.error?.name === 'ChunkLoadError'
       ) {
         isChunkError = true;
