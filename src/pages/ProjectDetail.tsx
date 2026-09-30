@@ -164,7 +164,14 @@ export const ProjectDetail: React.FC = () => {
                   <h1 className="text-4xl font-extrabold tracking-tight text-on-surface mb-2 font-headline">{project.name}</h1>
                   <p className="text-on-surface-variant/60 flex items-center gap-2 font-medium">
                     <Calendar size={16} />
-                    Creado el {new Date(project.createdAt?.toDate()).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                    Creado el {
+                      (() => {
+                        const rawDate = project.createdAt;
+                        if (!rawDate) return 'Recientemente';
+                        const d = typeof rawDate?.toDate === 'function' ? rawDate.toDate() : new Date(rawDate);
+                        return isNaN(d.getTime()) ? 'Recientemente' : d.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+                      })()
+                    }
                   </p>
                 </div>
                 <div className="bg-primary text-white p-6 rounded-3xl shadow-xl shadow-primary/20 min-w-[200px]">
