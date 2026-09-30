@@ -174,35 +174,35 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
       {/* Bottom Navigation */}
       {!isAddPage && (
-        <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-2 pb-safe bg-white/90 backdrop-blur-2xl shadow-[0_-10px_30px_rgba(0,0,0,0.08)] rounded-t-[2.5rem] border-t border-black/5 sm:hidden">
+        <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-3 py-1.5 pb-safe bg-white/95 backdrop-blur-2xl shadow-[0_-10px_30px_rgba(0,0,0,0.08)] rounded-t-[2.5rem] border-t border-black/5 sm:hidden select-none">
           <NavLink to="/" className={({ isActive }) => cn(
-            "flex flex-col items-center justify-center p-2 rounded-2xl transition-all duration-300",
-            isActive ? "text-primary bg-primary/5 scale-110" : "text-slate-400 opacity-60"
+            "flex flex-col items-center justify-center py-2 px-3.5 min-w-[60px] min-h-[50px] rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation",
+            isActive ? "text-primary bg-primary/10 font-black" : "text-slate-400 font-medium"
           )}>
             <Home size={22} />
-            <span className="text-[10px] font-bold uppercase tracking-widest mt-1 opacity-80">Home</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider mt-1 leading-none">Home</span>
           </NavLink>
           
           <NavLink to="/stats" className={({ isActive }) => cn(
-            "flex flex-col items-center justify-center p-2 rounded-2xl transition-all duration-300",
-            isActive ? "text-primary bg-primary/5 scale-110" : "text-slate-400 opacity-60"
+            "flex flex-col items-center justify-center py-2 px-3.5 min-w-[60px] min-h-[50px] rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation",
+            isActive ? "text-primary bg-primary/10 font-black" : "text-slate-400 font-medium"
           )}>
             <BarChart3 size={22} />
-            <span className="text-[10px] font-bold uppercase tracking-widest mt-1 opacity-80">Stats</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider mt-1 leading-none">Stats</span>
           </NavLink>
 
-          <NavLink to="/add" className="flex flex-col items-center justify-center relative translate-y-[-10px]">
-            <div className="p-4 bg-primary text-white rounded-2xl shadow-xl shadow-primary/30 active:scale-95 transition-transform border-4 border-surface">
+          <NavLink to="/add" className="flex flex-col items-center justify-center relative translate-y-[-12px] active:scale-90 transition-transform touch-manipulation">
+            <div className="p-4 bg-primary text-white rounded-2xl shadow-xl shadow-primary/30 border-4 border-surface flex items-center justify-center">
               <PlusCircle size={28} />
             </div>
           </NavLink>
 
           <NavLink to="/settings" className={({ isActive }) => cn(
-            "flex flex-col items-center justify-center p-2 rounded-2xl transition-all duration-300",
-            isActive ? "text-primary bg-primary/5 scale-110" : "text-slate-400 opacity-60"
+            "flex flex-col items-center justify-center py-2 px-3.5 min-w-[60px] min-h-[50px] rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation",
+            isActive ? "text-primary bg-primary/10 font-black" : "text-slate-400 font-medium"
           )}>
             <Settings size={22} />
-            <span className="text-[10px] font-bold uppercase tracking-widest mt-1 opacity-80">Settings</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider mt-1 leading-none">Ajustes</span>
           </NavLink>
         </nav>
       )}
