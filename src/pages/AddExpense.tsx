@@ -35,6 +35,7 @@ import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { addTransaction, updateTransaction, deleteTransaction, getTransaction } from '../services/firestoreService';
 import { getLocalToday, formatDisplayDate, formatLocalYYYYMMDD } from '../lib/dateUtils';
+import { trackEvent } from '../lib/analytics';
 
 const ICON_MAP: Record<string, any> = {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
@@ -210,8 +211,10 @@ export const AddExpense: React.FC = () => {
 
       if (id) {
         await updateTransaction(id, transactionData);
+        trackEvent('edit_expense', { type, amount: parsedAmount, category: selectedCategory.name });
       } else {
         await addTransaction(transactionData);
+        trackEvent('add_expense', { type, amount: parsedAmount, category: selectedCategory.name });
       }
       navigate(-1);
     } catch (error) {
