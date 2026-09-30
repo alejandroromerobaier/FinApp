@@ -206,34 +206,35 @@ export const Home: React.FC = () => {
     <div className="px-4 sm:px-6 max-w-4xl mx-auto py-6 sm:py-8 pb-32 sm:pb-10">
       {/* Header */}
       <header className="flex items-center justify-between mb-8 sm:mb-10">
-        <div className="flex items-center gap-3 sm:gap-4">
-          <Link to="/settings" className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-primary/10 flex items-center justify-center overflow-hidden border-2 border-primary/20 shadow-inner group">
+        <div className="flex items-center gap-3.5 sm:gap-4">
+          <Link to="/settings" className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white flex items-center justify-center overflow-hidden border-2 border-blue-500/20 shadow-md shadow-blue-500/10 group transition-all duration-300 hover:scale-105 active:scale-95">
             {user?.photoURL ? (
-              <img src={user.photoURL} alt={user.displayName || 'User'} className="w-full h-full object-cover transition-transform group-active:scale-90" referrerPolicy="no-referrer" />
+              <img src={user.photoURL} alt={user.displayName || 'User'} className="w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
             ) : (
-              <span className="text-lg sm:text-xl font-black text-primary uppercase transition-transform group-active:scale-90">
+              <span className="text-lg sm:text-xl font-black text-blue-600 uppercase transition-transform group-hover:scale-110">
                 {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
               </span>
             )}
           </Link>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-surface-container-low px-2.5 py-1 rounded-full border border-on-surface/5 w-fit mb-1">
               <button 
                 onClick={() => {
                   const d = parseLocalMonth(budgetMonth);
                   d.setMonth(d.getMonth() - 1);
                   setBudgetMonth(getLocalMonth(d));
                 }}
-                className="p-1 hover:bg-on-surface/5 rounded-lg text-on-surface-variant transition-colors"
+                className="p-0.5 hover:bg-on-surface/5 rounded-full text-on-surface-variant transition-colors active:scale-90"
+                title="Mes anterior"
               >
-                <ChevronLeft size={16} />
+                <ChevronLeft size={14} />
               </button>
               
               <button 
                 onClick={() => setBudgetMonth(getLocalMonth())}
                 className={cn(
-                  "text-[10px] sm:text-xs font-black uppercase tracking-[0.15em] transition-colors hover:text-primary leading-none",
-                  isCurrentMonth ? "text-primary/60" : "text-amber-500"
+                  "text-[10px] sm:text-[11px] font-black uppercase tracking-wider transition-colors hover:text-blue-600 leading-none px-1",
+                  isCurrentMonth ? "text-blue-600/80" : "text-amber-600"
                 )}
               >
                 {parseLocalMonth(budgetMonth).toLocaleString('es-ES', { month: 'long', year: 'numeric' })}
@@ -245,13 +246,15 @@ export const Home: React.FC = () => {
                   d.setMonth(d.getMonth() + 1);
                   setBudgetMonth(getLocalMonth(d));
                 }}
-                className="p-1 hover:bg-on-surface/5 rounded-lg text-on-surface-variant transition-colors"
+                className="p-0.5 hover:bg-on-surface/5 rounded-full text-on-surface-variant transition-colors active:scale-90"
+                title="Mes siguiente"
               >
-                <ChevronRight size={16} />
+                <ChevronRight size={14} />
               </button>
             </div>
-            <h2 className="text-xl sm:text-2xl font-black text-on-surface font-headline tracking-tight leading-none mt-1">
-              {user?.displayName?.split(' ')[0] || 'Usuario'}
+            <h2 className="text-xl sm:text-2xl font-black text-on-surface font-headline tracking-tight leading-tight flex items-center gap-2">
+              <span>Hola, {user?.displayName?.split(' ')[0] || 'Usuario'}</span>
+              <span className="text-lg">👋</span>
             </h2>
           </div>
         </div>
