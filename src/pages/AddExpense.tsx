@@ -253,44 +253,46 @@ export const AddExpense: React.FC = () => {
   return (
     <div className="min-h-screen bg-surface flex flex-col pb-10">
       {/* Header */}
-      <header className="fixed top-0 w-full z-40 flex items-center justify-between px-6 h-16 glass-header">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="text-on-surface-variant p-2 hover:bg-on-surface/5 rounded-full transition-colors">
-            <X size={24} />
-          </button>
-          <span className="text-xl font-extrabold tracking-tight text-on-surface font-headline">
-            {id ? 'Editar Transacción' : 'Nueva Transacción'}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          {id && isAuthor && (
-            <button 
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="p-2 text-rose-600 hover:bg-rose-500/5 rounded-full transition-colors"
-            >
-              {isDeleting ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
+      <header className="fixed top-0 w-full z-40 glass-header pt-safe-top">
+        <div className="flex items-center justify-between px-6 h-16">
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate(-1)} className="text-on-surface-variant p-2 hover:bg-on-surface/5 rounded-full transition-colors active:scale-90">
+              <X size={24} />
             </button>
-          )}
-          {isAuthor && (
-            <button 
-              onClick={handleSave} 
-              disabled={!isValidAmount || isSaving}
-              className={cn(
-                "font-bold px-4 py-2 rounded-xl transition-all active:scale-95 flex items-center gap-2",
-                (!isValidAmount || isSaving) 
-                  ? "text-on-surface-variant/30 bg-on-surface/5" 
-                  : "text-primary bg-primary/10 hover:bg-primary/20"
-              )}
-            >
-              {isSaving && <Loader2 size={16} className="animate-spin" />}
-              {id ? 'Actualizar' : 'Guardar'}
-            </button>
-          )}
+            <span className="text-xl font-extrabold tracking-tight text-on-surface font-headline">
+              {id ? 'Editar Transacción' : 'Nueva Transacción'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {id && isAuthor && (
+              <button 
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="p-2 text-rose-600 hover:bg-rose-500/5 rounded-full transition-colors"
+              >
+                {isDeleting ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
+              </button>
+            )}
+            {isAuthor && (
+              <button 
+                onClick={handleSave} 
+                disabled={!isValidAmount || isSaving}
+                className={cn(
+                  "font-bold px-4 py-2 rounded-xl transition-all active:scale-95 flex items-center gap-2",
+                  (!isValidAmount || isSaving) 
+                    ? "text-on-surface-variant/30 bg-on-surface/5" 
+                    : "text-primary bg-primary/10 hover:bg-primary/20"
+                )}
+              >
+                {isSaving && <Loader2 size={16} className="animate-spin" />}
+                {id ? 'Actualizar' : 'Guardar'}
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
-      <main className="flex-1 pt-24 max-w-2xl mx-auto w-full px-6 flex flex-col gap-8">
+      <main className="flex-1 pt-[calc(4.5rem+env(safe-area-inset-top,0px))] max-w-2xl mx-auto w-full px-6 flex flex-col gap-8">
         {!isAuthor && (
           <div className="bg-amber-500/10 border border-amber-500/10 p-4 rounded-2xl flex items-center gap-3 text-amber-700">
             <ShieldCheck size={20} />
