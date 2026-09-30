@@ -1,0 +1,59 @@
+const CACHE_NAME = 'finapp-cache-v1';
+const STATIC_ASSETS = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/favicon.png',
+  '/apple-touch-icon.png',
+  '/pwa-192x192.png',
+  '/pwa-512x512.png'
+];
+
+// Install Event
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(STATIC_ASSETS);
+    }).then(() => self.skipWaiting())
+  );
+});
+
+// Activate Event
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cache) => {
+          if (cache !== CACHE_NAME) {
+            return caches.delete(cache);
+          }
+        })
+      );
+    }).then(() => self.clients.claim())
+  );
+});
+
+// Fetch Event - Stale-While-Revalidate for static assets, Network-First for API/Firestore
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // Skip non-GET requests and Firestore / Firebase APIs
+  if (event.request.method !== 'GET' || url.hostname.includes('firestore.googleapis.com') || url.hostname.includes('identitytoolkit')) {
+    return;
+  }
+
+  event.respondWith(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.match(event.request).then((cachedResponse) => {
+        const fetchPromise = fetch(event.request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            cache.put(event.request, networkResponse.clone());
+          }
+          return networkResponse;
+        }).catch(() => cachedResponse);
+
+        return cachedResponse || fetchPromise;
+      });
+    })
+  );
+});
