@@ -3,11 +3,15 @@ import { auth, onAuthStateChanged, User, signOut as firebaseSignOut } from './fi
 import { syncUserProfile } from '../services/firestoreService';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
+import { setAnalyticsUser } from './analytics';
 
-interface UserProfile {
+export interface UserProfile {
   name: string;
   email: string;
   photoURL: string;
+  phone?: string;
+  bio?: string;
+  occupation?: string;
   currency: string;
   personalShowInHome?: boolean;
   personalHomeOrder?: number;
@@ -15,6 +19,7 @@ interface UserProfile {
   personalStatus?: 'active' | 'inactive';
   defaultProjectId?: string;
   createdAt: any;
+  updatedAt?: any;
 }
 
 interface AuthContextType {
@@ -25,8 +30,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-import { setAnalyticsUser } from './analytics';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -43,9 +46,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await syncUserProfile(user);
         
         // Listen to profile changes
-        const profileUnsubscribe = onSnapshot(doc(db, 'users', user.uid), (doc) => {
-          if (doc.exists()) {
-            setProfile(doc.data() as UserProfile);
+        const profileUnsubscribe = onSnapshot(doc(db, 'users', user.uid), (docSnapshot) => {
+          if (docSnapshot.exists()) {
+            setProfile(docSnapshot.data() as UserProfile);
           }
           setLoading(false);
         });
