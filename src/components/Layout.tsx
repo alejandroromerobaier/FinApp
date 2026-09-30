@@ -40,15 +40,19 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       {/* Top Bar */}
       {!isAddPage && (
         <header className="fixed top-0 w-full z-50 flex items-center justify-between px-4 sm:px-6 h-14 sm:h-16 glass-header">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white flex items-center justify-center p-1.5 sm:p-2 shadow-sm border border-black/5 cursor-pointer" onClick={() => navigate('/')}>
+          <div className="flex items-center gap-2.5 sm:gap-3 cursor-pointer group" onClick={() => navigate('/')}>
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-white flex items-center justify-center p-1 sm:p-1.5 shadow-md shadow-blue-500/10 border border-blue-500/15 overflow-hidden transition-all duration-300 group-hover:scale-105 group-active:scale-95 group-hover:shadow-lg group-hover:shadow-blue-500/20">
               <img 
                 src={logo} 
                 alt="FinApp Logo" 
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain transition-transform group-hover:scale-110 duration-300"
               />
             </div>
-            <span className="text-lg sm:text-xl font-extrabold tracking-tight text-on-surface font-headline cursor-pointer" onClick={() => navigate('/')}>FinApp</span>
+            <div className="flex flex-col">
+              <span className="text-xl sm:text-2xl font-black tracking-tight font-headline bg-gradient-to-r from-blue-700 via-blue-600 to-emerald-600 bg-clip-text text-transparent leading-none">
+                FinApp
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-2 relative">
             <button
