@@ -1,13 +1,11 @@
 import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Home, 
   BarChart3, 
   PlusCircle, 
   Settings, 
   Bell, 
-  Check, 
-  Trash2, 
   UserPlus,
   ArrowRight,
   AlertTriangle
@@ -16,17 +14,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import logo from '../assets/logo.png';
 import { useData } from '../lib/DataContext';
-import { useNavigate } from 'react-router-dom';
-
-import { VoiceExpenseModal } from './VoiceExpenseModal';
-import { Sparkles, Mic } from 'lucide-react';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { notifications, markAsRead } = useData();
   const [showNotifs, setShowNotifs] = React.useState(false);
-  const [isVoiceModalOpen, setIsVoiceModalOpen] = React.useState(false);
   
   const isAuthPage = location.pathname === '/login';
   const isAddPage = location.pathname === '/add';
@@ -56,14 +49,6 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               </div>
             </div>
             <div className="flex items-center gap-2 relative">
-              <button
-                onClick={() => setIsVoiceModalOpen(true)}
-                className="p-2 sm:px-3 sm:py-2 text-primary bg-primary/10 hover:bg-primary/20 transition-all rounded-full flex items-center gap-1.5 border border-primary/20 shadow-sm active:scale-95"
-                title="Dictar gasto por voz con IA"
-              >
-                <Sparkles size={16} className="text-primary" />
-                <span className="text-[11px] font-black uppercase tracking-wider hidden sm:inline">Voz IA</span>
-              </button>
               <button 
                 onClick={() => setShowNotifs(!showNotifs)}
                 className={cn(
@@ -209,7 +194,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         </nav>
       )}
 
-      {/* Side Desktop Sidebar (Optional, but let's make it responsive) */}
+      {/* Side Desktop Sidebar */}
       {!isAddPage && (
         <aside className="hidden sm:flex fixed left-0 top-0 h-full w-20 flex-col items-center py-10 bg-white border-r border-on-surface/5 z-50">
            <NavLink to="/" className={({ isActive }) => cn("p-4 rounded-2xl mb-4 transition-all", isActive ? "bg-primary text-white" : "text-on-surface-variant hover:bg-on-surface/5")}>
@@ -227,12 +212,6 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
            </NavLink>
         </aside>
       )}
-
-      {/* AI Voice Expense Modal */}
-      <VoiceExpenseModal 
-        isOpen={isVoiceModalOpen} 
-        onClose={() => setIsVoiceModalOpen(false)} 
-      />
     </div>
   );
 };
