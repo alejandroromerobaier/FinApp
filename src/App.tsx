@@ -6,7 +6,28 @@ import { DataProvider } from './lib/DataContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { RouteTracker } from './components/RouteTracker';
 
-// Lazy loading pages with preloading helpers for instant mobile touch navigation
+// Safe lazy loader with auto-retry and reload recovery on deployment chunk errors
+const lazyWithRetry = (importFn: () => Promise<any>, exportName?: string) =>
+  lazy(async () => {
+    try {
+      const module = await importFn();
+      sessionStorage.removeItem('chunk_reload_attempted');
+      return exportName ? { default: module[exportName] } : module;
+    } catch (error: any) {
+      const isChunkError =
+        error?.message?.includes('Failed to fetch dynamically imported module') ||
+        error?.message?.includes('Importing a module script failed') ||
+        error?.name === 'ChunkLoadError';
+
+      if (isChunkError && !sessionStorage.getItem('chunk_reload_attempted')) {
+        sessionStorage.setItem('chunk_reload_attempted', 'true');
+        window.location.reload();
+        return new Promise(() => {});
+      }
+      throw error;
+    }
+  });
+
 const loadLogin = () => import('./pages/Login');
 const loadHome = () => import('./pages/Home');
 const loadProjectDetail = () => import('./pages/ProjectDetail');
@@ -20,18 +41,18 @@ const loadReports = () => import('./pages/Reports');
 const loadBudgets = () => import('./pages/Budgets');
 const loadManageShortcuts = () => import('./pages/ManageShortcuts');
 
-const Login = lazy(() => loadLogin().then(m => ({ default: m.Login })));
-const Home = lazy(() => loadHome().then(m => ({ default: m.Home })));
-const ProjectDetail = lazy(() => loadProjectDetail().then(m => ({ default: m.ProjectDetail })));
-const SharedProjects = lazy(() => loadSharedProjects().then(m => ({ default: m.SharedProjects })));
-const AddExpense = lazy(() => loadAddExpense().then(m => ({ default: m.AddExpense })));
-const ManageCategories = lazy(() => loadManageCategories().then(m => ({ default: m.ManageCategories })));
-const Stats = lazy(() => loadStats().then(m => ({ default: m.Stats })));
-const Settings = lazy(() => loadSettings().then(m => ({ default: m.Settings })));
-const History = lazy(() => loadHistory().then(m => ({ default: m.History })));
-const Reports = lazy(() => loadReports().then(m => ({ default: m.Reports })));
-const Budgets = lazy(() => loadBudgets().then(m => ({ default: m.Budgets })));
-const ManageShortcuts = lazy(() => loadManageShortcuts().then(m => ({ default: m.ManageShortcuts })));
+const Login = lazyWithRetry(loadLogin, 'Login');
+const Home = lazyWithRetry(loadHome, 'Home');
+const ProjectDetail = lazyWithRetry(loadProjectDetail, 'ProjectDetail');
+const SharedProjects = lazyWithRetry(loadSharedProjects, 'SharedProjects');
+const AddExpense = lazyWithRetry(loadAddExpense, 'AddExpense');
+const ManageCategories = lazyWithRetry(loadManageCategories, 'ManageCategories');
+const Stats = lazyWithRetry(loadStats, 'Stats');
+const Settings = lazyWithRetry(loadSettings, 'Settings');
+const History = lazyWithRetry(loadHistory, 'History');
+const Reports = lazyWithRetry(loadReports, 'Reports');
+const Budgets = lazyWithRetry(loadBudgets, 'Budgets');
+const ManageShortcuts = lazyWithRetry(loadManageShortcuts, 'ManageShortcuts');
 
 const PageLoader = () => (
   <div className="min-h-[60vh] flex items-center justify-center">
