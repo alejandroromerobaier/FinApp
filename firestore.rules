@@ -130,7 +130,7 @@ service cloud.firestore {
 
     match /transactions/{transactionId} {
       allow read: if isAuthenticated() && (
-        (resource.data.projectId == null && resource.data.authorId == request.auth.uid) ||
+        resource.data.authorId == request.auth.uid ||
         (resource.data.projectId != null && isProjectMember(resource.data.projectId)) ||
         isAdmin()
       );
