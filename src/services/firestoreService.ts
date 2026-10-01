@@ -136,24 +136,26 @@ export const syncUserProfile = async (user: any, displayName?: string) => {
       });
       // No longer seeding personal copies! System categories are shared via 'scope: system'
     } else {
-      // Update existing user if needed (e.g., name changed)
+      // Update existing user if needed (e.g., name changed or email missing)
       const data = userDoc.data();
+      const updates: any = {};
       
-      // Ensure currency exists even for older profiles
+      if (email && data.email !== email) {
+        updates.email = email;
+      }
       if (!data.currency) {
-        await updateDoc(userRef, { currency: 'ARS' });
+        updates.currency = 'ARS';
       }
-
-      // Ensure personal view settings exist for older profiles
       if (data.personalShowInHome === undefined) {
-        await updateDoc(userRef, { 
-          personalShowInHome: true,
-          personalHomeOrder: 1
-        });
+        updates.personalShowInHome = true;
+        updates.personalHomeOrder = 1;
+      }
+      if (displayName && data.name !== displayName) {
+        updates.name = displayName;
       }
 
-      if (displayName && data.name !== displayName) {
-        await updateDoc(userRef, { name: displayName });
+      if (Object.keys(updates).length > 0) {
+        await updateDoc(userRef, updates);
       }
     }
     
@@ -369,9 +371,18 @@ export const deleteCategory = async (categoryId: string) => {
 export const getProjects = (callback: (projects: any[]) => void) => {
   if (!auth.currentUser) return () => {};
   
+  const uid = auth.currentUser.uid;
+  const email = auth.currentUser.email;
+
+  if (email) {
+    claimPendingInvitations(email, uid).catch(err =>
+      console.error('Error claiming pending invitations in getProjects:', err)
+    );
+  }
+
   const q = query(
     collection(db, 'projects'), 
-    where('memberIds', 'array-contains', auth.currentUser.uid)
+    where('memberIds', 'array-contains', uid)
   );
   
   return onSnapshot(q, (snapshot) => {
@@ -656,7 +667,7 @@ export const getGlobalTransactions = (projectIds: string[], callback: (transacti
   
   if (projectIds.length > 0) {
     // We fetch each project separately to be safe with indexes and real-time updates
-    projectIds.slice(0, 10).forEach(projectId => {
+    projectIds.slice(0, 50).forEach(projectId => {
       const qProject = query(
         collection(db, 'transactions'),
         where('projectId', '==', projectId)
