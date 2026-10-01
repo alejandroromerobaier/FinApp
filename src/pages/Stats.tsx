@@ -9,8 +9,8 @@ import {
   ArrowUpRight, ArrowDownRight, Activity, PieChart as PieChartIcon, 
   BarChart3, Info, Clock, CreditCard, Target, Zap, Globe
 } from 'lucide-react';
-import { formatCurrency, cn } from '@/src/lib/utils';
-import { getTransactions } from '../services/firestoreService';
+import { getTransactions, getBudgets } from '../services/firestoreService';
+import { getLocalMonth } from '../lib/dateUtils';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -57,14 +57,44 @@ const getHexFromClass = (className: string) => {
 
 export const Stats: React.FC = () => {
   const navigate = useNavigate();
-  const { categories, transactions, userNames, projects, budgets, loading: dataLoading } = useData();
-  const { profile } = useAuth();
+  const { categories, transactions, userNames, projects, loading: dataLoading } = useData();
+  const { user, profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>('month');
   const [filterProject, setFilterProject] = useState<string>('all');
   const [viewType, setViewType] = useState<'expense' | 'income'>('expense');
   const [selectedCurrency, setSelectedCurrency] = useState<string>('');
+  const [periodBudgets, setPeriodBudgets] = useState<any[]>([]);
+
+  const activeMonthDate = useMemo(() => {
+    const now = new Date();
+    if (timeRange === 'lastMonth') {
+      return new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    }
+    return now;
+  }, [timeRange]);
+
+  const targetMonthStr = useMemo(() => {
+    return getLocalMonth(activeMonthDate);
+  }, [activeMonthDate]);
+
+  const projectIdsStr = useMemo(() => projects.map(p => p.id).sort().join(','), [projects]);
+
+  useEffect(() => {
+    if (!user) {
+      setPeriodBudgets([]);
+      return;
+    }
+    const projectIds = projects.map(p => p.id);
+    const unsubscribe = getBudgets(targetMonthStr, projectIds, (data) => {
+      setPeriodBudgets(data);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user, targetMonthStr, projectIdsStr]);
 
   useEffect(() => {
     if (!dataLoading) {
@@ -258,8 +288,8 @@ export const Stats: React.FC = () => {
         { name: 'Gastos', value: totalExpenses, color: '#f43f5e' }
       ];
 
-      // Budget Comparison
-      const budgetComparison = budgets.filter(b => {
+      // Budget Comparison for the specific period's month
+      const budgetComparison = periodBudgets.filter(b => {
         // Filter budgets by project and matching currency
         if (filterProject === 'all') {
           // If viewing all, show budgets that match the selected currency
@@ -365,7 +395,7 @@ export const Stats: React.FC = () => {
       console.error("Error calculating stats:", e);
       return null;
     }
-  }, [transactions, timeRange, categories, filterProject, viewType, userNames, projects, profile, selectedCurrency, budgets]);
+  }, [transactions, timeRange, categories, filterProject, viewType, userNames, projects, profile, selectedCurrency, periodBudgets]);
 
   if (loading) {
     return (
@@ -420,7 +450,7 @@ export const Stats: React.FC = () => {
         
         <div className="hidden sm:flex items-center gap-2 text-primary bg-primary/5 px-4 py-2 rounded-2xl border border-primary/10">
           <Calendar size={16} />
-          <span className="text-xs font-black uppercase tracking-widest">{new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</span>
+          <span className="text-xs font-black uppercase tracking-widest">{activeMonthDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</span>
         </div>
       </header>
 
