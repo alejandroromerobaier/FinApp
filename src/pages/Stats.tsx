@@ -9,6 +9,7 @@ import {
   ArrowUpRight, ArrowDownRight, Activity, PieChart as PieChartIcon, 
   BarChart3, Info, Clock, CreditCard, Target, Zap, Globe
 } from 'lucide-react';
+import { formatCurrency, cn } from '../lib/utils';
 import { getTransactions, getBudgets } from '../services/firestoreService';
 import { getLocalMonth } from '../lib/dateUtils';
 import { useData } from '../lib/DataContext';
