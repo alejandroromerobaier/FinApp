@@ -13,6 +13,7 @@ export interface UserProfile {
   bio?: string;
   occupation?: string;
   currency: string;
+  personalMonthlyBudget?: number | null;
   personalShowInHome?: boolean;
   personalHomeOrder?: number;
   personalShowInExpenseSelector?: boolean;

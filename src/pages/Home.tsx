@@ -30,7 +30,9 @@ import {
   ChevronLeft,
   Eye,
   EyeOff,
-  Plus
+  Plus,
+  Target,
+  AlertCircle
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import logo from '../assets/logo.png';
@@ -79,6 +81,7 @@ export const Home: React.FC = () => {
       currentExpenses: number;
       currency: string;
       name: string;
+      monthlyBudget?: number | null;
     }> = {
       personal: {
         income: 0,
@@ -87,7 +90,8 @@ export const Home: React.FC = () => {
         currentIncome: 0,
         currentExpenses: 0,
         currency: profile?.currency || 'ARS',
-        name: 'Personal'
+        name: 'Personal',
+        monthlyBudget: profile?.personalMonthlyBudget ?? null
       }
     };
 
@@ -99,7 +103,8 @@ export const Home: React.FC = () => {
         currentIncome: 0,
         currentExpenses: 0,
         currency: p.currency || profile?.currency || 'ARS',
-        name: p.name
+        name: p.name,
+        monthlyBudget: p.monthlyBudget ?? null
       };
     });
 
@@ -124,7 +129,8 @@ export const Home: React.FC = () => {
           currentIncome: 0, 
           currentExpenses: 0,
           currency,
-          name: projectName
+          name: projectName,
+          monthlyBudget: projectId === 'personal' ? (profile?.personalMonthlyBudget ?? null) : (project?.monthlyBudget ?? null)
         };
       }
       
@@ -335,6 +341,72 @@ export const Home: React.FC = () => {
                   </span>
                 </div>
               </div>
+
+              {/* Presupuesto General del Mes y Barra de Progreso */}
+              {data.monthlyBudget && data.monthlyBudget > 0 && (() => {
+                const budget = data.monthlyBudget;
+                const spent = data.currentExpenses;
+                const pct = Math.round((spent / budget) * 100);
+                const isOver = pct >= 100;
+                const isWarning = pct >= 80 && !isOver;
+
+                return (
+                  <div className="mb-6 bg-black/20 p-4 sm:p-5 rounded-[1.5rem] sm:rounded-[2rem] border border-white/10 backdrop-blur-md">
+                    <div className="flex items-center justify-between mb-2.5 gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5">
+                        <Target size={15} className="text-white/80" />
+                        <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-white/90">
+                          Presupuesto del Mes
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        {showBalances ? (
+                          <span className="text-xs sm:text-sm font-black text-white font-headline">
+                            {formatCurrency(spent, data.currency)} <span className="text-white/50 font-normal">/ {formatCurrency(budget, data.currency)}</span>
+                          </span>
+                        ) : (
+                          <span className="text-xs sm:text-sm font-bold text-white/60">••••••</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Progress Bar Track */}
+                    <div className="w-full h-2.5 sm:h-3 bg-white/10 rounded-full overflow-hidden p-0.5 border border-white/10">
+                      <div 
+                        className={cn(
+                          "h-full rounded-full transition-all duration-500",
+                          isOver 
+                            ? "bg-rose-400 shadow-sm shadow-rose-500/50" 
+                            : isWarning 
+                              ? "bg-amber-400 shadow-sm shadow-amber-500/50" 
+                              : "bg-emerald-400 shadow-sm shadow-emerald-500/50"
+                        )}
+                        style={{ width: `${Math.min(pct, 100)}%` }}
+                      />
+                    </div>
+
+                    {/* Status & Alerts */}
+                    <div className="mt-3 flex items-center justify-between gap-2 flex-wrap text-[11px] sm:text-xs">
+                      {isOver ? (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/30 border border-rose-400/40 rounded-xl text-rose-200 font-bold w-full sm:w-auto">
+                          <AlertCircle size={14} className="shrink-0 text-rose-300 animate-pulse" />
+                          <span>¡Presupuesto superado por {showBalances ? formatCurrency(spent - budget, data.currency) : '•••'} ({pct}%)!</span>
+                        </div>
+                      ) : isWarning ? (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/30 border border-amber-400/40 rounded-xl text-amber-100 font-bold w-full sm:w-auto">
+                          <AlertCircle size={14} className="shrink-0 text-amber-300" />
+                          <span>Cerca del límite: {pct}% consumido (Quedan {showBalances ? formatCurrency(budget - spent, data.currency) : '•••'})</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between w-full text-white/70 font-medium">
+                          <span>{pct}% utilizado</span>
+                          <span>Disponible: {showBalances ? formatCurrency(budget - spent, data.currency) : '••••••'}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5">
                 <div className="bg-white/10 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] backdrop-blur-md border border-white/5 group-hover:bg-white/15 transition-all shadow-inner">

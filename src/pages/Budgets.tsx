@@ -4,19 +4,53 @@ import { ArrowLeft, Target, Save, Check, AlertCircle, ChevronLeft, ChevronRight,
 import { useNavigate } from 'react-router-dom';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
-import { updateBudget, deleteBudget, getBudgetsOnce } from '../services/firestoreService';
+import { updateBudget, deleteBudget, getBudgetsOnce, updateUserProfile, updateProject } from '../services/firestoreService';
 import { getLocalMonth, parseLocalMonth } from '../lib/dateUtils';
 import { formatCurrency, cn } from '../lib/utils';
 
 export const Budgets: React.FC = () => {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const { categories, budgets, projects, budgetMonth, setBudgetMonth } = useData();
   const [savingMap, setSavingMap] = useState<Record<string, boolean>>({});
   const [successMap, setSuccessMap] = useState<Record<string, boolean>>({});
   const [localBudgets, setLocalBudgets] = useState<Record<string, string>>({});
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [copying, setCopying] = useState(false);
+  const [generalBudgetInput, setGeneralBudgetInput] = useState<string>('');
+  const [isSavingGeneral, setIsSavingGeneral] = useState(false);
+  const [generalSaved, setGeneralSaved] = useState(false);
+
+  // Active project context & currency
+  const activeProject = projects.find(p => p.id === selectedProjectId);
+  const activeCurrency = selectedProjectId ? (activeProject?.currency || 'ARS') : (profile?.currency || 'ARS');
+  const currentGeneralBudget = selectedProjectId ? (activeProject?.monthlyBudget ?? null) : (profile?.personalMonthlyBudget ?? null);
+
+  React.useEffect(() => {
+    setGeneralBudgetInput(currentGeneralBudget !== null && currentGeneralBudget !== undefined ? currentGeneralBudget.toString() : '');
+  }, [selectedProjectId, currentGeneralBudget]);
+
+  const handleSaveGeneralBudget = async () => {
+    if (isSavingGeneral) return;
+    setIsSavingGeneral(true);
+    try {
+      const val = generalBudgetInput.trim() !== '' && !isNaN(Number(generalBudgetInput))
+        ? Number(generalBudgetInput)
+        : null;
+      if (selectedProjectId) {
+        await updateProject(selectedProjectId, { monthlyBudget: val });
+      } else if (user) {
+        await updateUserProfile(user.uid, { personalMonthlyBudget: val });
+      }
+      setGeneralSaved(true);
+      setTimeout(() => setGeneralSaved(false), 2000);
+    } catch (err) {
+      console.error(err);
+      alert('Error al guardar el presupuesto general');
+    } finally {
+      setIsSavingGeneral(false);
+    }
+  };
 
   // Filter only expense categories
   const expenseCategories = categories.filter(c => c.type === 'expense');
@@ -231,6 +265,58 @@ export const Budgets: React.FC = () => {
             Copiar Anterior
           </button>
         )}
+      </section>
+
+      {/* General Project / Personal Monthly Budget */}
+      <section className="bg-surface-container-lowest border border-on-surface/5 p-5 rounded-2xl shadow-sm space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div>
+            <h4 className="text-xs font-black uppercase tracking-wider text-on-surface">
+              Presupuesto Mensual General
+            </h4>
+            <p className="text-[11px] text-on-surface-variant/70 font-medium">
+              Límite global mensual para {selectedProjectId ? (activeProject?.name || 'este proyecto') : 'Gastos Personales'}
+            </p>
+          </div>
+          <span className="text-xs font-black text-primary uppercase bg-primary/10 px-2.5 py-1 rounded-lg">
+            {activeCurrency}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <input 
+            type="number"
+            step="any"
+            min="0"
+            value={generalBudgetInput}
+            onChange={(e) => setGeneralBudgetInput(e.target.value)}
+            placeholder="Sin presupuesto general (opcional)"
+            className="flex-1 bg-surface-container-low border-none rounded-xl p-3 text-sm font-bold text-on-surface placeholder:text-on-surface-variant/30 focus:ring-2 focus:ring-primary/20"
+          />
+          <button
+            onClick={handleSaveGeneralBudget}
+            disabled={isSavingGeneral}
+            className={cn(
+              "px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 shrink-0 shadow-sm",
+              generalSaved
+                ? "bg-emerald-500 text-white"
+                : "bg-primary text-white hover:bg-primary/90 active:scale-95 disabled:opacity-50 cursor-pointer"
+            )}
+          >
+            {isSavingGeneral ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : generalSaved ? (
+              <>
+                <Check size={16} />
+                <span>Guardado</span>
+              </>
+            ) : (
+              <>
+                <Save size={16} />
+                <span>Guardar</span>
+              </>
+            )}
+          </button>
+        </div>
       </section>
 
       <div className="space-y-3">

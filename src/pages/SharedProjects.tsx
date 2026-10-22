@@ -41,6 +41,7 @@ export const SharedProjects: React.FC = () => {
     name: '', 
     icon: 'plane', 
     currency: 'ARS',
+    monthlyBudget: '' as string | number,
     showInHome: true,
     showInExpenseSelector: true,
     status: 'active' as 'active' | 'inactive',
@@ -63,6 +64,7 @@ export const SharedProjects: React.FC = () => {
     isPersonal: true,
     name: 'Personal',
     icon: 'wallet',
+    monthlyBudget: profile?.personalMonthlyBudget ?? null,
     showInHome: profile?.personalShowInHome ?? true,
     showInExpenseSelector: profile?.personalShowInExpenseSelector ?? true,
     status: profile?.personalStatus || 'active',
@@ -94,6 +96,9 @@ export const SharedProjects: React.FC = () => {
         name: project.name, 
         icon: project.icon, 
         currency: project.currency || 'ARS',
+        monthlyBudget: project.isPersonal 
+          ? (profile?.personalMonthlyBudget !== undefined && profile?.personalMonthlyBudget !== null ? profile.personalMonthlyBudget.toString() : '')
+          : (project.monthlyBudget !== undefined && project.monthlyBudget !== null ? project.monthlyBudget.toString() : ''),
         showInHome: project.showInHome !== undefined ? project.showInHome : true,
         showInExpenseSelector: project.isPersonal
           ? (profile?.personalShowInExpenseSelector ?? true)
@@ -112,6 +117,7 @@ export const SharedProjects: React.FC = () => {
         name: '', 
         icon: 'plane', 
         currency: 'ARS',
+        monthlyBudget: '',
         showInHome: true,
         showInExpenseSelector: true,
         status: 'active',
@@ -139,12 +145,16 @@ export const SharedProjects: React.FC = () => {
     setSaveError('');
     
     try {
-      const { isDefaultProject, ...projectFields } = formData;
+      const { isDefaultProject, monthlyBudget, ...projectFields } = formData;
+      const parsedBudget = monthlyBudget !== '' && !isNaN(Number(monthlyBudget))
+        ? Number(monthlyBudget)
+        : null;
 
       if (editingProject) {
         if (editingProject.isPersonal) {
           await updateUserProfile(user!.uid, {
             currency: formData.currency,
+            personalMonthlyBudget: parsedBudget,
             personalShowInHome: formData.showInHome,
             personalShowInExpenseSelector: formData.showInExpenseSelector,
             personalStatus: formData.status,
@@ -152,7 +162,10 @@ export const SharedProjects: React.FC = () => {
             ...(isDefaultProject ? { defaultProjectId: 'personal' } : {})
           });
         } else {
-          await updateProject(editingProject.id, projectFields);
+          await updateProject(editingProject.id, {
+            ...projectFields,
+            monthlyBudget: parsedBudget
+          });
           if (isDefaultProject) {
             await updateUserProfile(user!.uid, { defaultProjectId: editingProject.id });
           } else if (profile?.defaultProjectId === editingProject.id) {
@@ -160,7 +173,10 @@ export const SharedProjects: React.FC = () => {
           }
         }
       } else {
-        const docRef = await createProject(projectFields);
+        const docRef = await createProject({
+          ...projectFields,
+          monthlyBudget: parsedBudget
+        });
         if (isDefaultProject && docRef?.id) {
           await updateUserProfile(user!.uid, { defaultProjectId: docRef.id });
         }
@@ -487,6 +503,30 @@ export const SharedProjects: React.FC = () => {
                     </select>
                   </div>
                 )}
+
+                {/* Presupuesto Mensual General */}
+                <div>
+                  <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-2 ml-1">
+                    Presupuesto Mensual General (Opcional)
+                  </label>
+                  <div className="relative">
+                    <input 
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={formData.monthlyBudget}
+                      onChange={(e) => setFormData({ ...formData, monthlyBudget: e.target.value })}
+                      placeholder="Ej. 250000"
+                      className="w-full bg-[#F2F2F7] border-none rounded-2xl p-4 pr-16 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all text-on-surface placeholder:text-on-surface-variant/30"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-on-surface-variant/40 uppercase pointer-events-none">
+                      {formData.currency}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-on-surface-variant/60 font-medium mt-1.5 ml-1">
+                    Establece un límite de gasto mensual para visualizar la barra de progreso y alertas en la pantalla principal.
+                  </p>
+                </div>
 
                 {/* Display configuration */}
                 <div className="pt-4 border-t border-black/5 space-y-5">

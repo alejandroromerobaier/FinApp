@@ -33,6 +33,7 @@ export interface Project {
   ownerId: string;
   memberIds: string[];
   pendingEmails?: string[];
+  monthlyBudget?: number | null;
   createdAt: any;
   updatedAt?: any;
 }

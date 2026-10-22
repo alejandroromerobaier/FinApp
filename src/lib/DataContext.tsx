@@ -31,7 +31,10 @@ export interface Project {
   currency: string;
   ownerId: string;
   memberIds: string[];
+  monthlyBudget?: number | null;
   showInHome?: boolean;
+  showInExpenseSelector?: boolean;
+  status?: 'active' | 'inactive';
   homeOrder?: number;
   createdAt: any;
 }
