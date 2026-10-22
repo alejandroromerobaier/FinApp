@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plane, Home, PlusCircle, Share2, Edit3, Trash2, Eye, MoreVertical, Hourglass, Users, X, Wallet, Briefcase, Heart, ShoppingBag, Landmark, Star, Archive, CheckCircle2, Power } from 'lucide-react';
+import { Plane, Home, PlusCircle, Share2, Edit3, Trash2, Eye, MoreVertical, Hourglass, Users, X, Wallet, Briefcase, Heart, ShoppingBag, Landmark, Star, Archive, CheckCircle2, Power, ArrowLeft } from 'lucide-react';
 import { formatCurrency, cn } from '@/src/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useData } from '../lib/DataContext';
@@ -237,14 +237,23 @@ export const SharedProjects: React.FC = () => {
     <div className="px-6 max-w-5xl mx-auto py-8 pb-32">
       {/* Section Header */}
       <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <span className="text-[0.75rem] font-bold uppercase tracking-[0.1em] text-on-surface-variant/60 mb-2 block">Colaboración</span>
-          <h1 className="text-4xl font-extrabold tracking-tight text-on-surface font-headline">Bóvedas Compartidas</h1>
-          <p className="text-on-surface-variant mt-2 max-w-md">Administra tus espacios compartidos, invita a colaboradores y controla los gastos en conjunto.</p>
+        <div className="flex items-start gap-4">
+          <button 
+            onClick={() => navigate('/settings')}
+            className="w-11 h-11 rounded-2xl bg-surface-container-low hover:bg-surface-container-high border border-on-surface/5 flex items-center justify-center text-on-surface transition-all active:scale-95 shrink-0 mt-1 shadow-sm"
+            title="Volver a Ajustes"
+          >
+            <ArrowLeft size={22} />
+          </button>
+          <div>
+            <span className="text-[0.75rem] font-bold uppercase tracking-[0.1em] text-on-surface-variant/60 mb-2 block">Colaboración</span>
+            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-on-surface font-headline">Bóvedas Compartidas</h1>
+            <p className="text-on-surface-variant mt-2 max-w-md text-sm sm:text-base">Administra tus espacios compartidos, invita a colaboradores y controla los gastos en conjunto.</p>
+          </div>
         </div>
         <button 
           onClick={() => handleOpenModal()}
-          className="bg-primary hover:opacity-90 text-white px-6 py-3.5 rounded-2xl flex items-center gap-2 transition-all active:scale-95 shadow-xl shadow-primary/10"
+          className="bg-primary hover:opacity-90 text-white px-6 py-3.5 rounded-2xl flex items-center gap-2 transition-all active:scale-95 shadow-xl shadow-primary/10 shrink-0 self-start md:self-auto"
         >
           <PlusCircle size={20} />
           <span className="font-bold">Crear Nuevo Proyecto</span>

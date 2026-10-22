@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, 
+  ArrowLeft,
   Calendar, 
   ShoppingBag, 
   ChevronDown, 
@@ -252,39 +253,54 @@ export const AddExpense: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-surface flex flex-col pb-10">
-      {/* Header */}
-      <header className="fixed top-0 w-full z-40 glass-header pt-safe-top">
-        <div className="flex items-center justify-between px-6 h-16">
-          <div className="flex items-center gap-3">
-            <button onClick={() => navigate(-1)} className="text-on-surface-variant p-2 hover:bg-on-surface/5 rounded-full transition-colors active:scale-90">
-              <X size={24} />
+      {/* Header (Fixed with blur and safe area) */}
+      <header className="fixed top-0 w-full z-40 glass-header pt-safe-top bg-surface/90 backdrop-blur-xl border-b border-on-surface/5">
+        <div className="flex items-center justify-between px-4 sm:px-6 h-16 max-w-2xl mx-auto w-full">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <button 
+              onClick={() => navigate(-1)} 
+              className="text-on-surface p-2 hover:bg-on-surface/5 rounded-full transition-colors active:scale-90 flex items-center justify-center shrink-0"
+              title="Volver atrás"
+            >
+              <ArrowLeft size={22} />
             </button>
-            <span className="text-xl font-extrabold tracking-tight text-on-surface font-headline">
+            <span className="text-lg sm:text-xl font-extrabold tracking-tight text-on-surface font-headline truncate">
               {id ? 'Editar Transacción' : 'Nueva Transacción'}
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Cancel Button */}
+            <button
+              onClick={() => navigate(-1)}
+              className="text-xs font-bold text-on-surface-variant/70 hover:text-on-surface px-3 py-1.5 rounded-xl hover:bg-on-surface/5 transition-colors uppercase tracking-wider"
+              title="Descartar cambios y salir"
+            >
+              Cancelar
+            </button>
+
             {id && isAuthor && (
               <button 
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="p-2 text-rose-600 hover:bg-rose-500/5 rounded-full transition-colors"
+                className="p-2 text-rose-600 hover:bg-rose-500/10 rounded-full transition-colors active:scale-90"
+                title="Eliminar transacción"
               >
-                {isDeleting ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
+                {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
               </button>
             )}
+
             {isAuthor && (
               <button 
                 onClick={handleSave} 
                 disabled={!isValidAmount || isSaving}
                 className={cn(
-                  "font-bold px-4 py-2 rounded-xl transition-all active:scale-95 flex items-center gap-2",
+                  "font-bold text-xs sm:text-sm px-3.5 sm:px-4 py-2 rounded-xl transition-all active:scale-95 flex items-center gap-1.5 shadow-sm",
                   (!isValidAmount || isSaving) 
-                    ? "text-on-surface-variant/30 bg-on-surface/5" 
-                    : "text-primary bg-primary/10 hover:bg-primary/20"
+                    ? "text-on-surface-variant/30 bg-on-surface/5 cursor-not-allowed shadow-none" 
+                    : "text-white bg-primary hover:bg-primary/90 shadow-primary/20"
                 )}
               >
-                {isSaving && <Loader2 size={16} className="animate-spin" />}
+                {isSaving && <Loader2 size={14} className="animate-spin" />}
                 {id ? 'Actualizar' : 'Guardar'}
               </button>
             )}
@@ -582,14 +598,25 @@ export const AddExpense: React.FC = () => {
         {/* Delete Button (Only when editing and is Author) */}
         {id && isAuthor && (
           <button 
+            type="button"
             onClick={handleDelete}
             disabled={isDeleting || isSaving}
-            className="w-full py-5 rounded-[2rem] font-bold text-rose-600 bg-rose-500/5 hover:bg-rose-500/10 transition-all active:scale-95 flex items-center justify-center gap-2 mt-4"
+            className="w-full py-4 rounded-2xl font-bold text-rose-600 bg-rose-500/5 hover:bg-rose-500/10 transition-all active:scale-95 flex items-center justify-center gap-2"
           >
-            {isDeleting ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
+            {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
             Eliminar Transacción
           </button>
         )}
+
+        {/* Cancel / Discard Action */}
+        <button 
+          type="button"
+          onClick={() => navigate(-1)}
+          disabled={isSaving || isDeleting}
+          className="w-full py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider text-on-surface-variant/70 hover:text-on-surface hover:bg-on-surface/5 transition-all active:scale-95 flex items-center justify-center gap-2"
+        >
+          Descartar y volver atrás
+        </button>
       </main>
 
       {/* Category Selection Sheet */}
