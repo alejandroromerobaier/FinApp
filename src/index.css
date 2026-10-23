@@ -91,18 +91,69 @@
 }
 
 .dark .bg-white\/50,
-.dark .bg-white\/80 {
-  background-color: rgba(26, 34, 52, 0.8) !important;
+.dark .bg-white\/60,
+.dark .bg-white\/70,
+.dark .bg-white\/80,
+.dark .bg-white\/90,
+.dark .bg-white\/95 {
+  background-color: rgba(26, 34, 52, 0.85) !important;
 }
 
 .dark .border-black\/5,
-.dark .border-black\/10 {
+.dark .border-black\/10,
+.dark .border-black\/20 {
   border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 .dark .bg-\[\#F2F2F7\] {
   background-color: var(--color-surface-container-low) !important;
   color: var(--color-on-surface) !important;
+}
+
+/* Fallback for hardcoded dark text classes */
+.dark .text-black {
+  color: var(--color-on-surface) !important;
+}
+
+.dark .text-black\/80,
+.dark .text-black\/70,
+.dark .text-black\/60 {
+  color: var(--color-on-surface) !important;
+}
+
+.dark .text-black\/40,
+.dark .text-black\/30 {
+  color: var(--color-on-surface-variant) !important;
+}
+
+.dark .text-black\/20,
+.dark .text-black\/10 {
+  color: rgba(241, 245, 249, 0.35) !important;
+}
+
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700 {
+  color: var(--color-on-surface) !important;
+}
+
+.dark .text-slate-600,
+.dark .text-slate-500 {
+  color: var(--color-on-surface-variant) !important;
+}
+
+.dark .text-slate-400 {
+  color: rgba(241, 245, 249, 0.65) !important;
+}
+
+.dark .bg-slate-100,
+.dark .bg-slate-200 {
+  background-color: var(--color-surface-container-low) !important;
+}
+
+.dark .border-slate-100,
+.dark .border-slate-200 {
+  border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 .dark input,

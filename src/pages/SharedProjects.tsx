@@ -249,10 +249,10 @@ export const SharedProjects: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F2F2F7]">
+      <div className="min-h-screen flex items-center justify-center bg-surface">
         <div className="flex flex-col items-center gap-4">
           <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-black/40 font-bold text-xs uppercase tracking-widest">Cargando proyectos...</p>
+          <p className="text-on-surface-variant font-bold text-xs uppercase tracking-widest">Cargando proyectos...</p>
         </div>
       </div>
     );
@@ -291,7 +291,7 @@ export const SharedProjects: React.FC = () => {
           onClick={() => setActiveTab('active')}
           className={cn(
             "flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2",
-            activeTab === 'active' ? "bg-white text-primary shadow-sm" : "text-on-surface-variant/40 hover:text-on-surface-variant"
+            activeTab === 'active' ? "bg-surface-container-lowest text-primary shadow-sm" : "text-on-surface-variant/70 hover:text-on-surface"
           )}
         >
           <CheckCircle2 size={16} />
@@ -301,7 +301,7 @@ export const SharedProjects: React.FC = () => {
           onClick={() => setActiveTab('inactive')}
           className={cn(
             "flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2",
-            activeTab === 'inactive' ? "bg-white text-slate-700 shadow-sm" : "text-on-surface-variant/40 hover:text-on-surface-variant"
+            activeTab === 'inactive' ? "bg-surface-container-lowest text-on-surface shadow-sm" : "text-on-surface-variant/70 hover:text-on-surface"
           )}
         >
           <Archive size={16} />
@@ -319,11 +319,11 @@ export const SharedProjects: React.FC = () => {
           </h2>
           
           {(activeTab === 'active' ? activeMyProjects : inactiveMyProjects).length === 0 ? (
-            <div className="bg-white/50 border-2 border-dashed border-black/5 rounded-3xl p-12 text-center">
-              <div className="w-16 h-16 bg-black/5 rounded-full flex items-center justify-center mx-auto mb-4">
-                {activeTab === 'active' ? <PlusCircle size={32} className="text-black/20" /> : <Archive size={32} className="text-black/20" />}
+            <div className="bg-surface-container-low/50 border-2 border-dashed border-on-surface/10 rounded-3xl p-12 text-center">
+              <div className="w-16 h-16 bg-on-surface/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                {activeTab === 'active' ? <PlusCircle size={32} className="text-on-surface-variant/30" /> : <Archive size={32} className="text-on-surface-variant/30" />}
               </div>
-              <p className="text-black/40 font-medium">
+              <p className="text-on-surface-variant/70 font-medium">
                 {activeTab === 'active' ? 'No tienes proyectos creados activos.' : 'No tienes proyectos inactivos o archivados.'}
               </p>
             </div>
@@ -349,8 +349,8 @@ export const SharedProjects: React.FC = () => {
           </h2>
 
           {(activeTab === 'active' ? activeSharedWithMe : inactiveSharedWithMe).length === 0 ? (
-            <div className="bg-white/50 border-2 border-dashed border-black/5 rounded-3xl p-12 text-center">
-              <p className="text-black/40 font-medium">
+            <div className="bg-surface-container-low/50 border-2 border-dashed border-on-surface/10 rounded-3xl p-12 text-center">
+              <p className="text-on-surface-variant/70 font-medium">
                 {activeTab === 'active' ? 'No tienes proyectos compartidos activos.' : 'No tienes proyectos compartidos inactivos.'}
               </p>
             </div>
@@ -393,13 +393,13 @@ export const SharedProjects: React.FC = () => {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
-            className="bg-white p-8 rounded-3xl border border-black/5 shadow-sm"
+            className="bg-surface-container-lowest p-8 rounded-3xl border border-on-surface/10 shadow-sm"
           >
             <h4 className="text-sm font-extrabold text-on-surface uppercase tracking-widest mb-6">Invitaciones</h4>
             <div className="space-y-6">
               <div className="flex flex-col items-center justify-center py-4 text-center">
-                <Hourglass size={32} className="text-black/10 mb-2" />
-                <p className="text-xs text-black/40 font-medium">No tienes invitaciones pendientes</p>
+                <Hourglass size={32} className="text-on-surface-variant/20 mb-2" />
+                <p className="text-xs text-on-surface-variant/70 font-medium">No tienes invitaciones pendientes</p>
               </div>
             </div>
           </motion.div>
@@ -415,16 +415,16 @@ export const SharedProjects: React.FC = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsModalOpen(false)}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl relative z-10 flex flex-col max-h-[90vh] overflow-hidden"
+              className="bg-surface-container-lowest w-full max-w-lg rounded-[2.5rem] shadow-2xl relative z-10 flex flex-col max-h-[90vh] overflow-hidden border border-on-surface/10"
             >
               {/* Fixed Header */}
-              <div className="flex justify-between items-center px-6 py-5 border-b border-black/5 shrink-0 bg-white">
+              <div className="flex justify-between items-center px-6 py-5 border-b border-on-surface/10 shrink-0 bg-surface-container-lowest">
                 <div className="min-w-0 flex-1 mr-3">
                   <h2 className="text-xl sm:text-2xl font-extrabold text-on-surface font-headline truncate">
                     {editingProject ? (editingProject.isPersonal ? 'Editar Proyecto Personal' : 'Editar Proyecto') : 'Nuevo Proyecto'}
@@ -433,7 +433,7 @@ export const SharedProjects: React.FC = () => {
                     {editingProject?.isPersonal ? 'Configura tu billetera principal' : 'Configura los detalles y visibilidad'}
                   </p>
                 </div>
-                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-black/5 rounded-full transition-colors text-on-surface-variant shrink-0">
+                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-on-surface/5 rounded-full transition-colors text-on-surface-variant shrink-0">
                   <X size={20} />
                 </button>
               </div>
@@ -443,23 +443,23 @@ export const SharedProjects: React.FC = () => {
                 {!editingProject?.isPersonal ? (
                   <>
                     <div>
-                      <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-2 ml-1">Nombre del Proyecto</label>
+                      <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2 ml-1">Nombre del Proyecto</label>
                       <input 
                         type="text" 
                         required
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         placeholder="Ej: Viaje a Córdoba, Gastos Casa..."
-                        className="w-full bg-[#F2F2F7] border-none rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all text-on-surface"
+                        className="w-full bg-surface-container-low border border-on-surface/10 rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all text-on-surface outline-none"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-2 ml-1">Preferencia de Moneda</label>
+                      <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2 ml-1">Preferencia de Moneda</label>
                       <select 
                         value={formData.currency}
                         onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                        className="w-full bg-[#F2F2F7] border-none rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer text-on-surface"
+                        className="w-full bg-surface-container-low border border-on-surface/10 rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer text-on-surface outline-none"
                       >
                         <option value="ARS">Peso Argentino (ARS)</option>
                         <option value="USD">Dólar (USD)</option>
@@ -473,7 +473,7 @@ export const SharedProjects: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-2 ml-1">Icono del Proyecto</label>
+                      <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2 ml-1">Icono del Proyecto</label>
                       <div className="grid grid-cols-4 gap-3">
                         {PROJECT_ICONS.map((item) => (
                           <button
@@ -484,7 +484,7 @@ export const SharedProjects: React.FC = () => {
                               "aspect-square rounded-2xl flex items-center justify-center transition-all border-2",
                               formData.icon === item.id 
                                 ? "bg-primary border-primary text-white shadow-lg shadow-primary/20" 
-                                : "bg-[#F2F2F7] border-transparent text-black/40 hover:bg-black/5"
+                                : "bg-surface-container-low border-transparent text-on-surface-variant hover:bg-on-surface/5"
                             )}
                           >
                             <item.icon size={22} />
@@ -495,11 +495,11 @@ export const SharedProjects: React.FC = () => {
                   </>
                 ) : (
                   <div>
-                    <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-2 ml-1">Preferencia de Moneda (Personal)</label>
+                    <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2 ml-1">Preferencia de Moneda (Personal)</label>
                     <select 
                       value={formData.currency}
                       onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                      className="w-full bg-[#F2F2F7] border-none rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer text-on-surface"
+                      className="w-full bg-surface-container-low border border-on-surface/10 rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer text-on-surface outline-none"
                     >
                       <option value="ARS">Peso Argentino (ARS)</option>
                       <option value="USD">Dólar (USD)</option>
@@ -544,7 +544,7 @@ export const SharedProjects: React.FC = () => {
 
                 {/* Presupuesto Mensual General */}
                 <div>
-                  <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-2 ml-1">
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2 ml-1">
                     Presupuesto Mensual General (Opcional)
                   </label>
                   <div className="relative">
@@ -569,37 +569,37 @@ export const SharedProjects: React.FC = () => {
                         });
                       }}
                       placeholder="Ej. 250.000"
-                      className="w-full bg-[#F2F2F7] border-none rounded-2xl p-4 pr-16 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all text-on-surface placeholder:text-on-surface-variant/30"
+                      className="w-full bg-surface-container-low border border-on-surface/10 rounded-2xl p-4 pr-16 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all text-on-surface placeholder:text-on-surface-variant/40 outline-none"
                     />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-on-surface-variant/40 uppercase pointer-events-none">
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-on-surface-variant/70 uppercase pointer-events-none">
                       {formData.currency}
                     </span>
                   </div>
-                  <p className="text-[11px] text-on-surface-variant/60 font-medium mt-1.5 ml-1">
+                  <p className="text-[11px] text-on-surface-variant/70 font-medium mt-1.5 ml-1">
                     Establece un límite de gasto mensual para visualizar la barra de progreso y alertas en la pantalla principal.
                   </p>
                 </div>
 
                 {/* Display configuration */}
-                <div className="pt-4 border-t border-black/5 space-y-5">
-                  <span className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-[0.2em] block mb-2">Configuración y Visibilidad</span>
+                <div className="pt-4 border-t border-on-surface/10 space-y-5">
+                  <span className="text-[10px] font-black text-on-surface-variant/70 uppercase tracking-[0.2em] block mb-2">Configuración y Visibilidad</span>
 
                   <div className="flex items-center justify-between bg-surface-container-low p-3.5 rounded-2xl border border-on-surface/5">
                     <div>
                       <label className="block text-xs font-bold text-on-surface mb-0.5">Visibilidad en la Home</label>
-                      <p className="text-[11px] text-on-surface-variant/60 font-medium">Mostrar tarjeta en la pantalla principal</p>
+                      <p className="text-[11px] text-on-surface-variant/70 font-medium">Mostrar tarjeta en la pantalla principal</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, showInHome: !formData.showInHome })}
                       className={cn(
                         "w-12 h-6 rounded-full transition-all relative shrink-0 ml-3",
-                        formData.showInHome ? "bg-primary" : "bg-black/10"
+                        formData.showInHome ? "bg-primary" : "bg-on-surface/20"
                       )}
                     >
                       <motion.div 
                         animate={{ x: formData.showInHome ? 24 : 4 }}
-                        className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm" 
+                        className="absolute top-1 w-4 h-4 bg-surface-container-lowest rounded-full shadow-sm" 
                       />
                     </button>
                   </div>
@@ -607,19 +607,19 @@ export const SharedProjects: React.FC = () => {
                   <div className="flex items-center justify-between bg-surface-container-low p-3.5 rounded-2xl border border-on-surface/5">
                     <div>
                       <label className="block text-xs font-bold text-on-surface mb-0.5">Visibilidad al Cargar Gastos</label>
-                      <p className="text-[11px] text-on-surface-variant/60 font-medium">Mostrar en selector al registrar gasto</p>
+                      <p className="text-[11px] text-on-surface-variant/70 font-medium">Mostrar en selector al registrar gasto</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, showInExpenseSelector: !formData.showInExpenseSelector })}
                       className={cn(
                         "w-12 h-6 rounded-full transition-all relative shrink-0 ml-3",
-                        formData.showInExpenseSelector ? "bg-primary" : "bg-black/10"
+                        formData.showInExpenseSelector ? "bg-primary" : "bg-on-surface/20"
                       )}
                     >
                       <motion.div 
                         animate={{ x: formData.showInExpenseSelector ? 24 : 4 }}
-                        className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm" 
+                        className="absolute top-1 w-4 h-4 bg-surface-container-lowest rounded-full shadow-sm" 
                       />
                     </button>
                   </div>
@@ -627,19 +627,19 @@ export const SharedProjects: React.FC = () => {
                   <div className="flex items-center justify-between bg-surface-container-low p-3.5 rounded-2xl border border-on-surface/5">
                     <div>
                       <label className="block text-xs font-bold text-on-surface mb-0.5">Preinicialización</label>
-                      <p className="text-[11px] text-on-surface-variant/60 font-medium">Usar por defecto al cargar movimientos</p>
+                      <p className="text-[11px] text-on-surface-variant/70 font-medium">Usar por defecto al cargar movimientos</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, isDefaultProject: !formData.isDefaultProject })}
                       className={cn(
                         "w-12 h-6 rounded-full transition-all relative shrink-0 ml-3",
-                        formData.isDefaultProject ? "bg-primary" : "bg-black/10"
+                        formData.isDefaultProject ? "bg-primary" : "bg-on-surface/20"
                       )}
                     >
                       <motion.div 
                         animate={{ x: formData.isDefaultProject ? 24 : 4 }}
-                        className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm" 
+                        className="absolute top-1 w-4 h-4 bg-surface-container-lowest rounded-full shadow-sm" 
                       />
                     </button>
                   </div>
@@ -647,7 +647,7 @@ export const SharedProjects: React.FC = () => {
                   <div className="flex items-center justify-between bg-surface-container-low p-3.5 rounded-2xl border border-on-surface/5">
                     <div>
                       <label className="block text-xs font-bold text-on-surface mb-0.5">Estado del Proyecto</label>
-                      <p className="text-[11px] text-on-surface-variant/60 font-medium">Proyecto Activo o Archivados</p>
+                      <p className="text-[11px] text-on-surface-variant/70 font-medium">Proyecto Activo o Archivados</p>
                     </div>
                     <button
                       type="button"
@@ -655,8 +655,8 @@ export const SharedProjects: React.FC = () => {
                       className={cn(
                         "px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all border shrink-0 ml-3",
                         formData.status === 'active' 
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
-                          : "bg-slate-100 text-slate-600 border-slate-200"
+                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" 
+                          : "bg-on-surface/10 text-on-surface-variant border-on-surface/15"
                       )}
                     >
                       {formData.status === 'active' ? 'Activo' : 'Inactivo'}
@@ -664,11 +664,11 @@ export const SharedProjects: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-2 ml-1">Posición en la Home</label>
+                    <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2 ml-1">Posición en la Home</label>
                     <select 
                       value={formData.homeOrder}
                       onChange={(e) => setFormData({ ...formData, homeOrder: parseInt(e.target.value) })}
-                      className="w-full bg-[#F2F2F7] border-none rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer text-on-surface"
+                      className="w-full bg-surface-container-low border border-on-surface/10 rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer text-on-surface outline-none"
                     >
                       {Array.from({ length: editingProject ? projectsCount : projectsCount + 1 }, (_, i) => i + 1).map(num => (
                         <option key={num} value={num}>{num}ª Posición</option>
@@ -679,7 +679,7 @@ export const SharedProjects: React.FC = () => {
               </form>
 
               {/* Fixed Footer */}
-              <div className="p-6 pt-4 border-t border-black/5 bg-white shrink-0 flex flex-col gap-2">
+              <div className="p-6 pt-4 border-t border-on-surface/10 bg-surface-container-lowest shrink-0 flex flex-col gap-2">
                 {saveError && (
                   <p className="text-rose-600 text-xs font-bold text-center p-2.5 bg-rose-500/10 rounded-xl uppercase tracking-wider">{saveError}</p>
                 )}
@@ -713,19 +713,19 @@ export const SharedProjects: React.FC = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsInviteModalOpen(false)}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white w-full max-w-md rounded-[2.5rem] p-6 sm:p-8 shadow-2xl relative z-10 flex flex-col max-h-[90vh] overflow-y-auto"
+              className="bg-surface-container-lowest w-full max-w-md rounded-[2.5rem] p-6 sm:p-8 shadow-2xl relative z-10 flex flex-col max-h-[90vh] overflow-y-auto border border-on-surface/10"
             >
               <div className="flex justify-between items-center mb-6 gap-3 shrink-0">
                 <h2 className="text-xl sm:text-2xl font-extrabold text-on-surface font-headline truncate min-w-0 flex-1">
                   Invitar Colaborador
                 </h2>
-                <button onClick={() => setIsInviteModalOpen(false)} className="p-2 hover:bg-black/5 rounded-full transition-colors shrink-0">
+                <button onClick={() => setIsInviteModalOpen(false)} className="p-2 hover:bg-on-surface/5 rounded-full transition-colors shrink-0 text-on-surface-variant">
                   <X size={24} />
                 </button>
               </div>
@@ -736,14 +736,14 @@ export const SharedProjects: React.FC = () => {
 
               <form onSubmit={handleInvite} className="space-y-6">
                 <div>
-                  <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-3 ml-1">Email del Colaborador</label>
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-3 ml-1">Email del Colaborador</label>
                   <input 
                     type="email" 
                     required
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                     placeholder="ejemplo@correo.com"
-                    className="w-full bg-[#F2F2F7] border-none rounded-2xl p-4 text-lg font-bold focus:ring-2 focus:ring-primary/20 transition-all"
+                    className="w-full bg-surface-container-low border border-on-surface/10 rounded-2xl p-4 text-lg font-bold focus:ring-2 focus:ring-primary/20 transition-all text-on-surface outline-none"
                   />
                   {inviteError && (
                     <p className="text-error text-xs font-bold mt-2 ml-1 uppercase tracking-wider">{inviteError}</p>
@@ -787,15 +787,15 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, isOwner, isDefault, 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className={cn(
-        "bg-white rounded-[2rem] p-5 sm:p-8 border border-black/5 shadow-sm hover:shadow-md transition-all group",
-        isInactive && "opacity-75 bg-slate-50/50"
+        "bg-surface-container-lowest rounded-[2rem] p-5 sm:p-8 border border-on-surface/10 shadow-sm hover:shadow-md transition-all group",
+        isInactive && "opacity-75 bg-surface-container-low/50"
       )}
     >
       <div className="flex justify-between items-start gap-3 mb-6">
         <div className="flex items-center gap-3 sm:gap-5 min-w-0 flex-1">
           <div className={cn(
             "w-12 h-12 sm:w-16 sm:h-16 rounded-[18px] sm:rounded-[22px] flex items-center justify-center shrink-0",
-            isInactive ? "bg-slate-200 text-slate-500" : isOwner ? "bg-primary/5 text-primary" : "bg-secondary/5 text-secondary"
+            isInactive ? "bg-on-surface/10 text-on-surface-variant" : isOwner ? "bg-primary/5 text-primary" : "bg-secondary/5 text-secondary"
           )}>
             <Icon className="w-6 h-6 sm:w-8 sm:h-8" strokeWidth={2.5} />
           </div>
@@ -809,18 +809,18 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, isOwner, isDefault, 
                 {isOwner ? 'PROPIETARIO' : 'COLABORADOR'}
               </span>
               {isInactive && (
-                <span className="bg-slate-200 text-slate-700 text-[10px] font-extrabold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg uppercase tracking-wider flex items-center gap-1 shrink-0">
+                <span className="bg-on-surface/10 text-on-surface-variant text-[10px] font-extrabold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg uppercase tracking-wider flex items-center gap-1 shrink-0">
                   <Archive size={10} />
                   INACTIVO
                 </span>
               )}
               {isDefault && !isInactive && (
-                <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg uppercase tracking-wider flex items-center gap-1 shrink-0">
-                  <Star size={10} className="fill-amber-800" />
+                <span className="bg-amber-500/15 text-amber-700 dark:text-amber-400 text-[10px] font-extrabold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg uppercase tracking-wider flex items-center gap-1 shrink-0">
+                  <Star size={10} className="fill-current" />
                   PREDETERMINADO
                 </span>
               )}
-              <span className="text-black/40 text-xs sm:text-sm font-medium flex items-center gap-1 shrink-0">
+              <span className="text-on-surface-variant/70 text-xs sm:text-sm font-medium flex items-center gap-1 shrink-0">
                 <Users size={14} />
                 {project.memberIds?.length || 1}
               </span>
@@ -833,7 +833,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, isOwner, isDefault, 
               onClick={onToggleStatus}
               className={cn(
                 "p-2 sm:p-2.5 rounded-xl transition-all shrink-0",
-                isInactive ? "text-emerald-600 hover:bg-emerald-50" : "text-black/20 hover:text-slate-600 hover:bg-black/5"
+                isInactive ? "text-emerald-600 hover:bg-emerald-500/10" : "text-on-surface-variant/40 hover:text-on-surface hover:bg-on-surface/5"
               )}
               title={isInactive ? "Reactivar proyecto" : "Inactivar / Archivar proyecto"}
             >
@@ -843,7 +843,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, isOwner, isDefault, 
           {onInvite && (
             <button 
               onClick={onInvite}
-              className="p-2 sm:p-2.5 text-black/20 hover:text-secondary hover:bg-secondary/5 rounded-xl transition-all shrink-0"
+              className="p-2 sm:p-2.5 text-on-surface-variant/40 hover:text-secondary hover:bg-secondary/5 rounded-xl transition-all shrink-0"
               title="Invitar colaborador"
             >
               <Share2 size={18} className="sm:w-5 sm:h-5" />
@@ -852,7 +852,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, isOwner, isDefault, 
           {onEdit && (
             <button 
               onClick={onEdit}
-              className="p-2 sm:p-2.5 text-black/20 hover:text-primary hover:bg-primary/5 rounded-xl transition-all shrink-0"
+              className="p-2 sm:p-2.5 text-on-surface-variant/40 hover:text-primary hover:bg-primary/5 rounded-xl transition-all shrink-0"
               title="Editar proyecto"
             >
               <Edit3 size={18} className="sm:w-5 sm:h-5" />
@@ -861,7 +861,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, isOwner, isDefault, 
           {isOwner && onDelete && (
             <button 
               onClick={onDelete}
-              className="p-2 sm:p-2.5 text-black/20 hover:text-error hover:bg-error/5 rounded-xl transition-all shrink-0"
+              className="p-2 sm:p-2.5 text-on-surface-variant/40 hover:text-error hover:bg-error/5 rounded-xl transition-all shrink-0"
               title="Eliminar proyecto"
             >
               <Trash2 size={18} className="sm:w-5 sm:h-5" />
@@ -870,7 +870,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, isOwner, isDefault, 
           {!isOwner && onLeave && (
             <button 
               onClick={onLeave}
-              className="p-2 sm:p-2.5 text-black/20 hover:text-error hover:bg-error/5 rounded-xl transition-all shrink-0"
+              className="p-2 sm:p-2.5 text-on-surface-variant/40 hover:text-error hover:bg-error/5 rounded-xl transition-all shrink-0"
               title="Salir del proyecto"
             >
               <X size={18} className="sm:w-5 sm:h-5" />
@@ -879,17 +879,17 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, isOwner, isDefault, 
         </div>
       </div>
 
-      <div className="flex items-center justify-between pt-4 border-t border-black/5">
+      <div className="flex items-center justify-between pt-4 border-t border-on-surface/10">
         <div className="flex -space-x-3">
           {/* Mock avatars for now, in a real app these would be member profile pics */}
-          <div className="w-10 h-10 rounded-full border-4 border-white bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">U1</div>
+          <div className="w-10 h-10 rounded-full border-4 border-surface-container-lowest bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">U1</div>
           {project.memberIds?.length > 1 && (
-            <div className="w-10 h-10 rounded-full border-4 border-white bg-secondary/10 flex items-center justify-center text-[10px] font-bold text-secondary">U2</div>
+            <div className="w-10 h-10 rounded-full border-4 border-surface-container-lowest bg-secondary/10 flex items-center justify-center text-[10px] font-bold text-secondary">U2</div>
           )}
         </div>
         <button 
           onClick={onView}
-          className="bg-black text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:opacity-90 transition-all active:scale-95"
+          className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:opacity-90 transition-all active:scale-95 shadow-md shadow-primary/20"
         >
           <Eye size={18} />
           Ver Detalles

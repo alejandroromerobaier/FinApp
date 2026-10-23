@@ -214,8 +214,8 @@ export const History: React.FC = () => {
               className={cn(
                 "flex-1 min-w-[50px] py-2 px-1 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all text-center truncate shrink-0 sm:shrink",
                 selectedPeriod === p.id 
-                  ? "bg-slate-900 text-white shadow-lg" 
-                  : "text-on-surface-variant/40 hover:bg-on-surface/5"
+                  ? "bg-primary text-white shadow-lg shadow-primary/20" 
+                  : "text-on-surface-variant/70 hover:bg-on-surface/5"
               )}
             >
               {p.label}

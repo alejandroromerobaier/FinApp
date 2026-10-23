@@ -400,10 +400,10 @@ export const Stats: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F2F2F7]">
+      <div className="min-h-screen flex items-center justify-center bg-surface">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-10 h-10 text-primary animate-spin" />
-          <p className="text-black/40 font-bold text-sm uppercase tracking-widest">Cargando análisis...</p>
+          <p className="text-on-surface-variant font-bold text-sm uppercase tracking-widest">Cargando análisis...</p>
         </div>
       </div>
     );
@@ -411,16 +411,16 @@ export const Stats: React.FC = () => {
 
   if (error || !stats) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F2F2F7] px-6">
-        <div className="bg-white p-8 rounded-[2rem] border border-black/5 shadow-sm text-center space-y-4 max-w-xs">
+      <div className="min-h-screen flex items-center justify-center bg-surface px-6">
+        <div className="bg-surface-container-lowest p-8 rounded-[2rem] border border-on-surface/10 shadow-sm text-center space-y-4 max-w-xs">
           <div className="w-16 h-16 bg-rose-500/10 rounded-full flex items-center justify-center text-rose-500 mx-auto">
             <Info size={32} />
           </div>
-          <h3 className="text-lg font-bold text-black">Algo salió mal</h3>
-          <p className="text-black/40 text-sm">No pudimos cargar tus estadísticas. Por favor, intenta de nuevo más tarde.</p>
+          <h3 className="text-lg font-bold text-on-surface">Algo salió mal</h3>
+          <p className="text-on-surface-variant text-sm">No pudimos cargar tus estadísticas. Por favor, intenta de nuevo más tarde.</p>
           <button 
             onClick={() => window.location.reload()}
-            className="w-full py-3 bg-black text-white rounded-xl font-bold text-sm"
+            className="w-full py-3 bg-primary text-white rounded-xl font-bold text-sm"
           >
             Reintentar
           </button>
@@ -465,7 +465,7 @@ export const Stats: React.FC = () => {
                 onClick={() => setTimeRange(range)}
                 className={cn(
                   "flex-1 min-w-[100px] sm:min-w-0 px-4 py-3 rounded-xl text-[11px] sm:text-xs font-black transition-all whitespace-nowrap uppercase tracking-widest",
-                  timeRange === range ? "bg-white text-primary shadow-sm" : "text-on-surface-variant/40 hover:text-on-surface-variant/60"
+                  timeRange === range ? "bg-surface-container-lowest text-primary shadow-sm" : "text-on-surface-variant/70 hover:text-on-surface"
                 )}
               >
                 {range === 'month' ? 'Este Mes' : 
@@ -482,7 +482,7 @@ export const Stats: React.FC = () => {
               onClick={() => setViewType('expense')}
               className={cn(
                 "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black transition-all uppercase tracking-widest",
-                viewType === 'expense' ? "bg-rose-500 text-white shadow-lg" : "text-rose-500/60 hover:bg-rose-500/5"
+                viewType === 'expense' ? "bg-rose-500 text-white shadow-lg" : "text-rose-500/70 hover:bg-rose-500/5"
               )}
             >
               <TrendingUp size={14} className="rotate-180" />
@@ -492,7 +492,7 @@ export const Stats: React.FC = () => {
               onClick={() => setViewType('income')}
               className={cn(
                 "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black transition-all uppercase tracking-widest",
-                viewType === 'income' ? "bg-emerald-500 text-white shadow-lg" : "text-emerald-500/60 hover:bg-emerald-500/5"
+                viewType === 'income' ? "bg-emerald-500 text-white shadow-lg" : "text-emerald-500/70 hover:bg-emerald-500/5"
               )}
             >
               <TrendingUp size={14} />
@@ -506,7 +506,7 @@ export const Stats: React.FC = () => {
                  onClick={() => setFilterProject('all')}
                  className={cn(
                    "px-5 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest border",
-                   filterProject === 'all' ? "bg-primary text-white border-primary shadow-md" : "bg-white text-on-surface-variant/60 border-on-surface/5"
+                   filterProject === 'all' ? "bg-primary text-white border-primary shadow-md" : "bg-surface-container-low text-on-surface-variant border-on-surface/5"
                  )}
                >
                  Todo
@@ -516,7 +516,7 @@ export const Stats: React.FC = () => {
                    onClick={() => setFilterProject('personal')}
                    className={cn(
                      "px-5 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest border",
-                     filterProject === 'personal' ? "bg-primary text-white border-primary shadow-md" : "bg-white text-on-surface-variant/60 border-on-surface/5"
+                     filterProject === 'personal' ? "bg-primary text-white border-primary shadow-md" : "bg-surface-container-low text-on-surface-variant border-on-surface/5"
                    )}
                  >
                    Personal
@@ -528,7 +528,7 @@ export const Stats: React.FC = () => {
                    onClick={() => setFilterProject(p.id)}
                    className={cn(
                      "px-5 py-2.5 rounded-xl text-[10px] font-black transition-all uppercase tracking-widest border max-w-[120px] truncate",
-                     filterProject === p.id ? "bg-primary text-white border-primary shadow-md" : "bg-white text-on-surface-variant/60 border-on-surface/5"
+                     filterProject === p.id ? "bg-primary text-white border-primary shadow-md" : "bg-surface-container-low text-on-surface-variant border-on-surface/5"
                    )}
                  >
                    {p.name}
@@ -554,7 +554,7 @@ export const Stats: React.FC = () => {
                         "px-3 py-1 rounded-lg text-[10px] font-black transition-all",
                         stats.activeCurrency === curr 
                           ? "bg-primary text-white shadow-sm" 
-                          : "bg-white text-primary/60 border border-primary/10 hover:bg-primary/5"
+                          : "bg-surface-container-lowest text-primary border border-primary/20 hover:bg-primary/5"
                       )}
                     >
                       {curr}
@@ -568,12 +568,12 @@ export const Stats: React.FC = () => {
 
         {!stats.hasData ? (
           <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-            <div className="w-20 h-20 bg-black/5 rounded-full flex items-center justify-center text-black/20">
+            <div className="w-20 h-20 bg-on-surface/5 rounded-full flex items-center justify-center text-on-surface-variant/40">
               <Activity size={40} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-black">Sin datos</h3>
-              <p className="text-black/40 text-sm">No hay transacciones para este período.</p>
+              <h3 className="text-lg font-bold text-on-surface">Sin datos</h3>
+              <p className="text-on-surface-variant text-sm">No hay transacciones para este período.</p>
             </div>
           </div>
         ) : (
@@ -865,12 +865,18 @@ export const Stats: React.FC = () => {
                         type="category" 
                         axisLine={false} 
                         tickLine={false} 
-                        tick={{ fontSize: 10, fontWeight: 700, fill: 'rgba(0,0,0,0.4)' }}
+                        tick={{ fontSize: 10, fontWeight: 700, fill: 'var(--color-on-surface-variant)' }}
                         width={80}
                       />
                       <Tooltip 
-                        cursor={{ fill: 'rgba(0,0,0,0.02)' }}
-                        contentStyle={{ backgroundColor: 'white', borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
+                        cursor={{ fill: 'rgba(128,128,128,0.06)' }}
+                        contentStyle={{ 
+                          backgroundColor: 'var(--color-surface-container-lowest)', 
+                          color: 'var(--color-on-surface)',
+                          borderRadius: '12px', 
+                          border: '1px solid var(--color-surface-container-low)', 
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)' 
+                        }}
                       />
                       <Bar 
                         dataKey="amount" 
@@ -928,17 +934,23 @@ export const Stats: React.FC = () => {
               <div className="h-48 w-full mt-4">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.comparisonData} barGap={20}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.15)" />
                     <XAxis 
                       dataKey="name" 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{ fontSize: 12, fontWeight: 600, fill: 'rgba(0,0,0,0.4)' }} 
+                      tick={{ fontSize: 12, fontWeight: 600, fill: 'var(--color-on-surface-variant)' }} 
                     />
                     <YAxis hide />
                     <Tooltip 
-                      cursor={{ fill: 'rgba(0,0,0,0.02)' }}
-                      contentStyle={{ backgroundColor: 'white', borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }}
+                      cursor={{ fill: 'rgba(128,128,128,0.06)' }}
+                      contentStyle={{ 
+                        backgroundColor: 'var(--color-surface-container-lowest)', 
+                        color: 'var(--color-on-surface)',
+                        borderRadius: '16px', 
+                        border: '1px solid var(--color-surface-container-low)', 
+                        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.2)' 
+                      }}
                     />
                     <Bar 
                       dataKey="value" 
@@ -978,11 +990,11 @@ export const Stats: React.FC = () => {
 const MainKPICard = ({ title, value, icon, color }: any) => (
   <motion.div 
     whileHover={{ y: -2 }}
-    className="bg-white p-6 rounded-[1.5rem] border border-black/5 shadow-sm space-y-4"
+    className="bg-surface-container-lowest p-6 rounded-[1.5rem] border border-on-surface/10 shadow-sm space-y-4"
   >
     <div className="flex items-center justify-between">
-      <span className="text-[11px] font-bold text-black/40 uppercase tracking-widest">{title}</span>
-      <div className="w-8 h-8 rounded-full bg-black/[0.02] flex items-center justify-center">
+      <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">{title}</span>
+      <div className="w-8 h-8 rounded-full bg-on-surface/5 flex items-center justify-center">
         {icon}
       </div>
     </div>
@@ -991,12 +1003,12 @@ const MainKPICard = ({ title, value, icon, color }: any) => (
 );
 
 const SecondaryKPICard = ({ title, value, icon }: any) => (
-  <div className="bg-white p-5 rounded-2xl border border-black/5 shadow-sm space-y-2">
-    <div className="flex items-center gap-2 text-black/30">
+  <div className="bg-surface-container-lowest p-5 rounded-2xl border border-on-surface/10 shadow-sm space-y-2">
+    <div className="flex items-center gap-2 text-on-surface-variant/70">
       {icon}
       <span className="text-[10px] font-bold uppercase tracking-widest">{title}</span>
     </div>
-    <p className="text-lg font-bold text-black tracking-tight">{value}</p>
+    <p className="text-lg font-bold text-on-surface tracking-tight">{value}</p>
   </div>
 );
 
@@ -1004,13 +1016,13 @@ const ChartCard = ({ title, icon, children }: any) => (
   <motion.div 
     initial={{ opacity: 0, y: 10 }}
     animate={{ opacity: 1, y: 0 }}
-    className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm"
+    className="bg-surface-container-lowest p-6 rounded-[2rem] border border-on-surface/10 shadow-sm"
   >
     <div className="flex items-center gap-3 mb-2">
-      <div className="w-8 h-8 rounded-xl bg-black/[0.02] flex items-center justify-center text-black/60">
+      <div className="w-8 h-8 rounded-xl bg-on-surface/5 flex items-center justify-center text-on-surface-variant">
         {icon}
       </div>
-      <h3 className="text-base font-bold text-black tracking-tight">{title}</h3>
+      <h3 className="text-base font-bold text-on-surface tracking-tight">{title}</h3>
     </div>
     {children}
   </motion.div>

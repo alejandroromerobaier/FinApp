@@ -174,7 +174,7 @@ export const ManageCategories: React.FC = () => {
             onClick={() => setNewType('expense')}
             className={cn(
               "px-6 py-2 rounded-full text-sm font-bold transition-all",
-              newType === 'expense' ? "bg-rose-100 text-rose-700" : "bg-on-surface/5 text-on-surface-variant"
+              newType === 'expense' ? "bg-rose-500/15 text-rose-600 dark:text-rose-400" : "bg-on-surface/5 text-on-surface-variant"
             )}
           >
             Gastos
@@ -183,7 +183,7 @@ export const ManageCategories: React.FC = () => {
             onClick={() => setNewType('income')}
             className={cn(
               "px-6 py-2 rounded-full text-sm font-bold transition-all",
-              newType === 'income' ? "bg-emerald-100 text-emerald-700" : "bg-on-surface/5 text-on-surface-variant"
+              newType === 'income' ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-on-surface/5 text-on-surface-variant"
             )}
           >
             Ingresos
@@ -473,16 +473,16 @@ export const ManageCategories: React.FC = () => {
 };
 
 const IndicatorCard = ({ title, value, subtitle, isStatus }: any) => (
-  <div className="bg-slate-50 p-6 rounded-2xl relative overflow-hidden group">
+  <div className="bg-surface-container-low p-6 rounded-2xl relative overflow-hidden group border border-on-surface/5">
     <h4 className="text-[0.6875rem] font-bold text-on-surface-variant uppercase tracking-widest mb-4">{title}</h4>
     <div className="flex items-center gap-2">
       {isStatus && (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[0.6rem] font-bold uppercase">
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[0.65rem] font-bold uppercase tracking-wider">
           Estable
         </span>
       )}
       {!isStatus && <p className="text-2xl font-bold text-primary font-headline">{value}</p>}
     </div>
-    <p className="mt-1 text-xs text-on-surface-variant">{subtitle}</p>
+    <p className="mt-1 text-xs text-on-surface-variant/70">{subtitle}</p>
   </div>
 );

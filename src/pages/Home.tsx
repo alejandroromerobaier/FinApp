@@ -218,7 +218,7 @@ export const Home: React.FC = () => {
       {/* Header */}
       <header className="flex items-center justify-between mb-8 sm:mb-10">
         <div className="flex items-center gap-3.5 sm:gap-4">
-          <Link to="/settings" className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white flex items-center justify-center overflow-hidden border-2 border-blue-500/20 shadow-md shadow-blue-500/10 group transition-all duration-300 hover:scale-105 active:scale-95">
+          <Link to="/settings" className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-surface-container-lowest flex items-center justify-center overflow-hidden border-2 border-blue-500/20 shadow-md shadow-blue-500/10 group transition-all duration-300 hover:scale-105 active:scale-95">
             {user?.photoURL ? (
               <img src={user.photoURL} alt={user.displayName || 'User'} className="w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
             ) : (

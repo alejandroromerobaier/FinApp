@@ -271,7 +271,7 @@ export const Budgets: React.FC = () => {
           <button
             onClick={copyFromLastMonth}
             disabled={copying}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-on-surface/10 rounded-xl text-xs font-black uppercase tracking-wider text-on-surface hover:bg-on-surface/5 transition-all shadow-sm active:scale-95"
+            className="flex items-center gap-2 px-4 py-2 bg-surface-container-lowest border border-on-surface/10 rounded-xl text-xs font-black uppercase tracking-wider text-on-surface hover:bg-on-surface/5 transition-all shadow-sm active:scale-95"
           >
             {copying ? (
               <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />

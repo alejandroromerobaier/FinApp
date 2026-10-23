@@ -119,10 +119,10 @@ export const ProjectDetail: React.FC = () => {
 
   if (loading || !project) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F2F2F7]">
+      <div className="min-h-screen flex items-center justify-center bg-surface">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-10 h-10 text-primary animate-spin" />
-          <p className="text-black/40 font-bold text-xs uppercase tracking-widest">Cargando detalles...</p>
+          <p className="text-on-surface-variant font-bold text-xs uppercase tracking-widest">Cargando detalles...</p>
         </div>
       </div>
     );
@@ -133,7 +133,7 @@ export const ProjectDetail: React.FC = () => {
       {/* Header with Back Button */}
       <div className="flex items-center justify-between mb-10">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-3 bg-white rounded-2xl shadow-sm border border-black/5 hover:bg-black/5 transition-colors">
+          <button onClick={() => navigate(-1)} className="p-3 bg-surface-container-lowest rounded-2xl shadow-sm border border-on-surface/10 hover:bg-on-surface/5 transition-colors">
             <ArrowLeft size={20} />
           </button>
           <div>
@@ -154,15 +154,15 @@ export const ProjectDetail: React.FC = () => {
       <section className="mb-12">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
           <div className="md:col-span-8">
-            <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm relative overflow-hidden">
+            <div className="bg-surface-container-lowest p-8 rounded-[2.5rem] border border-on-surface/10 shadow-sm relative overflow-hidden">
               <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
-                  <span className="inline-flex items-center px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-wider mb-4">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wider mb-4">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
                     Proyecto Activo
                   </span>
                   <h1 className="text-4xl font-extrabold tracking-tight text-on-surface mb-2 font-headline">{project.name}</h1>
-                  <p className="text-on-surface-variant/60 flex items-center gap-2 font-medium">
+                  <p className="text-on-surface-variant/70 flex items-center gap-2 font-medium">
                     <Calendar size={16} />
                     Creado el {
                       (() => {
@@ -184,27 +184,27 @@ export const ProjectDetail: React.FC = () => {
             </div>
           </div>
           
-          <div className="md:col-span-4 bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm">
+          <div className="md:col-span-4 bg-surface-container-lowest p-8 rounded-[2.5rem] border border-on-surface/10 shadow-sm">
             <h3 className="text-sm font-black text-on-surface uppercase tracking-widest mb-6 flex items-center gap-2">
               <Users size={18} className="text-primary" />
               Colaboradores
             </h3>
             <div className="flex -space-x-3 mb-6">
               {members.map((m, i) => (
-                <div key={m.id} className="w-12 h-12 rounded-full border-4 border-white bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shadow-sm overflow-hidden">
+                <div key={m.id} className="w-12 h-12 rounded-full border-4 border-surface-container-lowest bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shadow-sm overflow-hidden">
                   {m.photoURL ? <img src={m.photoURL} alt={m.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : m.name.substring(0, 2).toUpperCase()}
                 </div>
               ))}
               {isOwner && (
                 <button 
                   onClick={() => setIsInviteModalOpen(true)}
-                  className="w-12 h-12 rounded-full border-4 border-white bg-black/5 flex items-center justify-center text-black/20 hover:bg-black/10 transition-colors"
+                  className="w-12 h-12 rounded-full border-4 border-surface-container-lowest bg-on-surface/5 flex items-center justify-center text-on-surface-variant/40 hover:bg-on-surface/10 transition-colors"
                 >
                   <Plus size={20} />
                 </button>
               )}
             </div>
-            <p className="text-xs text-on-surface-variant/60 font-medium">
+            <p className="text-xs text-on-surface-variant/70 font-medium">
               {members.length} personas compartiendo gastos en esta bóveda.
             </p>
           </div>
@@ -214,7 +214,7 @@ export const ProjectDetail: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         {/* Sidebar: Contributors */}
         <aside className="lg:col-span-4 space-y-8">
-          <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm">
+          <div className="bg-surface-container-lowest p-8 rounded-[2.5rem] border border-on-surface/10 shadow-sm">
             <h2 className="text-lg font-extrabold text-on-surface mb-8 flex items-center gap-2 font-headline">
               Contribuciones
             </h2>
@@ -222,8 +222,8 @@ export const ProjectDetail: React.FC = () => {
               {stats.contributorStats.map((m) => (
                 <div key={m.id} className="flex items-center justify-between group">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-sm bg-black/5 flex items-center justify-center border border-black/5">
-                      {m.photoURL ? <img src={m.photoURL} className="w-full h-full object-cover" alt={m.name} referrerPolicy="no-referrer" /> : <span className="font-bold text-black/20">{m.name.substring(0, 2).toUpperCase()}</span>}
+                    <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-sm bg-on-surface/5 flex items-center justify-center border border-on-surface/10">
+                      {m.photoURL ? <img src={m.photoURL} className="w-full h-full object-cover" alt={m.name} referrerPolicy="no-referrer" /> : <span className="font-bold text-on-surface-variant/40">{m.name.substring(0, 2).toUpperCase()}</span>}
                     </div>
                     <div>
                       <p className="font-bold text-on-surface group-hover:text-primary transition-colors">{m.name}</p>
@@ -252,17 +252,17 @@ export const ProjectDetail: React.FC = () => {
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-extrabold text-on-surface font-headline">Historial de Gastos</h2>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-black/40">{transactions.length} registros</span>
+              <span className="text-xs font-bold text-on-surface-variant/70">{transactions.length} registros</span>
             </div>
           </div>
           
           {transactions.length === 0 ? (
-            <div className="bg-white/50 border-2 border-dashed border-black/5 rounded-[2.5rem] p-16 text-center">
-              <div className="w-20 h-20 bg-black/5 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Plus size={40} className="text-black/10" />
+            <div className="bg-surface-container-low/50 border-2 border-dashed border-on-surface/10 rounded-[2.5rem] p-16 text-center">
+              <div className="w-20 h-20 bg-on-surface/5 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Plus size={40} className="text-on-surface-variant/30" />
               </div>
               <h3 className="text-xl font-bold text-on-surface mb-2">Sin gastos registrados</h3>
-              <p className="text-on-surface-variant/60 max-w-xs mx-auto">Comienza a registrar los gastos compartidos de este proyecto.</p>
+              <p className="text-on-surface-variant/70 max-w-xs mx-auto">Comienza a registrar los gastos compartidos de este proyecto.</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -273,12 +273,12 @@ export const ProjectDetail: React.FC = () => {
                   <div 
                     key={t.id} 
                     onClick={() => navigate(`/edit/${t.id}`)}
-                    className="bg-white p-6 rounded-[2rem] flex items-center justify-between hover:shadow-md transition-all border border-black/5 cursor-pointer group active:scale-[0.99]"
+                    className="bg-surface-container-lowest p-6 rounded-[2rem] flex items-center justify-between hover:shadow-md transition-all border border-on-surface/10 cursor-pointer group active:scale-[0.99]"
                   >
                     <div className="flex items-center gap-5">
                       <div className={cn(
                         "w-14 h-14 rounded-full flex items-center justify-center shadow-sm transition-transform group-hover:scale-110",
-                        cat?.color || 'bg-slate-100'
+                        cat?.color || 'bg-slate-500'
                       )}>
                         <div className="text-white">
                           <IconComponent name={cat?.icon || 'Tag'} size={24} />
@@ -287,9 +287,9 @@ export const ProjectDetail: React.FC = () => {
                       <div>
                         <h3 className="font-bold text-on-surface text-lg leading-tight">{t.description || 'Sin descripción'}</h3>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs font-medium text-on-surface-variant/60">Por <span className="text-primary font-bold">{member?.name || 'Usuario'}</span></span>
-                          <span className="w-1 h-1 rounded-full bg-black/10"></span>
-                          <span className="text-[10px] font-black text-black/40 uppercase tracking-widest">
+                          <span className="text-xs font-medium text-on-surface-variant/70">Por <span className="text-primary font-bold">{member?.name || 'Usuario'}</span></span>
+                          <span className="w-1 h-1 rounded-full bg-on-surface/10"></span>
+                          <span className="text-[10px] font-black text-on-surface-variant/70 uppercase tracking-widest">
                             {cat?.name || 'Otros'}
                           </span>
                         </div>
@@ -298,11 +298,11 @@ export const ProjectDetail: React.FC = () => {
                     <div className="text-right">
                       <div className={cn(
                         "text-2xl font-black tracking-tight font-headline",
-                        t.type === 'expense' ? "text-rose-600" : "text-emerald-600"
+                        t.type === 'expense' ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
                       )}>
                         {t.type === 'expense' ? '-' : '+'}{formatCurrency(t.amount, project.currency)}
                       </div>
-                      <div className="text-[10px] font-black text-black/20 uppercase tracking-widest mt-0.5">
+                      <div className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-widest mt-0.5">
                         {new Date(t.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
                       </div>
                     </div>
@@ -323,31 +323,31 @@ export const ProjectDetail: React.FC = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsInviteModalOpen(false)}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white w-full max-w-md rounded-[2.5rem] p-6 sm:p-8 shadow-2xl relative z-10 flex flex-col max-h-[90vh] overflow-y-auto"
+              className="bg-surface-container-lowest w-full max-w-md rounded-[2.5rem] p-6 sm:p-8 shadow-2xl relative z-10 flex flex-col max-h-[90vh] overflow-y-auto border border-on-surface/10"
             >
               <div className="flex justify-between items-center mb-8">
                 <h2 className="text-2xl font-extrabold text-on-surface font-headline">Invitar Colaborador</h2>
-                <button onClick={() => setIsInviteModalOpen(false)} className="p-2 hover:bg-black/5 rounded-full transition-colors">
+                <button onClick={() => setIsInviteModalOpen(false)} className="p-2 hover:bg-on-surface/5 rounded-full transition-colors text-on-surface-variant">
                   <X size={24} />
                 </button>
               </div>
 
               <form onSubmit={handleInvite} className="space-y-6">
                 <div>
-                  <label className="block text-xs font-bold text-black/40 uppercase tracking-widest mb-3 ml-1">Correo Electrónico</label>
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-3 ml-1">Correo Electrónico</label>
                   <input 
                     type="email" 
                     required
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                     placeholder="ejemplo@correo.com"
-                    className="w-full bg-[#F2F2F7] border-none rounded-2xl p-4 text-lg font-bold focus:ring-2 focus:ring-primary/20 transition-all"
+                    className="w-full bg-surface-container-low border border-on-surface/10 text-on-surface placeholder:text-on-surface-variant/40 rounded-2xl p-4 text-lg font-bold focus:ring-2 focus:ring-primary/20 transition-all outline-none"
                   />
                   {inviteError && <p className="text-rose-500 text-xs font-bold mt-2 ml-1">{inviteError}</p>}
                 </div>

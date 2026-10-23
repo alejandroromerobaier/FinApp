@@ -366,7 +366,7 @@ export const AddExpense: React.FC = () => {
               placeholder="0,00"
               className={cn(
                 "w-full max-w-[340px] bg-transparent border-none p-0 focus:ring-0 text-5xl sm:text-7xl font-black tracking-tighter font-headline text-center placeholder:text-on-surface-variant/10 transition-all",
-                type === 'expense' ? "text-on-surface" : "text-emerald-900"
+                type === 'expense' ? "text-on-surface" : "text-emerald-600 dark:text-emerald-400"
               )}
               autoFocus={isAuthor}
             />
@@ -377,10 +377,10 @@ export const AddExpense: React.FC = () => {
         <div className="space-y-4">
           {/* Description */}
           <div className="bg-surface-container-lowest p-6 rounded-3xl border border-on-surface/5 shadow-sm">
-            <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/40 mb-3">Descripción</label>
+            <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70 mb-3">Descripción</label>
             <input 
               readOnly={!isAuthor}
-              className="w-full bg-transparent border-none p-0 focus:ring-0 text-xl font-bold placeholder:text-on-surface-variant/20 text-on-surface"
+              className="w-full bg-transparent border-none p-0 focus:ring-0 text-xl font-bold placeholder:text-on-surface-variant/30 text-on-surface"
               placeholder={type === 'expense' ? "¿En qué gastaste?" : "¿De dónde viene el dinero?"}
               type="text"
               value={description}
@@ -409,13 +409,13 @@ export const AddExpense: React.FC = () => {
                 className="absolute inset-0 opacity-0 cursor-pointer"
               />
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/40 mb-2">Fecha</label>
+                <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70 mb-2">Fecha</label>
                 <div className="flex items-center gap-3 text-on-surface font-extrabold">
                   <Calendar size={20} className="text-primary" />
                   <span>{formatDateDisplay(date)}</span>
                 </div>
               </div>
-              <ChevronRight size={20} className="text-on-surface-variant/20" />
+              <ChevronRight size={20} className="text-on-surface-variant/40" />
             </div>
 
             <button 
@@ -428,7 +428,7 @@ export const AddExpense: React.FC = () => {
               )}
             >
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/40 mb-2">Categoría</label>
+                <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70 mb-2">Categoría</label>
                 <div className="flex items-center gap-3 text-on-surface font-extrabold">
                   {selectedCategory ? (
                     <>
@@ -441,17 +441,17 @@ export const AddExpense: React.FC = () => {
                       <span>{selectedCategory.name}</span>
                     </>
                   ) : (
-                    <span className="text-on-surface-variant/30">Seleccionar...</span>
+                    <span className="text-on-surface-variant/40">Seleccionar...</span>
                   )}
                 </div>
               </div>
-              {isAuthor && <ChevronDown size={20} className="text-on-surface-variant/20" />}
+              {isAuthor && <ChevronDown size={20} className="text-on-surface-variant/40" />}
             </button>
           </div>
 
           {/* Destination Selector */}
           <div className={cn("bg-surface-container-low p-6 rounded-[2rem] border border-on-surface/5", !isAuthor && "pointer-events-none opacity-60")}>
-            <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/40 mb-4">
+            <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70 mb-4">
               {type === 'expense' ? 'Destino de los fondos' : 'Origen de los fondos'}
             </label>
             <div className="flex bg-on-surface/5 p-1.5 rounded-2xl">
@@ -460,7 +460,7 @@ export const AddExpense: React.FC = () => {
                   onClick={() => setDestination('personal')}
                   className={cn(
                     "flex-1 py-3 px-4 rounded-[14px] text-xs font-black transition-all uppercase tracking-wider",
-                    destination === 'personal' ? "bg-surface-container-lowest text-on-surface shadow-sm" : "text-on-surface-variant/40"
+                    destination === 'personal' ? "bg-surface-container-lowest text-on-surface shadow-sm" : "text-on-surface-variant/70 hover:text-on-surface"
                   )}
                 >
                   Personal
@@ -476,7 +476,7 @@ export const AddExpense: React.FC = () => {
                   }}
                   className={cn(
                     "flex-1 py-3 px-4 rounded-[14px] text-xs font-black transition-all uppercase tracking-wider",
-                    destination === 'shared' ? "bg-surface-container-lowest text-on-surface shadow-sm" : "text-on-surface-variant/40"
+                    destination === 'shared' ? "bg-surface-container-lowest text-on-surface shadow-sm" : "text-on-surface-variant/70 hover:text-on-surface"
                   )}
                 >
                   Compartido
@@ -525,7 +525,7 @@ export const AddExpense: React.FC = () => {
 
           {/* Payment Method Selector */}
           <div className={cn("bg-surface-container-low p-6 rounded-[2rem] border border-on-surface/5 shadow-sm space-y-4", !isAuthor && "pointer-events-none opacity-60")}>
-            <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/40">
+            <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70">
               Método de Pago
             </label>
             <div className="flex gap-3">
@@ -537,12 +537,12 @@ export const AddExpense: React.FC = () => {
                     "flex-1 py-4 px-2 rounded-2xl font-black text-xs transition-all uppercase tracking-widest flex items-center justify-center gap-2 border-2",
                     paymentMethod === method 
                       ? "bg-primary/10 border-primary text-primary shadow-inner" 
-                      : "bg-surface-container-lowest border-transparent text-on-surface-variant/40 hover:bg-on-surface/5"
+                      : "bg-surface-container-lowest border-transparent text-on-surface-variant/70 hover:bg-on-surface/5 hover:text-on-surface"
                   )}
                 >
                   <div className={cn(
                     "w-6 h-6 rounded-lg flex items-center justify-center",
-                    paymentMethod === method ? "bg-primary text-white" : "bg-on-surface-variant/10 text-on-surface-variant/40"
+                    paymentMethod === method ? "bg-primary text-white" : "bg-on-surface-variant/10 text-on-surface-variant/70"
                   )}>
                     {method === 'Efectivo' ? <Wallet size={14} /> : <CreditCard size={14} />}
                   </div>
@@ -554,7 +554,7 @@ export const AddExpense: React.FC = () => {
 
           {/* Classification Selector (Fixed/Variable) */}
           <div className={cn("bg-surface-container-low p-6 rounded-[2rem] border border-on-surface/5 shadow-sm space-y-4", !isAuthor && "pointer-events-none opacity-60")}>
-            <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/40">
+            <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70">
               Clasificación de Gasto
             </label>
             <div className="flex gap-3">
@@ -566,12 +566,12 @@ export const AddExpense: React.FC = () => {
                     "flex-1 py-4 px-2 rounded-2xl font-black text-xs transition-all uppercase tracking-widest flex items-center justify-center gap-2 border-2",
                     classification === item 
                       ? "bg-primary/10 border-primary text-primary shadow-inner" 
-                      : "bg-surface-container-lowest border-transparent text-on-surface-variant/40 hover:bg-on-surface/5"
+                      : "bg-surface-container-lowest border-transparent text-on-surface-variant/70 hover:bg-on-surface/5 hover:text-on-surface"
                   )}
                 >
                   <div className={cn(
                     "w-6 h-6 rounded-lg flex items-center justify-center",
-                    classification === item ? "bg-primary text-white" : "bg-on-surface-variant/10 text-on-surface-variant/40"
+                    classification === item ? "bg-primary text-white" : "bg-on-surface-variant/10 text-on-surface-variant/70"
                   )}>
                     {item === 'fixed' ? <Clock size={14} /> : <Zap size={14} />}
                   </div>

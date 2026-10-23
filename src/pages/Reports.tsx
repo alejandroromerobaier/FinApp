@@ -524,8 +524,8 @@ export const Reports: React.FC = () => {
                 className={cn(
                   "flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
                   selectedPeriod === p.id 
-                    ? "bg-slate-900 text-white shadow-lg" 
-                    : "text-on-surface-variant/40 hover:bg-on-surface/5"
+                    ? "bg-primary text-white shadow-lg shadow-primary/25" 
+                    : "text-on-surface-variant/70 hover:bg-on-surface/5"
                 )}
               >
                 {p.label}
@@ -558,7 +558,7 @@ export const Reports: React.FC = () => {
                 className={cn(
                   "px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap border-2",
                   selectedProjectId === 'all' 
-                    ? "bg-slate-900 border-slate-900 text-white shadow-lg" 
+                    ? "bg-primary border-primary text-white shadow-lg shadow-primary/20" 
                     : "bg-surface-container-low border-on-surface/5 text-on-surface-variant hover:border-primary/20"
                 )}
               >
@@ -732,43 +732,43 @@ export const Reports: React.FC = () => {
             </div>
           </div>
           
-          <div className="bg-white rounded-[2.5rem] p-10 sm:p-16 shadow-2xl border border-on-surface/5 relative group">
+          <div className="bg-surface-container-lowest rounded-[2.5rem] p-10 sm:p-16 shadow-2xl border border-on-surface/10 relative group">
             <div className="absolute inset-0 opacity-[0.02] pointer-events-none select-none overflow-hidden" 
-                 style={{ backgroundImage: 'radial-gradient(#000 1.5px, transparent 1.5px)', backgroundSize: '32px 32px' }} />
+                 style={{ backgroundImage: 'radial-gradient(currentColor 1.5px, transparent 1.5px)', backgroundSize: '32px 32px' }} />
             
             <div className="relative z-10 space-y-10">
-              <div className="flex items-start justify-between border-b-2 border-slate-100 pb-10">
+              <div className="flex items-start justify-between border-b-2 border-on-surface/10 pb-10">
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center p-3 shadow-lg group-hover:scale-110 transition-transform duration-500">
-                    <img src={logo} alt="FinApp Logo" className="w-full h-full object-contain invert" />
+                  <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center p-3 shadow-lg group-hover:scale-110 transition-transform duration-500">
+                    <img src={logo} alt="FinApp Logo" className="w-full h-full object-contain" />
                   </div>
                   <div>
-                    <h4 className="text-3xl font-black text-slate-900 font-headline tracking-tighter mb-0.5">FINAPP</h4>
+                    <h4 className="text-3xl font-black text-on-surface font-headline tracking-tighter mb-0.5">FINAPP</h4>
                     <p className="text-[10px] font-black text-primary uppercase tracking-[0.5em]">Consolidated Intelligence</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">ID Documento</p>
-                  <p className="text-[10px] font-bold text-slate-900 font-mono">#{currentDate.getTime().toString(16).toUpperCase()}</p>
+                  <p className="text-[9px] font-black text-on-surface-variant/70 uppercase tracking-widest mb-1">ID Documento</p>
+                  <p className="text-[10px] font-bold text-on-surface font-mono">#{currentDate.getTime().toString(16).toUpperCase()}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-16 py-4">
                 <div className="space-y-6">
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-l-3 border-primary pl-4 mb-4">Estado de Resultados</p>
+                    <p className="text-[10px] font-black text-on-surface-variant/70 uppercase tracking-widest border-l-3 border-primary pl-4 mb-4">Estado de Resultados</p>
                     <div className="space-y-3">
                       <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Ingresos</span>
-                        <span className="font-bold text-emerald-600">+{formatCurrency(currentStats.income, activeCurrency)}</span>
+                        <span className="text-on-surface-variant">Ingresos</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">+{formatCurrency(currentStats.income, activeCurrency)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Gastos</span>
-                        <span className="font-bold text-rose-600">-{formatCurrency(currentStats.expenses, activeCurrency)}</span>
+                        <span className="text-on-surface-variant">Gastos</span>
+                        <span className="font-bold text-rose-600 dark:text-rose-400">-{formatCurrency(currentStats.expenses, activeCurrency)}</span>
                       </div>
-                      <div className="pt-3 border-t border-slate-100 flex justify-between">
-                        <span className="font-black text-slate-900 uppercase text-[11px] tracking-tight">Superávit/Déficit</span>
-                        <span className={cn("text-lg font-black font-headline", currentStats.income - currentStats.expenses >= 0 ? "text-emerald-700" : "text-rose-700")}>
+                      <div className="pt-3 border-t border-on-surface/10 flex justify-between">
+                        <span className="font-black text-on-surface uppercase text-[11px] tracking-tight">Superávit/Déficit</span>
+                        <span className={cn("text-lg font-black font-headline", currentStats.income - currentStats.expenses >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
                           {formatCurrency(currentStats.income - currentStats.expenses, activeCurrency)}
                         </span>
                       </div>
@@ -778,16 +778,16 @@ export const Reports: React.FC = () => {
 
                 <div className="space-y-6">
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-l-3 border-indigo-500 pl-4 mb-4">Top Categorías</p>
+                    <p className="text-[10px] font-black text-on-surface-variant/70 uppercase tracking-widest border-l-3 border-indigo-500 pl-4 mb-4">Top Categorías</p>
                     <div className="space-y-3">
                       {sortedCategories.slice(0, 4).map(([name, amount]) => (
                         <div key={name} className="space-y-1">
                           <div className="flex justify-between text-[11px] items-center">
-                            <span className="text-slate-500 truncate mr-4">{name}</span>
-                            <span className="font-bold text-slate-900">{formatCurrency(amount, activeCurrency)}</span>
+                            <span className="text-on-surface-variant truncate mr-4">{name}</span>
+                            <span className="font-bold text-on-surface">{formatCurrency(amount, activeCurrency)}</span>
                           </div>
-                          <div className="w-full h-1 bg-slate-50 rounded-full overflow-hidden">
-                            <div className="h-full bg-slate-200 rounded-full" style={{ width: `${(amount / (currentStats.expenses || 1)) * 100}%` }} />
+                          <div className="w-full h-1 bg-on-surface/5 rounded-full overflow-hidden">
+                            <div className="h-full bg-primary/40 rounded-full" style={{ width: `${(amount / (currentStats.expenses || 1)) * 100}%` }} />
                           </div>
                         </div>
                       ))}
@@ -796,18 +796,18 @@ export const Reports: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-12 border-t border-slate-100 flex items-end justify-between">
+              <div className="pt-12 border-t border-on-surface/10 flex items-end justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center shadow-lg">
-                    <ShieldCheck size={20} className="text-white" />
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shadow-lg">
+                    <ShieldCheck size={20} className="text-primary" />
                   </div>
                   <div>
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Cifrado de Seguridad</p>
-                    <p className="text-[9px] font-bold text-slate-900 uppercase">AES-256 Verificado</p>
+                    <p className="text-[8px] font-black text-on-surface-variant/70 uppercase tracking-widest leading-none mb-1">Cifrado de Seguridad</p>
+                    <p className="text-[9px] font-bold text-on-surface uppercase">AES-256 Verificado</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest italic tracking-tight">Reporte verificado para {user?.displayName}</p>
+                  <p className="text-[8px] font-black text-on-surface-variant/50 uppercase tracking-widest italic tracking-tight">Reporte verificado para {user?.displayName}</p>
                 </div>
               </div>
             </div>
