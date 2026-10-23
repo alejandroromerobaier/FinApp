@@ -510,7 +510,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, category
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
-      onClick={() => navigate('/history')}
+      onClick={() => navigate(`/edit/${transaction.id}`)}
       className="bg-surface-container-lowest p-3.5 sm:p-4 rounded-[1.5rem] border border-on-surface/5 flex items-center justify-between gap-3 group hover:bg-on-surface/5 transition-all cursor-pointer min-w-0"
     >
       <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
