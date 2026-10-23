@@ -8,7 +8,9 @@ import {
   Bell, 
   UserPlus,
   ArrowRight,
-  AlertTriangle
+  AlertTriangle,
+  Check,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
@@ -18,13 +20,15 @@ import { useData } from '../lib/DataContext';
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { notifications, markAsRead } = useData();
+  const { notifications, markAsRead, markAllAsRead, deleteNotification, clearAllNotifications } = useData();
   const [showNotifs, setShowNotifs] = React.useState(false);
+  const [filterNotifs, setFilterNotifs] = React.useState<'all' | 'unread'>('all');
   
   const isAuthPage = location.pathname === '/login';
   const isAddPage = location.pathname === '/add';
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
+  const displayedNotifs = notifications.filter(n => filterNotifs === 'all' || !n.isRead);
 
   if (isAuthPage) return <>{children}</>;
 
@@ -73,78 +77,164 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                       initial={{ opacity: 0, y: 10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute top-full right-0 mt-2 w-80 sm:w-96 bg-surface-container-lowest rounded-3xl shadow-2xl border border-on-surface/5 overflow-hidden z-[60]"
+                      className="absolute top-full right-0 mt-2 w-84 sm:w-96 bg-surface-container-lowest rounded-3xl shadow-2xl border border-on-surface/10 overflow-hidden z-[60]"
                     >
-                      <div className="p-5 border-b border-on-surface/5 flex items-center justify-between">
-                        <h3 className="font-headline font-black text-on-surface text-sm uppercase tracking-widest">Notificaciones</h3>
-                        {unreadCount > 0 && (
-                          <button 
-                            onClick={() => {
-                              notifications.filter(n => !n.isRead).forEach(n => markAsRead(n.id));
-                            }}
-                            className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
+                      {/* Dropdown Header */}
+                      <div className="p-4 sm:p-5 border-b border-on-surface/10 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-headline font-black text-on-surface text-sm uppercase tracking-widest">Notificaciones</h3>
+                            {unreadCount > 0 && (
+                              <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-black">
+                                {unreadCount} nueva{unreadCount > 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {unreadCount > 0 && (
+                              <button 
+                                onClick={() => markAllAsRead()}
+                                className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline flex items-center gap-1 cursor-pointer"
+                                title="Marcar todas como leídas"
+                              >
+                                <Check size={12} strokeWidth={3} />
+                                <span>Leer todo</span>
+                              </button>
+                            )}
+                            {notifications.length > 0 && (
+                              <button 
+                                onClick={() => {
+                                  if (window.confirm('¿Deseas vaciar todo el historial de notificaciones?')) {
+                                    clearAllNotifications();
+                                  }
+                                }}
+                                className="text-[10px] font-black text-on-surface-variant/50 hover:text-rose-500 uppercase tracking-widest transition-colors flex items-center gap-1 cursor-pointer ml-1"
+                                title="Vaciar historial de notificaciones"
+                              >
+                                <Trash2 size={12} />
+                                <span>Vaciar</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Filter Tabs */}
+                        <div className="flex gap-1.5 p-1 bg-surface-container-low rounded-xl">
+                          <button
+                            type="button"
+                            onClick={() => setFilterNotifs('all')}
+                            className={cn(
+                              "flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
+                              filterNotifs === 'all'
+                                ? "bg-surface-container-lowest text-on-surface shadow-sm"
+                                : "text-on-surface-variant/60 hover:text-on-surface"
+                            )}
                           >
-                            Leer todo
+                            Todas ({notifications.length})
                           </button>
-                        )}
+                          <button
+                            type="button"
+                            onClick={() => setFilterNotifs('unread')}
+                            className={cn(
+                              "flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
+                              filterNotifs === 'unread'
+                                ? "bg-surface-container-lowest text-on-surface shadow-sm"
+                                : "text-on-surface-variant/60 hover:text-on-surface"
+                            )}
+                          >
+                            No leídas ({unreadCount})
+                          </button>
+                        </div>
                       </div>
-                      <div className="max-h-[70vh] overflow-y-auto custom-scrollbar">
-                        {notifications.length === 0 ? (
+
+                      {/* Notifications List */}
+                      <div className="max-h-[60vh] overflow-y-auto custom-scrollbar divide-y divide-on-surface/[0.04]">
+                        {displayedNotifs.length === 0 ? (
                           <div className="p-10 text-center flex flex-col items-center gap-3">
                             <div className="w-12 h-12 rounded-2xl bg-on-surface/5 flex items-center justify-center text-on-surface-variant/20">
                               <Bell size={24} />
                             </div>
-                            <p className="text-xs font-bold text-on-surface-variant/40 uppercase tracking-widest">Sin novedades</p>
+                            <p className="text-xs font-bold text-on-surface-variant/50 uppercase tracking-widest">
+                              {filterNotifs === 'unread' ? 'Sin notificaciones pendientes' : 'Sin notificaciones'}
+                            </p>
                           </div>
                         ) : (
-                          <div className="divide-y divide-on-surface/[0.03]">
-                            {notifications.map((n) => (
-                              <motion.div 
-                                key={n.id}
-                                className={cn(
-                                  "p-4 flex gap-4 transition-colors hover:bg-on-surface/[0.02] cursor-pointer",
-                                  !n.isRead && "bg-primary/[0.03]"
-                                )}
-                                onClick={() => {
-                                  if(!n.isRead) markAsRead(n.id);
-                                  if(n.type === 'project_shared') navigate('/settings');
-                                  if(n.type === 'expense_added') navigate('/history');
-                                  if(n.type === 'budget_alert') navigate('/budgets');
-                                  setShowNotifs(false);
+                          displayedNotifs.map((n) => (
+                            <motion.div 
+                              key={n.id}
+                              className={cn(
+                                "p-4 flex gap-3 transition-colors hover:bg-on-surface/[0.03] cursor-pointer group relative",
+                                !n.isRead && "bg-primary/[0.04]"
+                              )}
+                              onClick={() => {
+                                if (!n.isRead) markAsRead(n.id);
+                                if (n.type === 'project_shared') navigate('/projects');
+                                if (n.type === 'expense_added') navigate('/history');
+                                if (n.type === 'budget_alert') navigate('/budgets');
+                                setShowNotifs(false);
+                              }}
+                            >
+                              <div className={cn(
+                                "w-10 h-10 shrink-0 rounded-xl flex items-center justify-center",
+                                n.type === 'project_shared' ? "bg-indigo-500/10 text-indigo-600" :
+                                n.type === 'expense_added' ? "bg-emerald-500/10 text-emerald-600" :
+                                n.type === 'budget_alert' ? (n.data?.threshold === 100 ? "bg-rose-500/10 text-rose-600" : "bg-amber-500/10 text-amber-600") :
+                                "bg-on-surface/5 text-on-surface-variant"
+                              )}>
+                                {n.type === 'project_shared' ? <UserPlus size={18} /> :
+                                 n.type === 'expense_added' ? <PlusCircle size={18} /> :
+                                 n.type === 'budget_alert' ? <AlertTriangle size={18} /> :
+                                 <Bell size={18} />}
+                              </div>
+                              <div className="flex-1 space-y-1 min-w-0 pr-6">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={cn(
+                                    "text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded",
+                                    n.type === 'project_shared' ? "bg-indigo-500/10 text-indigo-700 dark:text-indigo-400" :
+                                    n.type === 'expense_added' ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" :
+                                    n.type === 'budget_alert' ? "bg-amber-500/10 text-amber-700 dark:text-amber-400" :
+                                    "bg-on-surface/5 text-on-surface-variant"
+                                  )}>
+                                    {n.type === 'project_shared' ? 'Proyecto' :
+                                     n.type === 'expense_added' ? 'Gasto' :
+                                     n.type === 'budget_alert' ? 'Presupuesto' : 'Aviso'}
+                                  </span>
+                                  {!n.isRead && <span className="w-1.5 h-1.5 bg-primary rounded-full shrink-0" />}
+                                </div>
+                                <p className="text-xs font-bold text-on-surface leading-snug break-words">
+                                  {n.content}
+                                </p>
+                                <span className="text-[9px] font-bold text-on-surface-variant/50 uppercase tracking-widest block">
+                                  {n.createdAt ? (
+                                    typeof n.createdAt.toDate === 'function'
+                                      ? n.createdAt.toDate().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                                      : new Date(n.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                                  ) : 'Ahora'}
+                                </span>
+                              </div>
+
+                              {/* Individual Delete Button */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteNotification(n.id);
                                 }}
+                                className="absolute right-3 top-4 p-1.5 rounded-lg text-on-surface-variant/30 hover:text-rose-500 hover:bg-rose-500/10 transition-colors opacity-70 sm:opacity-0 group-hover:opacity-100"
+                                title="Eliminar notificación"
                               >
-                                <div className={cn(
-                                  "w-10 h-10 shrink-0 rounded-xl flex items-center justify-center",
-                                  n.type === 'project_shared' ? "bg-indigo-500/10 text-indigo-600" :
-                                  n.type === 'expense_added' ? "bg-emerald-500/10 text-emerald-600" :
-                                  n.type === 'budget_alert' ? (n.data?.threshold === 100 ? "bg-rose-500/10 text-rose-600" : "bg-amber-500/10 text-amber-600") :
-                                  "bg-on-surface/5 text-on-surface-variant"
-                                )}>
-                                  {n.type === 'project_shared' ? <UserPlus size={18} /> :
-                                   n.type === 'expense_added' ? <PlusCircle size={18} /> :
-                                   n.type === 'budget_alert' ? <AlertTriangle size={18} /> :
-                                   <Bell size={18} />}
-                                </div>
-                                <div className="flex-1 space-y-1">
-                                  <p className="text-xs font-bold text-on-surface leading-snug">
-                                    {n.content}
-                                  </p>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[9px] font-black text-on-surface-variant/30 uppercase tracking-widest">
-                                      {n.createdAt ? (
-                                        typeof n.createdAt.toDate === 'function'
-                                          ? n.createdAt.toDate().toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                                          : new Date(n.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                                      ) : 'Ahora'}
-                                    </span>
-                                    {!n.isRead && <span className="w-1.5 h-1.5 bg-primary rounded-full" />}
-                                  </div>
-                                </div>
-                                <ArrowRight size={14} className="text-on-surface-variant/20 self-center" />
-                              </motion.div>
-                            ))}
-                          </div>
+                                <Trash2 size={14} />
+                              </button>
+                            </motion.div>
+                          ))
                         )}
+                      </div>
+
+                      {/* Dropdown Footer: Auto-cleanup Notice */}
+                      <div className="p-3 bg-surface-container-low border-t border-on-surface/5 text-center">
+                        <p className="text-[10px] text-on-surface-variant/50 font-medium">
+                          🕒 Limpieza automática activa: se conservan hasta 7 días.
+                        </p>
                       </div>
                     </motion.div>
                   </>

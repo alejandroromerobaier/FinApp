@@ -7,6 +7,10 @@ import {
   getCategoriesByIds,
   getNotifications,
   markNotificationRead,
+  markAllNotificationsRead,
+  deleteNotification,
+  clearAllNotifications,
+  cleanOldNotifications,
   getBudgets,
   getShortcuts,
   Shortcut
@@ -77,6 +81,9 @@ export interface DataContextType {
   budgetMonth: string;
   setBudgetMonth: (month: string) => void;
   markAsRead: (id: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+  deleteNotification: (id: string) => Promise<void>;
+  clearAllNotifications: () => Promise<void>;
   showBalances: boolean;
   toggleShowBalances: () => void;
 }
@@ -113,6 +120,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setNotifications(data);
     });
 
+    // Automatic maintenance: clean notifications older than 7 days
+    cleanOldNotifications(user.uid, 7);
+
     // Sync shortcuts
     const unsubscribeShortcuts = getShortcuts((data: Shortcut[]) => {
       setShortcuts(data);
@@ -147,6 +157,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const markAsRead = async (id: string) => {
     await markNotificationRead(id);
+  };
+
+  const markAllAsRead = async () => {
+    if (user) await markAllNotificationsRead(user.uid);
+  };
+
+  const handleDeleteNotification = async (id: string) => {
+    await deleteNotification(id);
+  };
+
+  const handleClearAllNotifications = async () => {
+    if (user) await clearAllNotifications(user.uid);
   };
 
   const toggleShowBalances = () => {
@@ -305,6 +327,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       budgetMonth,
       setBudgetMonth,
       markAsRead,
+      markAllAsRead,
+      deleteNotification: handleDeleteNotification,
+      clearAllNotifications: handleClearAllNotifications,
       loading,
       showBalances,
       toggleShowBalances

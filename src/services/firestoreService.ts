@@ -115,6 +115,82 @@ export const markNotificationRead = async (id: string) => {
   }
 };
 
+export const markAllNotificationsRead = async (userId: string) => {
+  try {
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', userId),
+      where('isRead', '==', false)
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) return;
+    const batch = writeBatch(db);
+    snap.docs.forEach(docSnap => {
+      batch.update(docSnap.ref, { isRead: true });
+    });
+    await batch.commit();
+  } catch (error) {
+    console.error('Error marking all notifications read:', error);
+  }
+};
+
+export const deleteNotification = async (id: string) => {
+  try {
+    const ref = doc(db, 'notifications', id);
+    await deleteDoc(ref);
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+  }
+};
+
+export const clearAllNotifications = async (userId: string) => {
+  try {
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', userId)
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) return;
+    const batch = writeBatch(db);
+    snap.docs.forEach(docSnap => {
+      batch.delete(docSnap.ref);
+    });
+    await batch.commit();
+  } catch (error) {
+    console.error('Error clearing all notifications:', error);
+  }
+};
+
+export const cleanOldNotifications = async (userId: string, days: number = 7) => {
+  try {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', userId)
+    );
+    const snap = await getDocs(q);
+    const oldDocs = snap.docs.filter(docSnap => {
+      const data = docSnap.data();
+      if (!data.createdAt) return false;
+      const created = typeof data.createdAt?.toDate === 'function' 
+        ? data.createdAt.toDate() 
+        : new Date(data.createdAt);
+      return created < cutoffDate;
+    });
+
+    if (oldDocs.length > 0) {
+      const batch = writeBatch(db);
+      oldDocs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      console.log(`[Notifications] Limpieza automática: eliminadas ${oldDocs.length} notificaciones >${days} días.`);
+    }
+  } catch (error) {
+    console.error('Error cleaning old notifications:', error);
+  }
+};
+
 // --- User Profile ---
 
 export const syncUserProfile = async (user: any, displayName?: string) => {
@@ -387,7 +463,7 @@ export const getProjects = (callback: (projects: any[]) => void) => {
   );
   
   return onSnapshot(q, (snapshot) => {
-    const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+    const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
     projects.sort((a, b) => {
       const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
       const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);

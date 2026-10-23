@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, 
@@ -61,6 +61,8 @@ const formatTime = (rawDate: any): string => {
     return '';
   }
 };
+
+const PAGE_SIZE = 35;
 
 export const History: React.FC = () => {
   const navigate = useNavigate();
@@ -154,16 +156,60 @@ export const History: React.FC = () => {
     });
   }, [transactions, searchQuery, filterType, filterCategory, filterProject, filterClassification, selectedPeriod, currentDate]);
 
+  const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Reset pagination limit when any filter or search changes
+  useEffect(() => {
+    setVisibleLimit(PAGE_SIZE);
+  }, [searchQuery, filterType, filterCategory, filterProject, filterClassification, selectedPeriod, currentDate]);
+
+  const hasMore = visibleLimit < filteredTransactions.length;
+
+  const loadMore = useCallback(() => {
+    if (hasMore && !isLoadingMore) {
+      setIsLoadingMore(true);
+      setTimeout(() => {
+        setVisibleLimit(prev => Math.min(prev + PAGE_SIZE, filteredTransactions.length));
+        setIsLoadingMore(false);
+      }, 150);
+    }
+  }, [hasMore, isLoadingMore, filteredTransactions.length]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !hasMore) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        loadMore();
+      }
+    }, {
+      rootMargin: '250px',
+      threshold: 0.1
+    });
+
+    observer.observe(sentinel);
+    return () => {
+      if (sentinel) observer.unobserve(sentinel);
+    };
+  }, [hasMore, loadMore]);
+
+  const paginatedTransactions = useMemo(() => {
+    return filteredTransactions.slice(0, visibleLimit);
+  }, [filteredTransactions, visibleLimit]);
+
   const groupedTransactions = useMemo(() => {
     const groups: { [key: string]: any[] } = {};
-    filteredTransactions.forEach(t => {
+    paginatedTransactions.forEach(t => {
       const date = t.date instanceof Date ? t.date : new Date(t.date);
       const dateKey = isNaN(date.getTime()) ? 'Fecha Desconocida' : dateGroupFormatter.format(date);
       if (!groups[dateKey]) groups[dateKey] = [];
       groups[dateKey].push(t);
     });
     return groups;
-  }, [filteredTransactions]);
+  }, [paginatedTransactions]);
 
   if (loading) {
     return (
@@ -184,7 +230,16 @@ export const History: React.FC = () => {
           >
             <ChevronLeft size={24} />
           </button>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-on-surface font-headline">Historial</h1>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-on-surface font-headline leading-tight">Historial</h1>
+            <p className="text-[11px] font-bold text-on-surface-variant/70">
+              {filteredTransactions.length === 0 ? '0 movimientos' : (
+                hasMore 
+                  ? `Mostrando ${paginatedTransactions.length} de ${filteredTransactions.length} movimientos`
+                  : `${filteredTransactions.length} movimiento${filteredTransactions.length > 1 ? 's' : ''}`
+              )}
+            </p>
+          </div>
         </div>
         <button 
           onClick={() => setShowFilters(!showFilters)}
@@ -404,7 +459,8 @@ export const History: React.FC = () => {
       {/* Transactions List */}
       <div className="space-y-8">
         {Object.keys(groupedTransactions).length > 0 ? (
-          Object.entries(groupedTransactions).map(([date, items]) => (
+          <>
+            {Object.entries(groupedTransactions).map(([date, items]) => (
             <div key={date}>
               <h3 className="text-[11px] font-black text-on-surface-variant/40 uppercase tracking-[0.2em] mb-4 ml-1">{date}</h3>
               <div className="space-y-3">
@@ -494,7 +550,33 @@ export const History: React.FC = () => {
                 })}
               </div>
             </div>
-          ))
+          ))}
+
+          {/* Infinite Scroll Sentinel and Load More */}
+          {hasMore && (
+            <div ref={sentinelRef} className="pt-6 pb-8 flex flex-col items-center justify-center gap-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-on-surface-variant/70">
+                <Loader2 size={16} className="animate-spin text-primary" />
+                <span>Cargando más movimientos...</span>
+              </div>
+              <button
+                type="button"
+                onClick={loadMore}
+                className="px-4 py-2.5 bg-surface-container-low hover:bg-on-surface/5 text-primary text-xs font-bold rounded-xl transition-all border border-on-surface/5 shadow-sm active:scale-95 cursor-pointer"
+              >
+                Cargar más ({filteredTransactions.length - paginatedTransactions.length} restantes)
+              </button>
+            </div>
+          )}
+
+          {!hasMore && filteredTransactions.length > PAGE_SIZE && (
+            <div className="py-8 text-center border-t border-on-surface/5">
+              <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/40">
+                Has llegado al final • {filteredTransactions.length} transacciones cargadas
+              </p>
+            </div>
+          )}
+        </>
         ) : (
           <div className="text-center py-20 bg-surface-container-low rounded-[3rem] border border-dashed border-on-surface/10">
             <div className="w-20 h-20 bg-on-surface/5 rounded-full flex items-center justify-center mx-auto mb-6">
