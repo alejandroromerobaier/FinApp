@@ -36,6 +36,7 @@ export interface Project {
   showInExpenseSelector?: boolean;
   status?: 'active' | 'inactive';
   homeOrder?: number;
+  cardColor?: string;
   createdAt: any;
 }
 

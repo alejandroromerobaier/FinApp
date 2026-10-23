@@ -73,14 +73,18 @@ function AppContent() {
   );
 }
 
+import { ThemeProvider } from './lib/ThemeContext';
+
 export default function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <DataProvider>
-          <AppContent />
-        </DataProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <DataProvider>
+            <AppContent />
+          </DataProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

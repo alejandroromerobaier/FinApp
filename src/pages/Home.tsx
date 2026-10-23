@@ -43,6 +43,7 @@ import { getTransactions, cleanupDuplicateCategories, Shortcut } from '../servic
 import { formatDisplayDate, getLocalMonth, parseLocalMonth } from '../lib/dateUtils';
 import { ShortcutKeypadModal } from '../components/ShortcutKeypadModal';
 import { ShortcutIconComponent, ShortcutBadge } from './ManageShortcuts';
+import { getProjectGradient } from '../lib/constants';
 
 const ICON_MAP: Record<string, any> = {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
@@ -82,6 +83,7 @@ export const Home: React.FC = () => {
       currency: string;
       name: string;
       monthlyBudget?: number | null;
+      cardColor?: string | null;
     }> = {
       personal: {
         income: 0,
@@ -91,7 +93,8 @@ export const Home: React.FC = () => {
         currentExpenses: 0,
         currency: profile?.currency || 'ARS',
         name: 'Personal',
-        monthlyBudget: profile?.personalMonthlyBudget ?? null
+        monthlyBudget: profile?.personalMonthlyBudget ?? null,
+        cardColor: profile?.personalCardColor || 'navy'
       }
     };
 
@@ -104,7 +107,8 @@ export const Home: React.FC = () => {
         currentExpenses: 0,
         currency: p.currency || profile?.currency || 'ARS',
         name: p.name,
-        monthlyBudget: p.monthlyBudget ?? null
+        monthlyBudget: p.monthlyBudget ?? null,
+        cardColor: p.cardColor || 'slate'
       };
     });
 
@@ -130,7 +134,8 @@ export const Home: React.FC = () => {
           currentExpenses: 0,
           currency,
           name: projectName,
-          monthlyBudget: projectId === 'personal' ? (profile?.personalMonthlyBudget ?? null) : (project?.monthlyBudget ?? null)
+          monthlyBudget: projectId === 'personal' ? (profile?.personalMonthlyBudget ?? null) : (project?.monthlyBudget ?? null),
+          cardColor: projectId === 'personal' ? (profile?.personalCardColor || 'navy') : (project?.cardColor || 'slate')
         };
       }
       
@@ -288,7 +293,7 @@ export const Home: React.FC = () => {
             transition={{ delay: idx * 0.1 }}
             className={cn(
               "relative overflow-hidden rounded-[2.5rem] sm:rounded-[3.5rem] p-6 sm:p-10 text-white shadow-2xl group border border-white/10",
-              id === 'personal' ? "bg-gradient-to-br from-primary via-primary/95 to-primary/90 shadow-primary/30" : "bg-gradient-to-br from-slate-800 via-slate-900 to-black shadow-slate-900/30"
+              getProjectGradient(data.cardColor, id === 'personal')
             )}
           >
             {/* Decorative elements */}

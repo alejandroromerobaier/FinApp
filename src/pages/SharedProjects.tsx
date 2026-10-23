@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plane, Home, PlusCircle, Share2, Edit3, Trash2, Eye, MoreVertical, Hourglass, Users, X, Wallet, Briefcase, Heart, ShoppingBag, Landmark, Star, Archive, CheckCircle2, Power, ArrowLeft } from 'lucide-react';
+import { Plane, Home, PlusCircle, Share2, Edit3, Trash2, Eye, MoreVertical, Hourglass, Users, X, Wallet, Briefcase, Heart, ShoppingBag, Landmark, Star, Archive, CheckCircle2, Power, ArrowLeft, Check } from 'lucide-react';
 import { formatCurrency, cn, formatCurrencyInput, formatAmountForDisplay, parseFormattedAmount } from '@/src/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { createProject, updateProject, deleteProject, removeMemberFromProject, inviteUserToProjectByEmail, updateUserProfile } from '../services/firestoreService';
+import { PROJECT_COLOR_OPTIONS } from '../lib/constants';
 
 const PROJECT_ICONS = [
   { id: 'plane', icon: Plane, label: 'Viajes' },
@@ -46,7 +47,8 @@ export const SharedProjects: React.FC = () => {
     showInExpenseSelector: true,
     status: 'active' as 'active' | 'inactive',
     homeOrder: 1,
-    isDefaultProject: false
+    isDefaultProject: false,
+    cardColor: 'slate'
   });
   const [inviteEmail, setInviteEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
@@ -69,6 +71,7 @@ export const SharedProjects: React.FC = () => {
     showInExpenseSelector: profile?.personalShowInExpenseSelector ?? true,
     status: profile?.personalStatus || 'active',
     homeOrder: profile?.personalHomeOrder ?? 1,
+    cardColor: profile?.personalCardColor || 'navy',
     memberIds: [user?.uid],
     ownerId: user?.uid,
     currency: profile?.currency || 'ARS'
@@ -107,7 +110,10 @@ export const SharedProjects: React.FC = () => {
           ? (profile?.personalStatus || 'active')
           : (project.status || 'active'),
         homeOrder: project.homeOrder || 1,
-        isDefaultProject: currentDefault === project.id
+        isDefaultProject: currentDefault === project.id,
+        cardColor: project.isPersonal 
+          ? (profile?.personalCardColor || 'navy')
+          : (project.cardColor || 'slate')
       });
     } else {
       setEditingProject(null);
@@ -122,7 +128,8 @@ export const SharedProjects: React.FC = () => {
         showInExpenseSelector: true,
         status: 'active',
         homeOrder: maxOrder + 1,
-        isDefaultProject: false
+        isDefaultProject: false,
+        cardColor: 'slate'
       });
     }
     setIsModalOpen(true);
@@ -158,12 +165,14 @@ export const SharedProjects: React.FC = () => {
             personalShowInExpenseSelector: formData.showInExpenseSelector,
             personalStatus: formData.status,
             personalHomeOrder: formData.homeOrder,
+            personalCardColor: formData.cardColor,
             ...(isDefaultProject ? { defaultProjectId: 'personal' } : {})
           });
         } else {
           await updateProject(editingProject.id, {
             ...projectFields,
-            monthlyBudget: parsedBudget
+            monthlyBudget: parsedBudget,
+            cardColor: formData.cardColor
           });
           if (isDefaultProject) {
             await updateUserProfile(user!.uid, { defaultProjectId: editingProject.id });
@@ -174,7 +183,8 @@ export const SharedProjects: React.FC = () => {
       } else {
         const docRef = await createProject({
           ...projectFields,
-          monthlyBudget: parsedBudget
+          monthlyBudget: parsedBudget,
+          cardColor: formData.cardColor
         });
         if (isDefaultProject && docRef?.id) {
           await updateUserProfile(user!.uid, { defaultProjectId: docRef.id });
@@ -502,6 +512,35 @@ export const SharedProjects: React.FC = () => {
                     </select>
                   </div>
                 )}
+
+                {/* Color de Tarjeta en Home */}
+                <div>
+                  <label className="block text-xs font-bold text-black/40 dark:text-white/40 uppercase tracking-widest mb-2.5 ml-1">
+                    Color de Tarjeta en Home
+                  </label>
+                  <div className="grid grid-cols-4 sm:grid-cols-8 gap-2.5">
+                    {PROJECT_COLOR_OPTIONS.map((c) => {
+                      const isSelected = (formData.cardColor || (editingProject?.isPersonal ? 'navy' : 'slate')) === c.id;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, cardColor: c.id })}
+                          className={cn(
+                            "h-11 rounded-2xl flex items-center justify-center transition-all relative shadow-sm cursor-pointer",
+                            c.previewClass,
+                            isSelected ? "ring-4 ring-primary ring-offset-2 scale-105" : "hover:scale-102 opacity-90 hover:opacity-100"
+                          )}
+                          title={c.name}
+                        >
+                          {isSelected && (
+                            <Check size={18} className="text-white drop-shadow-md stroke-[3]" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
                 {/* Presupuesto Mensual General */}
                 <div>

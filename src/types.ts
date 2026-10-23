@@ -34,6 +34,7 @@ export interface Project {
   memberIds: string[];
   pendingEmails?: string[];
   monthlyBudget?: number | null;
+  cardColor?: string;
   createdAt: any;
   updatedAt?: any;
 }
