@@ -4,8 +4,8 @@ import { X, Check, Loader2, Zap, Clock, Wallet, CreditCard } from 'lucide-react'
 import { Shortcut, addTransaction } from '../services/firestoreService';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
-import { ShortcutIconComponent, ShortcutBadge } from '../pages/ManageShortcuts';
-import { formatCurrency, cn } from '../lib/utils';
+import { ShortcutBadge } from '../pages/ManageShortcuts';
+import { formatCurrency, cn, formatCurrencyInput, formatAmountForDisplay, parseFormattedAmount } from '../lib/utils';
 import { getLocalToday } from '../lib/dateUtils';
 
 interface ShortcutKeypadModalProps {
@@ -26,7 +26,7 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
   useEffect(() => {
     if (shortcut) {
       if (shortcut.defaultAmount && shortcut.defaultAmount > 0) {
-        setAmount(String(shortcut.defaultAmount));
+        setAmount(formatAmountForDisplay(shortcut.defaultAmount));
       } else {
         setAmount('');
       }
@@ -54,7 +54,7 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
     : projects.find(p => p.id === targetProjectId);
 
   const currency = project?.currency || profile?.currency || 'ARS';
-  const parsedAmount = parseFloat(amount.replace(',', '.')) || 0;
+  const parsedAmount = parseFormattedAmount(amount);
 
   const handleConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -205,16 +205,24 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
                   ref={inputRef}
                   type="text"
                   inputMode="decimal"
-                  pattern="[0-9]*[.,]?[0-9]*"
                   value={amount}
                   onChange={(e) => {
-                    let val = e.target.value.replace(',', '.');
-                    val = val.replace(/[^0-9.]/g, '');
-                    const parts = val.split('.');
-                    if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
-                    setAmount(val);
+                    const input = e.target;
+                    const oldVal = input.value;
+                    const oldCursor = input.selectionStart || oldVal.length;
+                    const charsFromRight = oldVal.length - oldCursor;
+
+                    const { display } = formatCurrencyInput(oldVal);
+                    setAmount(display);
+
+                    requestAnimationFrame(() => {
+                      if (input && document.activeElement === input) {
+                        const newCursor = Math.max(0, display.length - charsFromRight);
+                        input.setSelectionRange(newCursor, newCursor);
+                      }
+                    });
                   }}
-                  placeholder="0.00"
+                  placeholder="0,00"
                   className="w-full bg-surface-container-low border-2 border-transparent focus:border-primary/30 rounded-2xl py-4 pl-10 pr-4 text-3xl font-black font-headline text-center text-on-surface focus:ring-0 transition-all placeholder:text-on-surface-variant/20 shadow-inner"
                 />
               </div>

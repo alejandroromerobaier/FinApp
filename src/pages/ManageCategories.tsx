@@ -207,25 +207,27 @@ export const ManageCategories: React.FC = () => {
                   </p>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-1.5">
+                <button 
+                  onClick={() => startEdit(cat)}
+                  className="p-2.5 rounded-xl text-primary hover:bg-primary/5 transition-colors"
+                  title="Editar categoría"
+                >
+                  <Edit2 size={20} />
+                </button>
                 {cat.ownerId === user?.uid && (
-                  <>
-                    <button 
-                      onClick={() => startEdit(cat)}
-                      className="p-2.5 rounded-xl text-primary hover:bg-primary/5 transition-colors"
-                    >
-                      <Edit2 size={20} />
-                    </button>
-                    <button 
-                      onClick={() => setShowDeleteModal(cat.id)}
-                      className="p-2.5 rounded-xl text-rose-500 hover:bg-rose-50 transition-colors"
-                    >
-                      <Trash2 size={20} />
-                    </button>
-                  </>
+                  <button 
+                    onClick={() => setShowDeleteModal(cat.id)}
+                    className="p-2.5 rounded-xl text-rose-500 hover:bg-rose-50 transition-colors"
+                    title="Eliminar categoría"
+                  >
+                    <Trash2 size={20} />
+                  </button>
                 )}
                 {(cat.scope === 'system' || !cat.ownerId) && (
-                  <span className="text-[9px] font-black text-on-surface-variant/20 uppercase tracking-widest px-3 py-1 bg-on-surface/5 rounded-full">Sistema</span>
+                  <span className="text-[9px] font-black text-on-surface-variant/40 uppercase tracking-widest px-2.5 py-1 bg-on-surface/5 rounded-full ml-1">
+                    Base
+                  </span>
                 )}
               </div>
             </div>

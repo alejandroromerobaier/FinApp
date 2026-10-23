@@ -104,7 +104,8 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (
         isAdmin() || 
         (isValidCategory(request.resource.data) && (
-          (resource.data.scope == 'system' && resource.data.ownerId == null) ||
+          (resource.data.scope == 'system') ||
+          (resource.data.ownerId == null) ||
           (resource.data.ownerId == request.auth.uid)
         ))
       );

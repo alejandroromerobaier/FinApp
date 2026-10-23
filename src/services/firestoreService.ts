@@ -194,15 +194,16 @@ export const ensureSystemCategories = async () => {
     { name: 'Regalo', icon: 'Gift', color: 'bg-rose-600', type: 'income', scope: 'system' },
   ];
 
-  // We check for these specifically to ensure they exist once globally
+  // We check for these specifically to ensure they exist once globally without overwriting user-edited names
   const qGlobal = query(collection(db, 'categories'), where('scope', '==', 'system'));
   const globalSnap = await getDocs(qGlobal);
+  const existingDocIds = new Set(globalSnap.docs.map(doc => doc.id));
   const existingNames = new Set(globalSnap.docs.map(doc => doc.data().name));
 
   for (const cat of defaultCategories) {
-    if (!existingNames.has(cat.name)) {
-      // System categories have NO ownerId and a predictable ID for consistency
-      const catId = `system_${cat.name.toLowerCase().replace(/\s+/g, '_')}`;
+    const catId = `system_${cat.name.toLowerCase().replace(/\s+/g, '_')}`;
+    // Only insert if neither the predictable ID nor the category name exists
+    if (!existingDocIds.has(catId) && !existingNames.has(cat.name)) {
       await setDoc(doc(db, 'categories', catId), {
         ...cat,
         ownerId: null,
