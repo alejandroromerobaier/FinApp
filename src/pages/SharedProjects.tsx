@@ -328,7 +328,7 @@ export const SharedProjects: React.FC = () => {
               </p>
             </div>
           ) : (
-            (activeTab === 'active' ? activeMyProjects : inactiveMyProjects).map((project) => (
+            (activeTab === 'active' ? activeMyProjects : inactiveMyProjects).map((project: any) => (
               <ProjectCard 
                 key={project.id} 
                 project={project} 
