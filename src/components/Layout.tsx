@@ -35,7 +35,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         <header className="fixed top-0 w-full z-50 glass-header pt-safe-top">
           <div className="flex items-center justify-between px-4 sm:px-6 h-14 sm:h-16">
             <div className="flex items-center gap-2.5 sm:gap-3 cursor-pointer group" onClick={() => navigate('/')}>
-              <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-white flex items-center justify-center p-1 sm:p-1.5 shadow-md shadow-blue-500/10 border border-blue-500/15 overflow-hidden transition-all duration-300 group-hover:scale-105 group-active:scale-95 group-hover:shadow-lg group-hover:shadow-blue-500/20">
+              <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-surface-container-lowest flex items-center justify-center p-1 sm:p-1.5 shadow-md shadow-blue-500/10 border border-blue-500/15 overflow-hidden transition-all duration-300 group-hover:scale-105 group-active:scale-95 group-hover:shadow-lg group-hover:shadow-blue-500/20">
                 <img 
                   src={logo} 
                   alt="FinApp Logo" 
@@ -161,10 +161,10 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
       {/* Bottom Navigation */}
       {!isAddPage && (
-        <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-3 py-1.5 pb-safe bg-white/95 backdrop-blur-2xl shadow-[0_-10px_30px_rgba(0,0,0,0.08)] rounded-t-[2.5rem] border-t border-black/5 sm:hidden select-none">
+        <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-3 py-1.5 pb-safe bg-surface-container-lowest/95 backdrop-blur-2xl shadow-[0_-10px_30px_rgba(0,0,0,0.08)] rounded-t-[2.5rem] border-t border-on-surface/10 sm:hidden select-none">
           <NavLink to="/" className={({ isActive }) => cn(
             "flex flex-col items-center justify-center py-2 px-3.5 min-w-[60px] min-h-[50px] rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation",
-            isActive ? "text-primary bg-primary/10 font-black" : "text-slate-400 font-medium"
+            isActive ? "text-primary bg-primary/10 font-black" : "text-on-surface-variant font-medium"
           )}>
             <Home size={22} />
             <span className="text-[10px] font-bold uppercase tracking-wider mt-1 leading-none">Home</span>
@@ -172,7 +172,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           
           <NavLink to="/stats" className={({ isActive }) => cn(
             "flex flex-col items-center justify-center py-2 px-3.5 min-w-[60px] min-h-[50px] rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation",
-            isActive ? "text-primary bg-primary/10 font-black" : "text-slate-400 font-medium"
+            isActive ? "text-primary bg-primary/10 font-black" : "text-on-surface-variant font-medium"
           )}>
             <BarChart3 size={22} />
             <span className="text-[10px] font-bold uppercase tracking-wider mt-1 leading-none">Stats</span>
@@ -186,7 +186,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
           <NavLink to="/settings" className={({ isActive }) => cn(
             "flex flex-col items-center justify-center py-2 px-3.5 min-w-[60px] min-h-[50px] rounded-2xl transition-all duration-200 active:scale-95 touch-manipulation",
-            isActive ? "text-primary bg-primary/10 font-black" : "text-slate-400 font-medium"
+            isActive ? "text-primary bg-primary/10 font-black" : "text-on-surface-variant font-medium"
           )}>
             <Settings size={22} />
             <span className="text-[10px] font-bold uppercase tracking-wider mt-1 leading-none">Ajustes</span>
@@ -196,7 +196,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
       {/* Side Desktop Sidebar */}
       {!isAddPage && (
-        <aside className="hidden sm:flex fixed left-0 top-0 h-full w-20 flex-col items-center py-10 bg-white border-r border-on-surface/5 z-50">
+        <aside className="hidden sm:flex fixed left-0 top-0 h-full w-20 flex-col items-center py-10 bg-surface-container-lowest border-r border-on-surface/10 z-50">
            <NavLink to="/" className={({ isActive }) => cn("p-4 rounded-2xl mb-4 transition-all", isActive ? "bg-primary text-white" : "text-on-surface-variant hover:bg-on-surface/5")}>
              <Home size={24} />
            </NavLink>

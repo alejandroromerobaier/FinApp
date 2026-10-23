@@ -33,6 +33,11 @@ export interface Project {
   ownerId: string;
   memberIds: string[];
   pendingEmails?: string[];
+  cardColor?: string;
+  status?: 'active' | 'inactive';
+  showInHome?: boolean;
+  showInExpenseSelector?: boolean;
+  homeOrder?: number;
   createdAt: any;
   updatedAt?: any;
 }

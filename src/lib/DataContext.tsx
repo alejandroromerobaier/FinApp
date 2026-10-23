@@ -32,7 +32,11 @@ export interface Project {
   ownerId: string;
   memberIds: string[];
   showInHome?: boolean;
+  showInExpenseSelector?: boolean;
+  status?: 'active' | 'inactive';
   homeOrder?: number;
+  cardColor?: string;
+  isPersonal?: boolean;
   createdAt: any;
 }
 

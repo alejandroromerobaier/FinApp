@@ -41,6 +41,7 @@ import { getTransactions, cleanupDuplicateCategories, Shortcut } from '../servic
 import { formatDisplayDate, getLocalMonth, parseLocalMonth } from '../lib/dateUtils';
 import { ShortcutKeypadModal } from '../components/ShortcutKeypadModal';
 import { ShortcutIconComponent, ShortcutBadge } from './ManageShortcuts';
+import { getProjectGradient } from '../lib/constants';
 
 const ICON_MAP: Record<string, any> = {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
@@ -79,6 +80,7 @@ export const Home: React.FC = () => {
       currentExpenses: number;
       currency: string;
       name: string;
+      cardColor?: string | null;
     }> = {
       personal: {
         income: 0,
@@ -87,7 +89,8 @@ export const Home: React.FC = () => {
         currentIncome: 0,
         currentExpenses: 0,
         currency: profile?.currency || 'ARS',
-        name: 'Personal'
+        name: 'Personal',
+        cardColor: profile?.personalCardColor || 'navy'
       }
     };
 
@@ -99,7 +102,8 @@ export const Home: React.FC = () => {
         currentIncome: 0,
         currentExpenses: 0,
         currency: p.currency || profile?.currency || 'ARS',
-        name: p.name
+        name: p.name,
+        cardColor: p.cardColor || 'slate'
       };
     });
 
@@ -124,7 +128,8 @@ export const Home: React.FC = () => {
           currentIncome: 0, 
           currentExpenses: 0,
           currency,
-          name: projectName
+          name: projectName,
+          cardColor: projectId === 'personal' ? (profile?.personalCardColor || 'navy') : (project?.cardColor || 'slate')
         };
       }
       
@@ -207,7 +212,7 @@ export const Home: React.FC = () => {
       {/* Header */}
       <header className="flex items-center justify-between mb-8 sm:mb-10">
         <div className="flex items-center gap-3.5 sm:gap-4">
-          <Link to="/settings" className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white flex items-center justify-center overflow-hidden border-2 border-blue-500/20 shadow-md shadow-blue-500/10 group transition-all duration-300 hover:scale-105 active:scale-95">
+          <Link to="/settings" className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-surface-container-lowest flex items-center justify-center overflow-hidden border-2 border-blue-500/20 shadow-md shadow-blue-500/10 group transition-all duration-300 hover:scale-105 active:scale-95">
             {user?.photoURL ? (
               <img src={user.photoURL} alt={user.displayName || 'User'} className="w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
             ) : (
@@ -282,7 +287,7 @@ export const Home: React.FC = () => {
             transition={{ delay: idx * 0.1 }}
             className={cn(
               "relative overflow-hidden rounded-[2.5rem] sm:rounded-[3.5rem] p-6 sm:p-10 text-white shadow-2xl group border border-white/10",
-              id === 'personal' ? "bg-gradient-to-br from-primary via-primary/95 to-primary/90 shadow-primary/30" : "bg-gradient-to-br from-slate-800 via-slate-900 to-black shadow-slate-900/30"
+              getProjectGradient(data.cardColor, id === 'personal')
             )}
           >
             {/* Decorative elements */}

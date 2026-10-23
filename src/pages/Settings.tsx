@@ -24,11 +24,15 @@ import {
   AlertCircle, 
   CheckCircle2, 
   Loader2, 
-  Lock
+  Lock,
+  Sun,
+  Moon,
+  Monitor
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useAuth } from '../lib/AuthContext';
+import { useTheme } from '../lib/ThemeContext';
 import { updateUserProfile, syncUserProfile } from '../services/firestoreService';
 import { updatePassword, updateProfile as updateFirebaseProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../lib/firebase';
@@ -59,7 +63,15 @@ const AVATAR_PRESETS = [
 
 export const Settings: React.FC = () => {
   const { user, profile, signOut } = useAuth();
+  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+
+  const handleThemeChange = async (newTheme: 'light' | 'dark' | 'system') => {
+    setTheme(newTheme);
+    if (user) {
+      await updateUserProfile(user.uid, { themePreference: newTheme }).catch(() => {});
+    }
+  };
 
   // Profile Edit Modal state
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -352,6 +364,62 @@ export const Settings: React.FC = () => {
             iconColor="bg-indigo-50 text-indigo-700"
             isLast
           />
+        </div>
+      </section>
+
+      {/* Appearance Section */}
+      <section className="space-y-4">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-on-surface-variant px-1">Apariencia</h2>
+        <div className="bg-surface-container-lowest rounded-3xl p-5 shadow-sm border border-on-surface/5 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-sm text-on-surface">Tema de la Aplicación</span>
+            <span className="text-[10px] font-black uppercase tracking-wider text-primary bg-primary/10 px-2.5 py-1 rounded-lg">
+              {theme === 'system' ? 'Automático (Sistema)' : theme === 'dark' ? 'Modo Oscuro' : 'Modo Claro'}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-2.5 pt-1">
+            <button
+              type="button"
+              onClick={() => handleThemeChange('light')}
+              className={cn(
+                "flex flex-col items-center justify-center gap-2 p-3.5 rounded-2xl border transition-all cursor-pointer",
+                theme === 'light'
+                  ? "bg-primary text-white border-primary shadow-md shadow-primary/20 font-bold"
+                  : "bg-surface-container-low text-on-surface-variant border-transparent hover:border-on-surface/10 font-medium"
+              )}
+            >
+              <Sun size={20} />
+              <span className="text-xs">Claro</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleThemeChange('dark')}
+              className={cn(
+                "flex flex-col items-center justify-center gap-2 p-3.5 rounded-2xl border transition-all cursor-pointer",
+                theme === 'dark'
+                  ? "bg-primary text-white border-primary shadow-md shadow-primary/20 font-bold"
+                  : "bg-surface-container-low text-on-surface-variant border-transparent hover:border-on-surface/10 font-medium"
+              )}
+            >
+              <Moon size={20} />
+              <span className="text-xs">Oscuro</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleThemeChange('system')}
+              className={cn(
+                "flex flex-col items-center justify-center gap-2 p-3.5 rounded-2xl border transition-all cursor-pointer",
+                theme === 'system'
+                  ? "bg-primary text-white border-primary shadow-md shadow-primary/20 font-bold"
+                  : "bg-surface-container-low text-on-surface-variant border-transparent hover:border-on-surface/10 font-medium"
+              )}
+            >
+              <Monitor size={20} />
+              <span className="text-xs">Sistema</span>
+            </button>
+          </div>
         </div>
       </section>
 

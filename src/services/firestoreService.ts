@@ -387,7 +387,7 @@ export const getProjects = (callback: (projects: any[]) => void) => {
   );
   
   return onSnapshot(q, (snapshot) => {
-    const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
     projects.sort((a, b) => {
       const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
       const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
@@ -798,7 +798,7 @@ export const checkAndNotifyBudgetAlerts = async (transaction: any) => {
     const txSnap = await getDocs(q);
     let totalSpent = 0;
     txSnap.docs.forEach(doc => {
-      const data = doc.data();
+      const data = doc.data() as any;
       const txDate = safeToDate(data.date);
       if (getLocalMonth(txDate) === month) {
         totalSpent += (data.amount || 0);

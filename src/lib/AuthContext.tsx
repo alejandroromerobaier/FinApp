@@ -18,6 +18,8 @@ export interface UserProfile {
   personalShowInExpenseSelector?: boolean;
   personalStatus?: 'active' | 'inactive';
   defaultProjectId?: string;
+  personalCardColor?: string;
+  themePreference?: 'light' | 'dark' | 'system';
   createdAt: any;
   updatedAt?: any;
 }
