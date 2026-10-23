@@ -31,7 +31,7 @@ import {
   Clock
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { cn } from '@/src/lib/utils';
+import { cn, formatCurrencyInput, formatAmountForDisplay, parseFormattedAmount } from '../lib/utils';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { addTransaction, updateTransaction, deleteTransaction, getTransaction } from '../services/firestoreService';
@@ -125,7 +125,7 @@ export const AddExpense: React.FC = () => {
         try {
           const t: any = await getTransaction(id);
           if (t) {
-            setAmount(t.amount.toString());
+            setAmount(formatAmountForDisplay(t.amount));
             setType(t.type);
             setDescription(t.description || '');
             // Use original time from Firestore but normalize date string for the input
@@ -174,16 +174,23 @@ export const AddExpense: React.FC = () => {
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value.replace(',', '.');
-    val = val.replace(/[^0-9.]/g, '');
-    const parts = val.split('.');
-    if (parts.length > 2) {
-      val = parts[0] + '.' + parts.slice(1).join('');
-    }
-    setAmount(val);
+    const input = e.target;
+    const oldVal = input.value;
+    const oldCursor = input.selectionStart || oldVal.length;
+    const charsFromRight = oldVal.length - oldCursor;
+
+    const { display } = formatCurrencyInput(oldVal);
+    setAmount(display);
+
+    requestAnimationFrame(() => {
+      if (input && document.activeElement === input) {
+        const newCursor = Math.max(0, display.length - charsFromRight);
+        input.setSelectionRange(newCursor, newCursor);
+      }
+    });
   };
 
-  const parsedAmount = parseFloat(amount.replace(',', '.'));
+  const parsedAmount = parseFormattedAmount(amount);
   const isValidAmount = Boolean(amount && !isNaN(parsedAmount) && parsedAmount > 0);
 
   const handleSave = async () => {
@@ -356,9 +363,9 @@ export const AddExpense: React.FC = () => {
               readOnly={!isAuthor}
               value={amount}
               onChange={handleAmountChange}
-              placeholder="0.00"
+              placeholder="0,00"
               className={cn(
-                "w-full max-w-[280px] bg-transparent border-none p-0 focus:ring-0 text-6xl sm:text-8xl font-black tracking-tighter font-headline text-center placeholder:text-on-surface-variant/10 transition-all",
+                "w-full max-w-[340px] bg-transparent border-none p-0 focus:ring-0 text-5xl sm:text-7xl font-black tracking-tighter font-headline text-center placeholder:text-on-surface-variant/10 transition-all",
                 type === 'expense' ? "text-on-surface" : "text-emerald-900"
               )}
               autoFocus={isAuthor}

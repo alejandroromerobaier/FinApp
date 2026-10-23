@@ -6,7 +6,7 @@ import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { updateBudget, deleteBudget, getBudgetsOnce, updateUserProfile, updateProject } from '../services/firestoreService';
 import { getLocalMonth, parseLocalMonth } from '../lib/dateUtils';
-import { formatCurrency, cn } from '../lib/utils';
+import { formatCurrency, cn, formatCurrencyInput, formatAmountForDisplay, parseFormattedAmount } from '../lib/utils';
 
 export const Budgets: React.FC = () => {
   const navigate = useNavigate();
@@ -27,20 +27,36 @@ export const Budgets: React.FC = () => {
   const currentGeneralBudget = selectedProjectId ? (activeProject?.monthlyBudget ?? null) : (profile?.personalMonthlyBudget ?? null);
 
   React.useEffect(() => {
-    setGeneralBudgetInput(currentGeneralBudget !== null && currentGeneralBudget !== undefined ? currentGeneralBudget.toString() : '');
+    setGeneralBudgetInput(currentGeneralBudget !== null && currentGeneralBudget !== undefined ? formatAmountForDisplay(currentGeneralBudget) : '');
   }, [selectedProjectId, currentGeneralBudget]);
+
+  const handleGeneralBudgetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const oldVal = input.value;
+    const oldCursor = input.selectionStart || oldVal.length;
+    const charsFromRight = oldVal.length - oldCursor;
+
+    const { display } = formatCurrencyInput(oldVal);
+    setGeneralBudgetInput(display);
+
+    requestAnimationFrame(() => {
+      if (input && document.activeElement === input) {
+        const newCursor = Math.max(0, display.length - charsFromRight);
+        input.setSelectionRange(newCursor, newCursor);
+      }
+    });
+  };
 
   const handleSaveGeneralBudget = async () => {
     if (isSavingGeneral) return;
     setIsSavingGeneral(true);
     try {
-      const val = generalBudgetInput.trim() !== '' && !isNaN(Number(generalBudgetInput))
-        ? Number(generalBudgetInput)
-        : null;
+      const val = parseFormattedAmount(generalBudgetInput);
+      const finalVal = val > 0 ? val : null;
       if (selectedProjectId) {
-        await updateProject(selectedProjectId, { monthlyBudget: val });
+        await updateProject(selectedProjectId, { monthlyBudget: finalVal });
       } else if (user) {
-        await updateUserProfile(user.uid, { personalMonthlyBudget: val });
+        await updateUserProfile(user.uid, { personalMonthlyBudget: finalVal });
       }
       setGeneralSaved(true);
       setTimeout(() => setGeneralSaved(false), 2000);
@@ -62,7 +78,7 @@ export const Budgets: React.FC = () => {
       // Only include budgets for the selected context
       if ((selectedProjectId === null && (!b.projectId || b.projectId === 'personal' || b.projectId === null)) || 
           (selectedProjectId !== null && b.projectId === selectedProjectId)) {
-        initial[b.categoryId] = b.amount ? b.amount.toString() : '';
+        initial[b.categoryId] = b.amount ? formatAmountForDisplay(b.amount) : '';
       }
     });
     setLocalBudgets(initial);
@@ -88,7 +104,7 @@ export const Budgets: React.FC = () => {
 
   const handleSave = async (categoryId: string, rawAmount: number | string, isDelete: boolean = false) => {
     setSavingMap(prev => ({ ...prev, [categoryId]: true }));
-    const amount = typeof rawAmount === 'string' ? parseFloat(rawAmount.replace(',', '.')) || 0 : rawAmount;
+    const amount = typeof rawAmount === 'string' ? parseFormattedAmount(rawAmount) : rawAmount;
     try {
       if (isDelete) {
         await deleteBudget(categoryId, budgetMonth, selectedProjectId);
@@ -284,11 +300,10 @@ export const Budgets: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           <input 
-            type="number"
-            step="any"
-            min="0"
+            type="text"
+            inputMode="decimal"
             value={generalBudgetInput}
-            onChange={(e) => setGeneralBudgetInput(e.target.value)}
+            onChange={handleGeneralBudgetChange}
             placeholder="Sin presupuesto general (opcional)"
             className="flex-1 bg-surface-container-low border-none rounded-xl p-3 text-sm font-bold text-on-surface placeholder:text-on-surface-variant/30 focus:ring-2 focus:ring-primary/20"
           />
@@ -400,16 +415,24 @@ export const Budgets: React.FC = () => {
                             value={currentAmount || ''}
                             disabled={!isCurrentMonth}
                             onChange={(e) => {
-                              let val = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
-                              const parts = val.split('.');
-                              if (parts.length > 2) {
-                                val = parts[0] + '.' + parts.slice(1).join('');
-                              }
-                              setLocalBudgets(prev => ({ ...prev, [category.id]: val }));
+                              const input = e.target;
+                              const oldVal = input.value;
+                              const oldCursor = input.selectionStart || oldVal.length;
+                              const charsFromRight = oldVal.length - oldCursor;
+
+                              const { display } = formatCurrencyInput(oldVal);
+                              setLocalBudgets(prev => ({ ...prev, [category.id]: display }));
+
+                              requestAnimationFrame(() => {
+                                if (input && document.activeElement === input) {
+                                  const newCursor = Math.max(0, display.length - charsFromRight);
+                                  input.setSelectionRange(newCursor, newCursor);
+                                }
+                              });
                             }}
                             placeholder="0"
                             className={cn(
-                              "w-28 pl-10 pr-3 py-2 bg-on-surface/5 border-none rounded-xl text-sm font-bold text-on-surface transition-all text-right focus:ring-2 focus:ring-primary/20",
+                              "w-32 pl-10 pr-3 py-2 bg-on-surface/5 border-none rounded-xl text-sm font-bold text-on-surface transition-all text-right focus:ring-2 focus:ring-primary/20",
                               !isCurrentMonth && "opacity-80 bg-transparent text-lg pr-0"
                             )}
                           />

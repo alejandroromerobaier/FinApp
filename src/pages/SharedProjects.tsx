@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plane, Home, PlusCircle, Share2, Edit3, Trash2, Eye, MoreVertical, Hourglass, Users, X, Wallet, Briefcase, Heart, ShoppingBag, Landmark, Star, Archive, CheckCircle2, Power, ArrowLeft } from 'lucide-react';
-import { formatCurrency, cn } from '@/src/lib/utils';
+import { formatCurrency, cn, formatCurrencyInput, formatAmountForDisplay, parseFormattedAmount } from '@/src/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
@@ -97,8 +97,8 @@ export const SharedProjects: React.FC = () => {
         icon: project.icon, 
         currency: project.currency || 'ARS',
         monthlyBudget: project.isPersonal 
-          ? (profile?.personalMonthlyBudget !== undefined && profile?.personalMonthlyBudget !== null ? profile.personalMonthlyBudget.toString() : '')
-          : (project.monthlyBudget !== undefined && project.monthlyBudget !== null ? project.monthlyBudget.toString() : ''),
+          ? (profile?.personalMonthlyBudget !== undefined && profile?.personalMonthlyBudget !== null ? formatAmountForDisplay(profile.personalMonthlyBudget) : '')
+          : (project.monthlyBudget !== undefined && project.monthlyBudget !== null ? formatAmountForDisplay(project.monthlyBudget) : ''),
         showInHome: project.showInHome !== undefined ? project.showInHome : true,
         showInExpenseSelector: project.isPersonal
           ? (profile?.personalShowInExpenseSelector ?? true)
@@ -146,9 +146,8 @@ export const SharedProjects: React.FC = () => {
     
     try {
       const { isDefaultProject, monthlyBudget, ...projectFields } = formData;
-      const parsedBudget = monthlyBudget !== '' && !isNaN(Number(monthlyBudget))
-        ? Number(monthlyBudget)
-        : null;
+      const parsedNum = parseFormattedAmount(monthlyBudget);
+      const parsedBudget = parsedNum > 0 ? parsedNum : null;
 
       if (editingProject) {
         if (editingProject.isPersonal) {
@@ -511,12 +510,26 @@ export const SharedProjects: React.FC = () => {
                   </label>
                   <div className="relative">
                     <input 
-                      type="number"
-                      step="any"
-                      min="0"
+                      type="text"
+                      inputMode="decimal"
                       value={formData.monthlyBudget}
-                      onChange={(e) => setFormData({ ...formData, monthlyBudget: e.target.value })}
-                      placeholder="Ej. 250000"
+                      onChange={(e) => {
+                        const input = e.target;
+                        const oldVal = input.value;
+                        const oldCursor = input.selectionStart || oldVal.length;
+                        const charsFromRight = oldVal.length - oldCursor;
+
+                        const { display } = formatCurrencyInput(oldVal);
+                        setFormData(prev => ({ ...prev, monthlyBudget: display }));
+
+                        requestAnimationFrame(() => {
+                          if (input && document.activeElement === input) {
+                            const newCursor = Math.max(0, display.length - charsFromRight);
+                            input.setSelectionRange(newCursor, newCursor);
+                          }
+                        });
+                      }}
+                      placeholder="Ej. 250.000"
                       className="w-full bg-[#F2F2F7] border-none rounded-2xl p-4 pr-16 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all text-on-surface placeholder:text-on-surface-variant/30"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-black text-on-surface-variant/40 uppercase pointer-events-none">
