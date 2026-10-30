@@ -161,28 +161,28 @@ export const handleIncomingMessage = async (
     return rep;
   }
 
-  // 6. RECORD EXPENSE / INCOME WITH GEMINI
+  // 6. RECORD EXPENSE / INCOME WITH GEMINI OR SMART FALLBACK
   try {
     // Fetch categories and projects to guide the AI
     const catsSnap = await db.collection('categories').get();
-    const userCats = catsSnap.docs.map(d => d.data().name).filter(Boolean);
+    const userCats = catsSnap.docs.map(d => ({ id: d.id, name: d.data().name, type: d.data().type || 'expense' })).filter(c => Boolean(c.name));
 
     const projsSnap = await db.collection('projects')
       .where('memberIds', 'array-contains', userId)
       .get();
-    const userProjects = projsSnap.docs.map(d => d.data().name).filter(Boolean);
+    const userProjects = projsSnap.docs.map(d => ({ id: d.id, name: d.data().name })).filter(p => Boolean(p.name));
 
+    let parsed: any = null;
     const ai = getGeminiClient();
-    if (!ai) {
-      return `⚠️ El servicio de Inteligencia Artificial no está configurado (falta GEMINI_API_KEY).`;
-    }
 
-    const prompt = `
+    if (ai) {
+      try {
+        const prompt = `
 Interpreta este mensaje de un usuario para registrar un gasto o ingreso financiero:
 "${trimmed}"
 
-Categorías disponibles: [${userCats.join(', ')}]
-Proyectos compartidos: [${userProjects.join(', ')}]
+Categorías disponibles: [${userCats.map(c => c.name).join(', ')}]
+Proyectos compartidos: [${userProjects.map(p => p.name).join(', ')}]
 
 Extrae:
 - type: "expense" | "income"
@@ -192,28 +192,35 @@ Extrae:
 - paymentMethod: "Efectivo" | "Tarjeta" | "Transferencia"
 - projectName: si menciona un proyecto de la lista, o null
 `;
-
-    const res = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [prompt],
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            type: { type: Type.STRING, enum: ['expense', 'income'] },
-            amount: { type: Type.NUMBER },
-            description: { type: Type.STRING },
-            categoryName: { type: Type.STRING },
-            paymentMethod: { type: Type.STRING },
-            projectName: { type: Type.STRING, nullable: true }
-          },
-          required: ['type', 'amount', 'description', 'categoryName', 'paymentMethod']
-        }
+        const res = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: [prompt],
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                type: { type: Type.STRING, enum: ['expense', 'income'] },
+                amount: { type: Type.NUMBER },
+                description: { type: Type.STRING },
+                categoryName: { type: Type.STRING },
+                paymentMethod: { type: Type.STRING },
+                projectName: { type: Type.STRING, nullable: true }
+              },
+              required: ['type', 'amount', 'description', 'categoryName', 'paymentMethod']
+            }
+          }
+        });
+        parsed = JSON.parse(res.text || '{}');
+      } catch (geminiErr) {
+        console.warn('Gemini call failed, falling back to local NLP parser:', geminiErr);
       }
-    });
+    }
 
-    const parsed = JSON.parse(res.text || '{}');
+    // Fallback if Gemini not available or failed
+    if (!parsed || !parsed.amount) {
+      parsed = fallbackParseText(trimmed, userCats, userProjects);
+    }
     if (!parsed.amount || parsed.amount <= 0) {
       return `🤔 No entendí el monto del gasto o consulta.\nEjemplo: _"Gasté 15.000 en el súper con débito"_`;
     }
@@ -253,3 +260,125 @@ Extrae:
     return `⚠️ Ocurrió un error al procesar tu solicitud. Probá nuevamente o escribí *Ayuda*.`;
   }
 };
+
+/**
+ * Robust local NLP parser for Argentine Spanish amounts, categories and payment methods.
+ */
+function fallbackParseText(
+  text: string,
+  categories: { id: string; name: string; type: string }[],
+  projects: { id: string; name: string }[]
+): any {
+  const lower = text.toLowerCase();
+
+  // 1. Detect Type
+  const isIncome = /\b(ingreso|cobré|cobre|gané|gane|recibí|recibi|salario|sueldo|entrada|regalo|cobro)\b/i.test(lower);
+  const type = isIncome ? 'income' : 'expense';
+
+  // 2. Parse Amount (supporting millions: "2 millones", "1.5 millones", "500 mil", "40 lucas", "$15.000")
+  let amount = 0;
+
+  // Millions
+  const millMatch = lower.match(/(?:\$|\b)(\d+(?:[.,]\d+)?)\s*(?:de\s*)?(?:millón|millon|millones)\b/i);
+  if (millMatch) {
+    amount = Math.round(parseFloat(millMatch[1].replace(',', '.')) * 1_000_000);
+  }
+
+  // Lucas / Miles
+  if (!amount) {
+    const lucasMatch = lower.match(/(?:\$|\b)(\d+(?:[.,]\d+)?)\s*(?:lucas|mil)\b/i);
+    if (lucasMatch) {
+      amount = Math.round(parseFloat(lucasMatch[1].replace(',', '.')) * 1_000);
+    }
+  }
+
+  // Standard numbers
+  if (!amount) {
+    const numMatches = lower.match(/(?:\$|ar\$)?\s*(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?)/g);
+    if (numMatches) {
+      for (const raw of numMatches) {
+        const clean = raw.replace(/[^\d.,]/g, '').trim();
+        let val = 0;
+        if (clean.includes('.') && !clean.includes(',')) {
+          const parts = clean.split('.');
+          if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) {
+            val = parseFloat(clean.replace(/\./g, ''));
+          } else {
+            val = parseFloat(clean);
+          }
+        } else if (clean.includes('.') && clean.includes(',')) {
+          val = parseFloat(clean.replace(/\./g, '').replace(',', '.'));
+        } else if (clean.includes(',')) {
+          val = parseFloat(clean.replace(',', '.'));
+        } else {
+          val = parseFloat(clean);
+        }
+        if (val > 0) {
+          amount = val;
+          break;
+        }
+      }
+    }
+  }
+
+  // 3. Payment Method
+  const isCard = /\b(tarjeta|debito|débito|credito|crédito|mp|mercado pago|transferencia)\b/i.test(lower);
+  const paymentMethod = isCard ? 'Tarjeta' : 'Efectivo';
+
+  // 4. Project
+  let projectName: string | null = null;
+  for (const p of projects) {
+    if (lower.includes(p.name.toLowerCase())) {
+      projectName = p.name;
+      break;
+    }
+  }
+
+  // 5. Category
+  let categoryName = type === 'income' ? 'Salario' : 'Otros';
+  for (const c of categories) {
+    if (lower.includes(c.name.toLowerCase())) {
+      categoryName = c.name;
+      break;
+    }
+  }
+
+  // Common keywords map
+  if (categoryName === 'Otros') {
+    if (/\b(super|supermercado|chino|almacen|comida|almuerzo|cena|desayuno|restaurante|cafe|café|panaderia|helado|pedidosya|rappi)\b/i.test(lower)) {
+      categoryName = 'Comida';
+    } else if (/\b(nafta|combustible|ypf|shell|axion|taxi|uber|cabify|colectivo|sube|tren|peaje|estacionamiento)\b/i.test(lower)) {
+      categoryName = 'Transporte';
+    } else if (/\b(farmacia|remedio|medico|médico|salud|dentista|dentista|clinica)\b/i.test(lower)) {
+      categoryName = 'Salud';
+    } else if (/\b(alquiler|expensas|luz|gas|agua|internet|wifi|cable)\b/i.test(lower)) {
+      categoryName = 'Vivienda';
+    } else if (/\b(cine|salida|bar|cerveza|juego|boliche|fiesta|streaming|spotify|netflix)\b/i.test(lower)) {
+      categoryName = 'Ocio';
+    }
+  }
+
+  // 6. Clean description
+  let description = text
+    .replace(/(?:gasté|gaste|pagué|pague|compré|compre|cargué|cargue|anotá|anota|registrá|registra)/gi, '')
+    .replace(/(?:\$|ar\$)?\s*\d+(?:[.,]\d+)?(?:\s*(?:mil|lucas|millón|millon|millones))?/gi, '')
+    .replace(/\b(con|en|de|el|la|los|las|por|pesos|efectivo|tarjeta|debito|débito|credito|crédito)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!description || description.length < 2) {
+    description = `${type === 'expense' ? 'Gasto' : 'Ingreso'} de ${categoryName}`;
+  } else {
+    description = description.charAt(0).toUpperCase() + description.slice(1);
+  }
+
+  return {
+    type,
+    amount,
+    description,
+    categoryName,
+    paymentMethod,
+    projectName
+  };
+}
+
