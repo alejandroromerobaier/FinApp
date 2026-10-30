@@ -1324,4 +1324,99 @@ export const testConnection = async () => {
       console.error("Please check your Firebase configuration. ");
     }
   }
-}
+};
+
+// --- WhatsApp Integration Helpers ---
+
+/**
+ * Generates a 6-digit random code valid for 15 minutes to link a WhatsApp phone number to the user account.
+ */
+export const generateWhatsAppLinkCode = async (userId: string): Promise<{ code: string; expiresAt: Date }> => {
+  try {
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
+    // Clean up previous codes for this user
+    try {
+      const q = query(collection(db, 'whatsapp_linking_codes'), where('userId', '==', userId));
+      const snap = await getDocs(q);
+      const batch = writeBatch(db);
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    } catch (e) {
+      console.warn('Could not clean old linking codes:', e);
+    }
+
+    // Save new code
+    await setDoc(doc(db, 'whatsapp_linking_codes', code), {
+      code,
+      userId,
+      createdAt: serverTimestamp(),
+      expiresAt: Timestamp.fromDate(expiresAt)
+    });
+
+    return { code, expiresAt };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'whatsapp_linking_codes');
+    throw error;
+  }
+};
+
+/**
+ * Links a verified WhatsApp phone number to the user's profile.
+ */
+export const linkWhatsAppNumber = async (userId: string, phoneNumber: string) => {
+  try {
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, {
+      whatsappNumber: phoneNumber,
+      whatsappLinkedAt: serverTimestamp()
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
+    throw error;
+  }
+};
+
+/**
+ * Unlinks the WhatsApp phone number from the user's profile.
+ */
+export const unlinkWhatsApp = async (userId: string) => {
+  try {
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, {
+      whatsappNumber: null,
+      whatsappLinkedAt: null
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `users/${userId}`);
+    throw error;
+  }
+};
+
+/**
+ * Fetches the latest transaction created by this user (useful for undo / bot delete).
+ */
+export const getLatestUserTransaction = async (userId: string): Promise<any | null> => {
+  try {
+    const q = query(
+      collection(db, 'transactions'),
+      where('authorId', '==', userId)
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) return null;
+
+    const list = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      date: safeToDate(d.data().date)
+    }));
+
+    list.sort((a, b) => b.date.getTime() - a.date.getTime());
+    return list[0] || null;
+  } catch (error) {
+    console.error('Error in getLatestUserTransaction:', error);
+    return null;
+  }
+};
+

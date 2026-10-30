@@ -21,6 +21,8 @@ export interface UserProfile {
   defaultProjectId?: string;
   personalCardColor?: string;
   themePreference?: 'light' | 'dark' | 'system';
+  whatsappNumber?: string | null;
+  whatsappLinkedAt?: any;
   createdAt: any;
   updatedAt?: any;
 }

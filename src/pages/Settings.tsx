@@ -27,16 +27,27 @@ import {
   Lock,
   Sun,
   Moon,
-  Monitor
+  Monitor,
+  Bot,
+  MessageSquare,
+  Copy,
+  ExternalLink,
+  Sparkles
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useAuth } from '../lib/AuthContext';
 import { useTheme } from '../lib/ThemeContext';
 import { APP_VERSION } from '../lib/constants';
-import { updateUserProfile, syncUserProfile } from '../services/firestoreService';
+import { 
+  updateUserProfile, 
+  syncUserProfile, 
+  generateWhatsAppLinkCode, 
+  unlinkWhatsApp 
+} from '../services/firestoreService';
 import { updatePassword, updateProfile as updateFirebaseProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { WhatsAppSimulatorModal } from '../components/WhatsAppSimulatorModal';
 
 const CURRENCIES = [
   { code: 'ARS', label: 'ARS (Pesos Argentinos)', symbol: '$' },
@@ -95,6 +106,51 @@ export const Settings: React.FC = () => {
   const [resetEmailSent, setResetEmailSent] = useState(false);
 
   const isGoogleUser = user?.providerData.some(p => p.providerId === 'google.com');
+
+  // WhatsApp Integration state
+  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
+  const [isLinkingOpen, setIsLinkingOpen] = useState(false);
+  const [linkingCode, setLinkingCode] = useState<string | null>(null);
+  const [linkingExpiresAt, setLinkingExpiresAt] = useState<Date | null>(null);
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [isUnlinking, setIsUnlinking] = useState(false);
+
+  const handleGenerateLinkCode = async () => {
+    if (!user) return;
+    setIsGeneratingCode(true);
+    try {
+      const res = await generateWhatsAppLinkCode(user.uid);
+      setLinkingCode(res.code);
+      setLinkingExpiresAt(res.expiresAt);
+      setIsLinkingOpen(true);
+    } catch (err) {
+      console.error('Error generating link code:', err);
+    } finally {
+      setIsGeneratingCode(false);
+    }
+  };
+
+  const handleUnlinkWhatsApp = async () => {
+    if (!user) return;
+    if (!window.confirm('¿Seguro que deseas desvincular tu número de WhatsApp de FinApp?')) return;
+    setIsUnlinking(true);
+    try {
+      await unlinkWhatsApp(user.uid);
+    } catch (err) {
+      console.error('Error unlinking WhatsApp:', err);
+    } finally {
+      setIsUnlinking(false);
+    }
+  };
+
+  const handleCopyCode = () => {
+    if (linkingCode) {
+      navigator.clipboard.writeText(`VINCULAR ${linkingCode}`);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    }
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -471,6 +527,124 @@ export const Settings: React.FC = () => {
         </div>
       </section>
 
+      {/* WhatsApp Bot Section (QA Beta) */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
+            <MessageSquare size={14} className="text-[#25D366]" />
+            <span>Asistente WhatsApp</span>
+          </h2>
+          <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20">
+            Beta QA
+          </span>
+        </div>
+
+        <div className="bg-surface-container-lowest rounded-3xl p-5 shadow-sm border border-on-surface/5 space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-[#25D366]/10 text-[#25D366] flex items-center justify-center shrink-0 border border-[#25D366]/20">
+                <Bot size={26} />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-on-surface leading-tight">Bot Financiero WhatsApp</h3>
+                <p className="text-xs text-on-surface-variant mt-0.5">
+                  Registrá gastos e ingresos o pedí resúmenes por texto o nota de voz.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Status & Connection Pill */}
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-surface-container-low border border-on-surface/5">
+            <div className="flex items-center gap-2">
+              <div className={cn(
+                "w-2.5 h-2.5 rounded-full animate-pulse",
+                profile?.whatsappNumber ? "bg-emerald-500" : "bg-amber-500"
+              )} />
+              <span className="text-xs font-bold text-on-surface">
+                {profile?.whatsappNumber 
+                  ? `Vinculado: ${profile.whatsappNumber}`
+                  : 'Estado: Sin número vinculado'}
+              </span>
+            </div>
+            {profile?.whatsappNumber ? (
+              <button
+                onClick={handleUnlinkWhatsApp}
+                disabled={isUnlinking}
+                className="text-[11px] font-bold text-rose-500 hover:text-rose-600 hover:underline cursor-pointer disabled:opacity-50"
+              >
+                {isUnlinking ? 'Desvinculando...' : 'Desvincular'}
+              </button>
+            ) : (
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md">
+                Pendiente
+              </span>
+            )}
+          </div>
+
+          {/* Linking Code Generator Dropdown / Panel */}
+          {isLinkingOpen && linkingCode && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/15 space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                  Código de Vinculación (Vence en 15 min):
+                </span>
+                <button
+                  onClick={() => setIsLinkingOpen(false)}
+                  className="text-on-surface-variant hover:text-on-surface text-xs"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between bg-surface p-3 rounded-xl border border-on-surface/10">
+                <span className="font-mono text-xl font-black text-emerald-600 dark:text-emerald-400 tracking-widest">
+                  {linkingCode}
+                </span>
+                <button
+                  onClick={handleCopyCode}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 transition-colors"
+                >
+                  {linkCopied ? <Check size={14} /> : <Copy size={14} />}
+                  <span>{linkCopied ? '¡Copiado!' : 'Copiar comando'}</span>
+                </button>
+              </div>
+
+              <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                Envía por WhatsApp el mensaje: <strong className="font-mono font-bold text-on-surface">VINCULAR {linkingCode}</strong> a la línea del bot para activar la sincronización.
+              </p>
+            </motion.div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+            <button
+              onClick={() => setIsSimulatorOpen(true)}
+              className="flex-1 py-3 px-4 rounded-2xl bg-[#075e54] hover:bg-[#128c7e] text-white font-extrabold text-xs uppercase tracking-wider shadow-md shadow-emerald-900/10 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+            >
+              <Sparkles size={16} className="text-emerald-300" />
+              <span>Probar Simulador de WhatsApp (QA)</span>
+            </button>
+
+            {!profile?.whatsappNumber && (
+              <button
+                onClick={handleGenerateLinkCode}
+                disabled={isGeneratingCode}
+                className="py-3 px-4 rounded-2xl bg-surface-container-low hover:bg-surface-container text-on-surface font-extrabold text-xs uppercase tracking-wider border border-on-surface/10 flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+              >
+                {isGeneratingCode ? <Loader2 size={16} className="animate-spin" /> : <Phone size={16} />}
+                <span>Generar PIN de Enlace</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
       {/* System Actions */}
       <section className="pt-2">
         <button 
@@ -787,6 +961,12 @@ export const Settings: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* WhatsApp Simulator Modal (QA Beta) */}
+      <WhatsAppSimulatorModal
+        isOpen={isSimulatorOpen}
+        onClose={() => setIsSimulatorOpen(false)}
+      />
     </div>
   );
 };
