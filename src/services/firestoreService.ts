@@ -851,9 +851,11 @@ export const notifyCollaboratorsOnExpenseAdded = async (transaction: any) => {
     const projectName = projectData.name || 'Proyecto compartido';
     const currency = projectData.currency || 'ARS';
     const formattedAmount = formatCurrency(transaction.amount, currency);
-    const catName = transaction.categoryName || 'Gasto';
-
-    const content = `${authorName} registró un ${transaction.type === 'income' ? 'ingreso' : 'gasto'} de ${formattedAmount} en "${projectName}" (${catName})`;
+    let content = `${authorName} registró un ${transaction.type === 'income' ? 'ingreso' : 'gasto'} de ${formattedAmount} en "${projectName}" (${catName})`;
+    if (transaction.isInstallmentPlan && transaction.totalInstallments > 1) {
+      const formattedInstallment = formatCurrency(transaction.installmentAmount, currency);
+      content = `${authorName} financió una compra de ${formattedAmount} en ${transaction.totalInstallments} cuotas de ${formattedInstallment} en "${projectName}" (${catName})`;
+    }
 
     for (const memberId of targetMemberIds) {
       await addNotification({
@@ -863,7 +865,9 @@ export const notifyCollaboratorsOnExpenseAdded = async (transaction: any) => {
         data: {
           projectId: transaction.projectId,
           amount: transaction.amount,
-          categoryName: catName
+          categoryName: catName,
+          isInstallmentPlan: !!transaction.isInstallmentPlan,
+          totalInstallments: transaction.totalInstallments || 1
         }
       });
     }
@@ -1531,6 +1535,19 @@ export const createInstallmentExpense = async (params: CreateInstallmentParams) 
     };
 
     const docRef = await addDoc(collection(db, 'transactions'), txData);
+
+    // Notify collaborators if in a shared project
+    if (finalProjectId) {
+      notifyCollaboratorsOnExpenseAdded({
+        id: docRef.id,
+        ...txData,
+        amount: params.totalAmount,
+        installmentAmount: params.installmentAmount,
+        projectId: finalProjectId
+      }).catch(err =>
+        console.error('Collaborator notification error on installment plan:', err)
+      );
+    }
 
     // Check budget alert for the first installment
     checkAndNotifyBudgetAlerts({

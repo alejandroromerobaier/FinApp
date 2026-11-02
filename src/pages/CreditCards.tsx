@@ -18,7 +18,10 @@ import {
   Sparkles,
   Wallet,
   Landmark,
-  Building2
+  Building2,
+  Users,
+  User,
+  Globe
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useData } from '../lib/DataContext';
@@ -27,11 +30,14 @@ import { formatCurrency, cn } from '../lib/utils';
 import { getLocalToday, getLocalMonth, formatDisplayDate, formatLocalYYYYMMDD, parseLocalMonth } from '../lib/dateUtils';
 import { deleteInstallmentPlan, deleteSingleVirtualInstallment } from '../services/firestoreService';
 
+export type ScopeFilter = 'personal' | 'shared_mine' | 'all';
+
 export const CreditCards: React.FC = () => {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const { transactions, cards, projects, userNames } = useData();
 
+  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>('personal');
   const [selectedCardFilter, setSelectedCardFilter] = useState<string>('all');
   const [selectedMonthKey, setSelectedMonthKey] = useState<string>(getLocalMonth());
   const [expandedPlanId, setExpandedPlanId] = useState<string | null>(null);
@@ -41,6 +47,14 @@ export const CreditCards: React.FC = () => {
   const defaultCurrency = profile?.currency || 'ARS';
   const today = new Date();
   const currentMonthKey = getLocalMonth(today);
+
+  // Helper to match scope
+  const matchScope = (item: { projectId?: string | null; authorId?: string }) => {
+    const isPersonal = !item.projectId || item.projectId === 'personal' || item.projectId === 'null';
+    if (scopeFilter === 'personal') return isPersonal;
+    if (scopeFilter === 'shared_mine') return !isPersonal && item.authorId === user?.uid;
+    return true; // 'all'
+  };
 
   // Group transactions into cohesive installment plans
   const allPlans = useMemo(() => {
@@ -57,6 +71,8 @@ export const CreditCards: React.FC = () => {
       categoryIcon: string;
       categoryColor: string;
       projectId?: string | null;
+      authorId?: string;
+      authorName?: string;
       firstDueDate: string;
       installments: any[];
     }> = {};
@@ -79,6 +95,8 @@ export const CreditCards: React.FC = () => {
             categoryIcon: t.categoryIcon,
             categoryColor: t.categoryColor,
             projectId: t.projectId,
+            authorId: t.authorId,
+            authorName: t.authorName || userNames[t.authorId],
             firstDueDate: t.firstDueDate || formatLocalYYYYMMDD(t.date),
             installments: []
           };
@@ -92,13 +110,18 @@ export const CreditCards: React.FC = () => {
       plan.installments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       return plan;
     });
-  }, [transactions]);
+  }, [transactions, userNames]);
 
-  // Filter plans based on card selection
+  // Filter plans based on scope and card selection
   const filteredPlans = useMemo(() => {
-    if (selectedCardFilter === 'all') return allPlans;
-    return allPlans.filter(p => p.cardId === selectedCardFilter || p.cardName === selectedCardFilter);
-  }, [allPlans, selectedCardFilter]);
+    return allPlans.filter(p => {
+      if (!matchScope(p)) return false;
+      if (selectedCardFilter !== 'all') {
+        if (p.cardId !== selectedCardFilter && p.cardName !== selectedCardFilter) return false;
+      }
+      return true;
+    });
+  }, [allPlans, scopeFilter, selectedCardFilter, user?.uid]);
 
   // Generate 12-month timeline starting from current month
   const timelineMonths = useMemo(() => {
@@ -119,9 +142,10 @@ export const CreditCards: React.FC = () => {
       const label = targetDate.toLocaleDateString('es-ES', { month: 'short' });
       const year = targetDate.getFullYear();
 
-      // Find all installments in this month (respecting card filter)
+      // Find all installments in this month (respecting scope and card filter)
       const matchingInstallments = transactions.filter(t => {
         if (!t.isInstallment) return false;
+        if (!matchScope(t)) return false;
         if (selectedCardFilter !== 'all') {
           if (t.cardId !== selectedCardFilter && t.cardName !== selectedCardFilter) return false;
         }
@@ -141,7 +165,7 @@ export const CreditCards: React.FC = () => {
     }
 
     return months;
-  }, [transactions, today, selectedCardFilter]);
+  }, [transactions, today, selectedCardFilter, scopeFilter, user?.uid]);
 
   // Find max monthly amount for relative bar graph height
   const maxMonthAmount = useMemo(() => {
@@ -161,6 +185,7 @@ export const CreditCards: React.FC = () => {
 
     transactions.forEach(t => {
       if (t.isInstallment) {
+        if (!matchScope(t)) return;
         if (selectedCardFilter !== 'all') {
           if (t.cardId !== selectedCardFilter && t.cardName !== selectedCardFilter) return;
         }
@@ -246,6 +271,60 @@ export const CreditCards: React.FC = () => {
         </div>
       </div>
 
+      {/* Scope Filter Tabs (Personal vs Proyectos vs Todo) */}
+      {projects.length > 0 && (
+        <div className="flex bg-surface-container-low p-1 rounded-2xl border border-on-surface/5">
+          <button
+            type="button"
+            onClick={() => {
+              setScopeFilter('personal');
+              setSelectedCardFilter('all');
+            }}
+            className={cn(
+              "flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider",
+              scopeFilter === 'personal'
+                ? "bg-surface-container-lowest text-primary shadow-sm"
+                : "text-on-surface-variant/60 hover:text-on-surface"
+            )}
+          >
+            <User size={14} />
+            <span>Mis Tarjetas</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setScopeFilter('shared_mine');
+              setSelectedCardFilter('all');
+            }}
+            className={cn(
+              "flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider",
+              scopeFilter === 'shared_mine'
+                ? "bg-surface-container-lowest text-primary shadow-sm"
+                : "text-on-surface-variant/60 hover:text-on-surface"
+            )}
+          >
+            <Users size={14} />
+            <span>Mis Cuotas en Proyectos</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setScopeFilter('all');
+              setSelectedCardFilter('all');
+            }}
+            className={cn(
+              "flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider",
+              scopeFilter === 'all'
+                ? "bg-surface-container-lowest text-primary shadow-sm"
+                : "text-on-surface-variant/60 hover:text-on-surface"
+            )}
+          >
+            <Globe size={14} />
+            <span>Todos</span>
+          </button>
+        </div>
+      )}
+
       {/* Card Filter Chips */}
       {cards.length > 0 && (
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
@@ -258,11 +337,11 @@ export const CreditCards: React.FC = () => {
                 : "bg-surface-container-low text-on-surface-variant border-transparent hover:bg-surface-container"
             )}
           >
-            Todas las tarjetas ({allPlans.length})
+            Todas las tarjetas ({filteredPlans.length})
           </button>
           {cards.map(c => {
             const isSelected = selectedCardFilter === c.id;
-            const cardPlansCount = allPlans.filter(p => p.cardId === c.id || p.cardName === c.name).length;
+            const cardPlansCount = allPlans.filter(p => matchScope(p) && (p.cardId === c.id || p.cardName === c.name)).length;
             return (
               <button
                 key={c.id}
@@ -543,6 +622,24 @@ export const CreditCards: React.FC = () => {
                         <CreditCardIcon size={20} />
                       </div>
                       <div className="truncate">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          {plan.projectId ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary/10 text-primary text-[10px] font-black uppercase tracking-wider">
+                              <Users size={11} />
+                              <span>{projects.find(p => p.id === plan.projectId)?.name || 'Proyecto'}</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface-container-high text-on-surface-variant text-[10px] font-black uppercase tracking-wider">
+                              <User size={11} />
+                              <span>Personal</span>
+                            </span>
+                          )}
+                          {plan.authorId && plan.authorId !== user?.uid && (
+                            <span className="text-[10px] font-bold text-on-surface-variant/70">
+                              Por <strong className="text-on-surface">{userNames[plan.authorId] || plan.authorName || 'Otro miembro'}</strong>
+                            </span>
+                          )}
+                        </div>
                         <h3 className="text-sm sm:text-base font-black text-on-surface truncate">
                           {plan.description}
                         </h3>
@@ -602,14 +699,20 @@ export const CreditCards: React.FC = () => {
                       <ChevronDown size={14} className={cn("transition-transform", isExpanded && "rotate-180")} />
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setPlanToDelete({ id: plan.id, description: plan.description, totalInstallments: plan.totalInstallments })}
-                      className="flex items-center gap-1 text-xs font-bold text-error/80 hover:text-error px-2.5 py-1 rounded-xl hover:bg-error/10 transition-colors"
-                    >
-                      <Trash2 size={13} />
-                      <span>Cancelar Plan</span>
-                    </button>
+                    {plan.authorId === user?.uid || !plan.authorId ? (
+                      <button
+                        type="button"
+                        onClick={() => setPlanToDelete({ id: plan.id, description: plan.description, totalInstallments: plan.totalInstallments })}
+                        className="flex items-center gap-1 text-xs font-bold text-error/80 hover:text-error px-2.5 py-1 rounded-xl hover:bg-error/10 transition-colors"
+                      >
+                        <Trash2 size={13} />
+                        <span>Cancelar Plan</span>
+                      </button>
+                    ) : (
+                      <span className="text-[10px] text-on-surface-variant/50 font-medium italic">
+                        Administrado por {userNames[plan.authorId] || plan.authorName || 'el titular'}
+                      </span>
+                    )}
                   </div>
 
                   {/* Expanded Installments List */}
