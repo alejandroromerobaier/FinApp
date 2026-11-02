@@ -40,7 +40,7 @@ import { getGlobalTransactions, deleteTransaction, deleteInstallmentPlan, delete
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { formatDisplayDate, parseLocalYYYYMMDD } from '../lib/dateUtils';
+import { formatDisplayDate } from '../lib/dateUtils';
 
 const ICON_MAP: Record<string, any> = {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
@@ -188,14 +188,7 @@ export const History: React.FC = () => {
       const matchesClassification = filterClassification === 'all' || t.classification === filterClassification;
       
       const tDate = t.date instanceof Date ? t.date : new Date(t.date);
-      const effectiveDate = (t.isInstallment && t.installmentNumber === 1 && t.purchaseDate)
-        ? parseLocalYYYYMMDD(t.purchaseDate)
-        : tDate;
-
-      // In real_only, installments > 1 are future unless their due date has already passed
-      const isFuture = (timeScope === 'real_only' && t.isInstallment && t.installmentNumber && t.installmentNumber > 1)
-        ? true
-        : effectiveDate > endOfToday;
+      const isFuture = tDate > endOfToday;
 
       let matchesTimeScope = true;
       if (timeScope === 'real_only') {
@@ -214,8 +207,7 @@ export const History: React.FC = () => {
         const end = new Date(year, month + 1, 0, 23, 59, 59, 999);
         const start = new Date(year, month - (months - 1), 1, 0, 0, 0, 0);
         
-        const dateToCompare = (timeScope === 'real_only') ? effectiveDate : tDate;
-        matchesPeriod = dateToCompare >= start && dateToCompare <= end;
+        matchesPeriod = tDate >= start && tDate <= end;
       }
 
       return matchesSearch && matchesType && matchesCategory && matchesProject && matchesClassification && matchesPeriod && matchesTimeScope;
@@ -226,19 +218,7 @@ export const History: React.FC = () => {
       return [...filtered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }
 
-    if (timeScope === 'real_only') {
-      return [...filtered].sort((a, b) => {
-        const dateA = (a.isInstallment && a.installmentNumber === 1 && a.purchaseDate)
-          ? parseLocalYYYYMMDD(a.purchaseDate).getTime()
-          : (a.date instanceof Date ? a.date.getTime() : new Date(a.date).getTime());
-        const dateB = (b.isInstallment && b.installmentNumber === 1 && b.purchaseDate)
-          ? parseLocalYYYYMMDD(b.purchaseDate).getTime()
-          : (b.date instanceof Date ? b.date.getTime() : new Date(b.date).getTime());
-        return dateB - dateA;
-      });
-    }
-
-    return filtered;
+    return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [transactions, searchQuery, filterType, filterCategory, filterProject, filterClassification, selectedPeriod, currentDate, timeScope]);
 
   const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
@@ -600,9 +580,7 @@ export const History: React.FC = () => {
                   const endOfToday = new Date();
                   endOfToday.setHours(23, 59, 59, 999);
                   const tDate = t.date instanceof Date ? t.date : new Date(t.date);
-                  const isFuture = (timeScope === 'real_only' && t.isInstallment && t.installmentNumber === 1 && t.purchaseDate)
-                    ? false
-                    : (tDate > endOfToday);
+                  const isFuture = tDate > endOfToday;
 
                   return (
                     <div 
@@ -631,9 +609,6 @@ export const History: React.FC = () => {
                               <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tight bg-blue-500/10 text-blue-600 shrink-0">
                                 <Layers size={9} />
                                 <span>Cuota {t.installmentNumber}/{t.totalInstallments}</span>
-                                {t.installmentNumber === 1 && t.purchaseDate && (
-                                  <span className="opacity-75 font-medium hidden sm:inline"> • Vence {formatDisplayDate(t.date, false)}</span>
-                                )}
                               </div>
                             )}
                             {t.classification && (

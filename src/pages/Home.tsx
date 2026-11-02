@@ -39,7 +39,7 @@ import { formatCurrency, cn } from '@/src/lib/utils';
 import { useAuth } from '../lib/AuthContext';
 import { useData } from '../lib/DataContext';
 import { getTransactions, cleanupDuplicateCategories, Shortcut } from '../services/firestoreService';
-import { formatDisplayDate, getLocalMonth, parseLocalMonth, parseLocalYYYYMMDD } from '../lib/dateUtils';
+import { formatDisplayDate, getLocalMonth, parseLocalMonth } from '../lib/dateUtils';
 import { ShortcutKeypadModal } from '../components/ShortcutKeypadModal';
 import { ShortcutIconComponent, ShortcutBadge } from './ManageShortcuts';
 import { getProjectGradient } from '../lib/constants';
@@ -143,12 +143,8 @@ export const Home: React.FC = () => {
         projectTotals[projectId].expenses += t.amount;
       }
 
-      // Actividad del mes seleccionado (si es compra en cuotas con purchaseDate o gasto regular)
-      const effectiveDate = (t.purchaseDate && (!t.installmentNumber || t.installmentNumber === 1))
-        ? parseLocalYYYYMMDD(t.purchaseDate)
-        : tDate;
-
-      if (effectiveDate.getMonth() === activeMonth && effectiveDate.getFullYear() === activeYear) {
+      // Actividad del mes seleccionado
+      if (tDate.getMonth() === activeMonth && tDate.getFullYear() === activeYear) {
         if (t.type === 'income') {
           projectTotals[projectId].currentIncome += t.amount;
         } else {
@@ -199,26 +195,10 @@ export const Home: React.FC = () => {
 
     return transactions
       .filter(t => {
-        // If it's an installment plan, only installment 1 represents the initial purchase; exclude future installments > 1
-        if (t.isInstallment && t.installmentNumber && t.installmentNumber > 1) {
-          return false;
-        }
-
-        const effectiveDate = (t.purchaseDate && t.installmentNumber === 1)
-          ? parseLocalYYYYMMDD(t.purchaseDate)
-          : (t.date instanceof Date ? t.date : new Date(t.date));
-
-        return !isNaN(effectiveDate.getTime()) && effectiveDate <= endOfToday;
+        const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+        return !isNaN(tDate.getTime()) && tDate <= endOfToday;
       })
-      .sort((a, b) => {
-        const timeA = (a.purchaseDate && a.installmentNumber === 1)
-          ? parseLocalYYYYMMDD(a.purchaseDate).getTime()
-          : (a.date instanceof Date ? a.date.getTime() : new Date(a.date).getTime());
-        const timeB = (b.purchaseDate && b.installmentNumber === 1)
-          ? parseLocalYYYYMMDD(b.purchaseDate).getTime()
-          : (b.date instanceof Date ? b.date.getTime() : new Date(b.date).getTime());
-        return timeB - timeA;
-      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 5);
   }, [transactions]);
 
@@ -614,10 +594,6 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, category
   const userName = userNames[transaction.authorId] || (transaction.authorId === user?.uid ? 'Tú' : '...');
   const project = projects?.find(p => p.id === transaction.projectId);
 
-  const displayDate = (transaction.purchaseDate && transaction.installmentNumber === 1)
-    ? parseLocalYYYYMMDD(transaction.purchaseDate)
-    : (transaction.date instanceof Date ? transaction.date : new Date(transaction.date));
-
   return (
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
@@ -649,9 +625,6 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, category
                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter shrink-0 bg-blue-500/10 text-blue-600 dark:text-blue-400">
                  <CreditCard size={8} />
                  <span>Cuota {transaction.installmentNumber}/{transaction.totalInstallments}</span>
-                 {transaction.installmentNumber === 1 && transaction.purchaseDate && (
-                   <span className="opacity-70 font-medium hidden sm:inline"> • Vence {formatDisplayDate(transaction.date, false)}</span>
-                 )}
                </div>
             )}
           </div>
@@ -679,7 +652,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, category
           {showBalances ? formatCurrency(transaction.amount, project?.currency || profile?.currency) : '••••'}
         </p>
         <p className="text-[10px] text-on-surface-variant/40 font-bold">
-          {formatDisplayDate(displayDate, false)}
+          {formatDisplayDate(transaction.date, false)}
         </p>
       </div>
     </motion.div>

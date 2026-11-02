@@ -120,7 +120,7 @@ export const AddExpense: React.FC = () => {
   // Credit Card & Installments State
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [customCardName, setCustomCardName] = useState('');
-  const [installments, setInstallments] = useState(1);
+  const [installments, setInstallments] = useState<number | string>(1);
   const [isCustomInstallments, setIsCustomInstallments] = useState(false);
   const [calcMode, setCalcMode] = useState<'total' | 'installment'>('total');
   const [firstDueDate, setFirstDueDate] = useState<string>(getLocalToday());
@@ -289,11 +289,13 @@ export const AddExpense: React.FC = () => {
     ? (projects.find(p => p.id === selectedProjectId)?.currency || 'ARS') 
     : (profile?.currency || 'ARS');
 
+  const parsedInstallments = Math.max(1, typeof installments === 'number' ? installments : (parseInt(String(installments), 10) || 1));
+
   const currentTotalAmount = calcMode === 'total' 
     ? parsedAmount 
-    : parsedAmount * installments;
+    : parsedAmount * parsedInstallments;
   const currentInstallmentAmount = calcMode === 'total' 
-    ? (installments > 0 ? Math.round((parsedAmount / installments) * 100) / 100 : parsedAmount) 
+    ? (parsedInstallments > 0 ? Math.round((parsedAmount / parsedInstallments) * 100) / 100 : parsedAmount) 
     : parsedAmount;
 
   const handleSave = async () => {
@@ -311,11 +313,11 @@ export const AddExpense: React.FC = () => {
       const cardId = selectedCard?.id || null;
 
       // Handle installment expense creation (new expenses with > 1 installments)
-      if (!id && type === 'expense' && paymentMethod === 'Tarjeta de Crédito' && installments > 1) {
+      if (!id && type === 'expense' && paymentMethod === 'Tarjeta de Crédito' && parsedInstallments > 1) {
         await createInstallmentExpense({
           totalAmount: currentTotalAmount,
           installmentAmount: currentInstallmentAmount,
-          installments: Number(installments),
+          installments: parsedInstallments,
           description: description.trim() || `Compra con ${cardName || 'Tarjeta'}`,
           categoryId: selectedCategory.id,
           categoryName: selectedCategory.name,
@@ -329,7 +331,7 @@ export const AddExpense: React.FC = () => {
           firstDueDate: firstDueDate || date,
           purchaseDate: date
         });
-        trackEvent('add_installment_expense', { installments, totalAmount: currentTotalAmount });
+        trackEvent('add_installment_expense', { installments: parsedInstallments, totalAmount: currentTotalAmount });
         navigate(-1);
         return;
       }
@@ -815,7 +817,7 @@ export const AddExpense: React.FC = () => {
                           }}
                           className={cn(
                             "px-3.5 py-2 rounded-xl text-xs font-black transition-all",
-                            installments === num && !isCustomInstallments
+                            parsedInstallments === num && !isCustomInstallments
                               ? "bg-primary text-on-primary shadow-sm"
                               : "bg-surface-container-lowest border border-on-surface/5 text-on-surface-variant hover:text-on-surface"
                           )}
@@ -825,7 +827,10 @@ export const AddExpense: React.FC = () => {
                       ))}
                       <button
                         type="button"
-                        onClick={() => setIsCustomInstallments(true)}
+                        onClick={() => {
+                          setIsCustomInstallments(true);
+                          setInstallments('');
+                        }}
                         className={cn(
                           "px-3.5 py-2 rounded-xl text-xs font-black transition-all",
                           isCustomInstallments
@@ -841,11 +846,26 @@ export const AddExpense: React.FC = () => {
                       <div className="flex items-center gap-3 mt-2">
                         <span className="text-xs font-bold text-on-surface-variant">Cantidad:</span>
                         <input
-                          type="number"
-                          min={2}
-                          max={72}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          placeholder="2"
                           value={installments}
-                          onChange={(e) => setInstallments(Math.max(1, Math.min(72, Number(e.target.value))))}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '');
+                            if (val === '') {
+                              setInstallments('');
+                            } else {
+                              const num = parseInt(val, 10);
+                              setInstallments(Math.min(72, num));
+                            }
+                          }}
+                          onBlur={() => {
+                            if (installments === '' || Number(installments) < 1) {
+                              setInstallments(2);
+                            }
+                          }}
+                          autoFocus
                           className="w-24 px-3 py-1.5 rounded-xl bg-surface-container-lowest border border-on-surface/10 text-center font-black text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40"
                         />
                         <span className="text-xs font-medium text-on-surface-variant">cuotas</span>
@@ -853,7 +873,7 @@ export const AddExpense: React.FC = () => {
                     )}
 
                     {/* If installments > 1: Calculation Mode & Preview */}
-                    {installments > 1 && (
+                    {parsedInstallments > 1 && (
                       <div className="mt-4 p-4 rounded-2xl bg-surface-container-lowest border border-on-surface/10 space-y-3">
                         {/* Calc Mode Toggle */}
                         <div>
@@ -893,7 +913,7 @@ export const AddExpense: React.FC = () => {
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-on-surface-variant font-medium">Impacto mensual:</span>
                             <span className="font-black text-primary text-sm">
-                              {installments}x {formatCurrency(currentInstallmentAmount, activeCurrency)}
+                              {parsedInstallments}x {formatCurrency(currentInstallmentAmount, activeCurrency)}
                             </span>
                           </div>
                           <div className="flex items-center justify-between text-xs pt-1 border-t border-primary/10">

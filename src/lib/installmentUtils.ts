@@ -53,9 +53,6 @@ export const expandProjectedTransactions = (rawTransactions: any[]): any[] => {
         if (override?.date) {
           installmentDate = parseLocalYYYYMMDD(override.date);
           installmentDate.setHours(hours, minutes, seconds);
-        } else if (i === 1 && purchaseDateStr) {
-          installmentDate = parseLocalYYYYMMDD(purchaseDateStr);
-          installmentDate.setHours(hours, minutes, seconds);
         } else {
           const totalMonthIndex = startMonth + (i - 1);
           const targetYear = startYear + Math.floor(totalMonthIndex / 12);
