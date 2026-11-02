@@ -19,6 +19,7 @@ import {
 } from '../services/firestoreService';
 import { useAuth } from './AuthContext';
 import { getLocalMonth } from './dateUtils';
+import { expandProjectedTransactions } from './installmentUtils';
 
 export interface Category {
   id: string;
@@ -68,6 +69,10 @@ export interface Transaction {
   totalInstallments?: number;
   installmentPlanId?: string;
   originalPurchaseAmount?: number;
+  isInstallmentPlan?: boolean;
+  isVirtualInstallment?: boolean;
+  parentPlanId?: string;
+  firstDueDate?: string;
 }
 
 export interface Budget {
@@ -105,7 +110,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { user } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [rawTransactions, setRawTransactions] = useState<any[]>([]);
+
+  const transactions = useMemo(() => {
+    return expandProjectedTransactions(rawTransactions);
+  }, [rawTransactions]);
+
   const [userNames, setUserNames] = useState<Record<string, string>>({});
   const [userEmails, setUserEmails] = useState<Record<string, string>>({});
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -267,12 +277,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     if (!user) {
-      setTransactions([]);
+      setRawTransactions([]);
       return;
     }
 
     const unsubscribeTransactions = getGlobalTransactions(projects.map(p => p.id), (data) => {
-      setTransactions(data);
+      setRawTransactions(data);
       setLoading(false);
 
       // 1. Fetch names for unique authors we don't have yet

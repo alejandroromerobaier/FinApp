@@ -35,7 +35,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/src/lib/utils';
-import { getGlobalTransactions, deleteTransaction, deleteInstallmentPlan } from '../services/firestoreService';
+import { getGlobalTransactions, deleteTransaction, deleteInstallmentPlan, deleteSingleVirtualInstallment } from '../services/firestoreService';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -85,15 +85,24 @@ export const History: React.FC = () => {
     installmentNumber?: number;
     totalInstallments?: number;
     description: string;
+    isVirtual?: boolean;
   } | null>(null);
   const [isDeletingPlan, setIsDeletingPlan] = useState(false);
 
-  const handleDeleteSingle = async (txId: string) => {
+  const handleDeleteSingle = async () => {
+    if (!planToDelete) return;
+    setIsDeletingPlan(true);
     try {
-      await deleteTransaction(txId);
+      if (planToDelete.isVirtual && planToDelete.installmentNumber) {
+        await deleteSingleVirtualInstallment(planToDelete.planId, planToDelete.installmentNumber);
+      } else {
+        await deleteTransaction(planToDelete.txId);
+      }
       setPlanToDelete(null);
     } catch (err) {
-      console.error('Error deleting transaction:', err);
+      console.error('Error deleting single installment:', err);
+    } finally {
+      setIsDeletingPlan(false);
     }
   };
 
@@ -572,13 +581,15 @@ export const History: React.FC = () => {
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (t.installmentPlanId) {
+                            const planId = t.parentPlanId || t.installmentPlanId;
+                            if (planId && t.installmentNumber && t.totalInstallments) {
                               setPlanToDelete({
-                                planId: t.installmentPlanId,
+                                planId,
                                 txId: t.id,
                                 installmentNumber: t.installmentNumber,
                                 totalInstallments: t.totalInstallments,
-                                description: t.description || 'Gasto en cuotas'
+                                description: t.description || 'Gasto en cuotas',
+                                isVirtual: Boolean(t.isVirtualInstallment || t.parentPlanId)
                               });
                             } else {
                               if (window.confirm('¿Estás seguro de que deseas eliminar esta transacción?')) {
@@ -672,7 +683,7 @@ export const History: React.FC = () => {
                 <button
                   type="button"
                   disabled={isDeletingPlan}
-                  onClick={() => handleDeleteSingle(planToDelete.txId)}
+                  onClick={handleDeleteSingle}
                   className="w-full py-3 px-4 rounded-xl border border-on-surface/10 hover:bg-surface-container font-bold text-xs text-on-surface transition-colors flex items-center justify-center gap-2"
                 >
                   <span>Eliminar solo esta cuota ({planToDelete.installmentNumber}/{planToDelete.totalInstallments})</span>
