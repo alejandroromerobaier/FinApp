@@ -357,6 +357,13 @@ export const Settings: React.FC = () => {
             iconColor="bg-amber-500/10 text-amber-600"
           />
           <SettingsLink 
+            to="/cards" 
+            icon={<CreditCard size={20} />} 
+            title="Tarjetas de Crédito" 
+            subtitle="Cierres, vencimientos y cuotas" 
+            iconColor="bg-blue-500/10 text-blue-600"
+          />
+          <SettingsLink 
             to="/reports" 
             icon={<BarChart3 size={20} />} 
             title="Reportes y Exportación" 

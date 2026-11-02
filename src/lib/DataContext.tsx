@@ -13,7 +13,9 @@ import {
   cleanOldNotifications,
   getBudgets,
   getShortcuts,
-  Shortcut
+  Shortcut,
+  CreditCard,
+  getCards
 } from '../services/firestoreService';
 import { useAuth } from './AuthContext';
 import { getLocalMonth } from './dateUtils';
@@ -56,8 +58,16 @@ export interface Transaction {
   categoryColor: string;
   projectId?: string | null;
   authorId: string;
+  authorName?: string;
   paymentMethod?: string;
   classification?: 'fixed' | 'variable';
+  cardId?: string | null;
+  cardName?: string | null;
+  isInstallment?: boolean;
+  installmentNumber?: number;
+  totalInstallments?: number;
+  installmentPlanId?: string;
+  originalPurchaseAmount?: number;
 }
 
 export interface Budget {
@@ -72,6 +82,7 @@ export interface DataContextType {
   categories: Category[];
   projects: Project[];
   transactions: any[];
+  cards: CreditCard[];
   userNames: Record<string, string>;
   userEmails: Record<string, string>;
   loading: boolean;
@@ -100,6 +111,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [notifications, setNotifications] = useState<any[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [shortcuts, setShortcuts] = useState<Shortcut[]>([]);
+  const [cards, setCards] = useState<CreditCard[]>([]);
   const [budgetMonth, setBudgetMonth] = useState(getLocalMonth());
   const [loading, setLoading] = useState(true);
   const [showBalances, setShowBalances] = useState(() => {
@@ -112,6 +124,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) {
       setNotifications([]);
       setShortcuts([]);
+      setCards([]);
       return;
     }
 
@@ -128,9 +141,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setShortcuts(data);
     });
 
+    // Sync cards
+    const unsubscribeCards = getCards((data: CreditCard[]) => {
+      setCards(data);
+    });
+
     return () => {
       unsubscribeNotifs();
       unsubscribeShortcuts();
+      unsubscribeCards();
     };
   }, [user]);
 
@@ -319,6 +338,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       categories,
       projects,
       transactions,
+      cards,
       userNames,
       userEmails,
       notifications,

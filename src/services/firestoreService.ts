@@ -1323,4 +1323,192 @@ export const testConnection = async () => {
       console.error("Please check your Firebase configuration. ");
     }
   }
+};
+
+// --- Credit Cards & Installments ---
+
+export interface CreditCard {
+  id: string;
+  name: string;
+  bank?: string;
+  last4Digits?: string;
+  currency: string;
+  closingDay: number;
+  dueDay: number;
+  color: string;
+  userId: string;
+  createdAt?: any;
+  updatedAt?: any;
 }
+
+export const getCards = (callback: (cards: CreditCard[]) => void) => {
+  if (!auth.currentUser) return () => {};
+  const q = query(
+    collection(db, 'cards'),
+    where('userId', '==', auth.currentUser.uid)
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const cards = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CreditCard));
+    cards.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    callback(cards);
+  }, (error) => {
+    console.error('Error fetching credit cards:', error);
+  });
+};
+
+export const createCard = async (cardData: Omit<CreditCard, 'id' | 'userId'>) => {
+  try {
+    if (!auth.currentUser) return;
+    const docRef = await addDoc(collection(db, 'cards'), {
+      ...cardData,
+      userId: auth.currentUser.uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    return docRef;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, 'cards');
+  }
+};
+
+export const updateCard = async (id: string, cardData: Partial<CreditCard>) => {
+  try {
+    const cardRef = doc(db, 'cards', id);
+    await updateDoc(cardRef, {
+      ...cardData,
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `cards/${id}`);
+  }
+};
+
+export const deleteCard = async (id: string) => {
+  try {
+    await deleteDoc(doc(db, 'cards', id));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `cards/${id}`);
+  }
+};
+
+export interface CreateInstallmentParams {
+  totalAmount: number;
+  installmentAmount: number;
+  installments: number;
+  description: string;
+  categoryId: string;
+  categoryName: string;
+  categoryIcon: string;
+  categoryColor: string;
+  paymentMethod?: string;
+  classification?: 'fixed' | 'variable';
+  cardId?: string | null;
+  cardName?: string | null;
+  projectId?: string | null;
+  firstDueDate: string; // YYYY-MM-DD
+}
+
+/**
+ * Creates all monthly installment transactions in Firestore.
+ */
+export const createInstallmentExpense = async (params: CreateInstallmentParams) => {
+  try {
+    if (!auth.currentUser) return;
+    const uid = auth.currentUser.uid;
+    const planId = 'plan_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+    const now = new Date();
+
+    const rawProjectId = params.projectId;
+    const finalProjectId = (rawProjectId && typeof rawProjectId === 'string' && rawProjectId !== 'personal' && rawProjectId !== 'null' && rawProjectId.trim() !== '') 
+      ? rawProjectId.trim() 
+      : null;
+
+    const baseDate = parseLocalYYYYMMDD(params.firstDueDate);
+    const startYear = baseDate.getFullYear();
+    const startMonth = baseDate.getMonth();
+    const targetDay = baseDate.getDate();
+
+    const batch = writeBatch(db);
+    const createdDocs: any[] = [];
+
+    for (let i = 1; i <= params.installments; i++) {
+      // Calculate target month for installment i
+      const totalMonthIndex = startMonth + (i - 1);
+      const targetYear = startYear + Math.floor(totalMonthIndex / 12);
+      const targetMonth = totalMonthIndex % 12;
+
+      // Handle clamp to max days of target month (e.g., Feb 28/29)
+      const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+      const finalDay = Math.min(targetDay, daysInTargetMonth);
+
+      const installmentDate = new Date(targetYear, targetMonth, finalDay, now.getHours(), now.getMinutes(), now.getSeconds());
+
+      const docRef = doc(collection(db, 'transactions'));
+      const txData = {
+        amount: params.installmentAmount,
+        type: 'expense',
+        description: `${params.description.trim()} (${i}/${params.installments})`,
+        date: Timestamp.fromDate(installmentDate),
+        categoryId: params.categoryId,
+        categoryName: params.categoryName,
+        categoryIcon: params.categoryIcon,
+        categoryColor: params.categoryColor,
+        paymentMethod: 'Tarjeta de Crédito',
+        classification: params.classification || 'variable',
+        cardId: params.cardId || null,
+        cardName: params.cardName || null,
+        isInstallment: true,
+        installmentNumber: i,
+        totalInstallments: params.installments,
+        installmentPlanId: planId,
+        originalPurchaseAmount: params.totalAmount,
+        projectId: finalProjectId,
+        authorId: uid,
+        authorName: auth.currentUser.displayName || 'Usuario',
+        createdAt: serverTimestamp()
+      };
+
+      batch.set(docRef, txData);
+      createdDocs.push({ id: docRef.id, ...txData });
+    }
+
+    await batch.commit();
+
+    // Check budget alert for the first installment
+    if (createdDocs.length > 0) {
+      checkAndNotifyBudgetAlerts(createdDocs[0]).catch(err =>
+        console.error('Budget alert error on installment:', err)
+      );
+    }
+
+    return planId;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, 'transactions (installments)');
+    throw error;
+  }
+};
+
+/**
+ * Deletes all transactions that belong to an installment plan.
+ */
+export const deleteInstallmentPlan = async (installmentPlanId: string) => {
+  try {
+    if (!auth.currentUser) return;
+    const q = query(
+      collection(db, 'transactions'),
+      where('installmentPlanId', '==', installmentPlanId),
+      where('authorId', '==', auth.currentUser.uid)
+    );
+    const snapshot = await getDocs(q);
+    const batch = writeBatch(db);
+    snapshot.docs.forEach(d => {
+      batch.delete(d.ref);
+    });
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `transactions (plan: ${installmentPlanId})`);
+    throw error;
+  }
+};
+

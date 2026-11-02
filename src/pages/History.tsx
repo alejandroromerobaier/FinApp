@@ -30,10 +30,12 @@ import {
   Trash2,
   Wallet,
   CreditCard,
-  Clock
+  Clock,
+  Layers,
+  AlertTriangle
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/src/lib/utils';
-import { getGlobalTransactions, deleteTransaction } from '../services/firestoreService';
+import { getGlobalTransactions, deleteTransaction, deleteInstallmentPlan } from '../services/firestoreService';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -77,6 +79,35 @@ export const History: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'all'>('all');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showFilters, setShowFilters] = useState(false);
+  const [planToDelete, setPlanToDelete] = useState<{
+    planId: string;
+    txId: string;
+    installmentNumber?: number;
+    totalInstallments?: number;
+    description: string;
+  } | null>(null);
+  const [isDeletingPlan, setIsDeletingPlan] = useState(false);
+
+  const handleDeleteSingle = async (txId: string) => {
+    try {
+      await deleteTransaction(txId);
+      setPlanToDelete(null);
+    } catch (err) {
+      console.error('Error deleting transaction:', err);
+    }
+  };
+
+  const handleDeleteFullPlan = async (planId: string) => {
+    setIsDeletingPlan(true);
+    try {
+      await deleteInstallmentPlan(planId);
+      setPlanToDelete(null);
+    } catch (err) {
+      console.error('Error deleting installment plan:', err);
+    } finally {
+      setIsDeletingPlan(false);
+    }
+  };
 
   useEffect(() => {
     if (!dataLoading) {
@@ -484,6 +515,12 @@ export const History: React.FC = () => {
                             <h4 className="font-bold text-on-surface tracking-tight leading-snug truncate text-sm sm:text-base">
                               {t.description || category?.name || t.categoryName || 'Gasto'}
                             </h4>
+                            {t.installmentNumber && t.totalInstallments && (
+                              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tight bg-blue-500/10 text-blue-600 shrink-0">
+                                <Layers size={9} />
+                                <span>Cuota {t.installmentNumber}/{t.totalInstallments}</span>
+                              </div>
+                            )}
                             {t.classification && (
                               <div className={cn(
                                 "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter shrink-0",
@@ -510,8 +547,8 @@ export const History: React.FC = () => {
                             )}
                             <span className="w-1 h-1 rounded-full bg-on-surface-variant/20 shrink-0" />
                             <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider flex items-center gap-1 leading-none shrink-0">
-                              {t.paymentMethod === 'Tarjeta' ? <CreditCard size={10} /> : <Wallet size={10} />}
-                              {t.paymentMethod || 'Efectivo'}
+                              {(t.paymentMethod === 'Tarjeta' || t.paymentMethod === 'Tarjeta de Crédito') ? <CreditCard size={10} /> : <Wallet size={10} />}
+                              {t.cardName ? t.cardName : (t.paymentMethod || 'Efectivo')}
                             </span>
                           </div>
                         </div>
@@ -535,8 +572,18 @@ export const History: React.FC = () => {
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (window.confirm('¿Estás seguro de que deseas eliminar esta transacción?')) {
-                              deleteTransaction(t.id);
+                            if (t.installmentPlanId) {
+                              setPlanToDelete({
+                                planId: t.installmentPlanId,
+                                txId: t.id,
+                                installmentNumber: t.installmentNumber,
+                                totalInstallments: t.totalInstallments,
+                                description: t.description || 'Gasto en cuotas'
+                              });
+                            } else {
+                              if (window.confirm('¿Estás seguro de que deseas eliminar esta transacción?')) {
+                                deleteTransaction(t.id);
+                              }
                             }
                           }}
                           className="p-1.5 sm:p-2 text-on-surface-variant/30 hover:text-rose-600 hover:bg-rose-500/10 rounded-lg transition-all opacity-80 sm:opacity-0 sm:group-hover:opacity-100 shrink-0"
@@ -599,6 +646,61 @@ export const History: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Plan Deletion Choice Modal */}
+      <AnimatePresence>
+        {planToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-surface-container-lowest rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-on-surface/10 space-y-4"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto">
+                <AlertTriangle size={24} />
+              </div>
+
+              <div className="text-center space-y-1">
+                <h3 className="text-lg font-black text-on-surface">Eliminar Cuota</h3>
+                <p className="text-xs text-on-surface-variant">
+                  Esta transacción forma parte de un plan de <strong className="text-on-surface">{planToDelete.totalInstallments} cuotas</strong> ({planToDelete.description}). ¿Cómo querés proceder?
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <button
+                  type="button"
+                  disabled={isDeletingPlan}
+                  onClick={() => handleDeleteSingle(planToDelete.txId)}
+                  className="w-full py-3 px-4 rounded-xl border border-on-surface/10 hover:bg-surface-container font-bold text-xs text-on-surface transition-colors flex items-center justify-center gap-2"
+                >
+                  <span>Eliminar solo esta cuota ({planToDelete.installmentNumber}/{planToDelete.totalInstallments})</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isDeletingPlan}
+                  onClick={() => handleDeleteFullPlan(planToDelete.planId)}
+                  className="w-full py-3 px-4 rounded-xl bg-error text-white font-bold text-xs hover:bg-error/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isDeletingPlan ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  <span>Eliminar las {planToDelete.totalInstallments} cuotas del plan</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isDeletingPlan}
+                  onClick={() => setPlanToDelete(null)}
+                  className="w-full py-2.5 rounded-xl font-bold text-xs text-on-surface-variant/70 hover:text-on-surface transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
