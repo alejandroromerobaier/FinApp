@@ -1019,6 +1019,7 @@ export const addTransaction = async (transaction: any) => {
       authorId: auth.currentUser?.uid,
       createdAt: serverTimestamp(),
       date: Timestamp.fromDate(transactionDate),
+      purchaseDate: transaction.purchaseDate || formatLocalYYYYMMDD(transactionDate),
       paymentMethod: transaction.paymentMethod || 'Efectivo',
       // Denormalized category data for better collaboration visibility
       categoryName: transaction.categoryName,
@@ -1488,6 +1489,7 @@ export interface CreateInstallmentParams {
   cardName?: string | null;
   projectId?: string | null;
   firstDueDate: string; // YYYY-MM-DD
+  purchaseDate?: string; // YYYY-MM-DD
 }
 
 /**
@@ -1508,6 +1510,8 @@ export const createInstallmentExpense = async (params: CreateInstallmentParams) 
     const baseDate = parseLocalYYYYMMDD(params.firstDueDate);
     const firstDueDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), now.getHours(), now.getMinutes(), now.getSeconds());
 
+    const purchaseDate = params.purchaseDate || formatLocalYYYYMMDD(now);
+
     const txData = {
       amount: params.totalAmount,
       installmentAmount: params.installmentAmount,
@@ -1516,6 +1520,7 @@ export const createInstallmentExpense = async (params: CreateInstallmentParams) 
       description: params.description.trim(),
       date: Timestamp.fromDate(firstDueDate),
       firstDueDate: params.firstDueDate,
+      purchaseDate,
       isInstallmentPlan: true,
       totalInstallments: Number(params.installments),
       categoryId: params.categoryId,

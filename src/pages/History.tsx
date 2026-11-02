@@ -40,6 +40,7 @@ import { getGlobalTransactions, deleteTransaction, deleteInstallmentPlan, delete
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { formatDisplayDate, parseLocalYYYYMMDD } from '../lib/dateUtils';
 
 const ICON_MAP: Record<string, any> = {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
@@ -71,7 +72,7 @@ export type TimeScope = 'real_only' | 'all' | 'future_only';
 
 export const History: React.FC = () => {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const { categories, projects, transactions, userNames, loading: dataLoading } = useData();
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -187,7 +188,14 @@ export const History: React.FC = () => {
       const matchesClassification = filterClassification === 'all' || t.classification === filterClassification;
       
       const tDate = t.date instanceof Date ? t.date : new Date(t.date);
-      const isFuture = tDate > endOfToday;
+      const effectiveDate = (t.isInstallment && t.installmentNumber === 1 && t.purchaseDate)
+        ? parseLocalYYYYMMDD(t.purchaseDate)
+        : tDate;
+
+      // In real_only, installments > 1 are future unless their due date has already passed
+      const isFuture = (timeScope === 'real_only' && t.isInstallment && t.installmentNumber && t.installmentNumber > 1)
+        ? true
+        : effectiveDate > endOfToday;
 
       let matchesTimeScope = true;
       if (timeScope === 'real_only') {
@@ -205,7 +213,9 @@ export const History: React.FC = () => {
         // Full end of month (e.g. Sept 30th 23:59:59.999 instead of Sept 8th)
         const end = new Date(year, month + 1, 0, 23, 59, 59, 999);
         const start = new Date(year, month - (months - 1), 1, 0, 0, 0, 0);
-        matchesPeriod = tDate >= start && tDate <= end;
+        
+        const dateToCompare = (timeScope === 'real_only') ? effectiveDate : tDate;
+        matchesPeriod = dateToCompare >= start && dateToCompare <= end;
       }
 
       return matchesSearch && matchesType && matchesCategory && matchesProject && matchesClassification && matchesPeriod && matchesTimeScope;
@@ -214,6 +224,18 @@ export const History: React.FC = () => {
     if (timeScope === 'future_only') {
       // Sort upcoming installments closest first
       return [...filtered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }
+
+    if (timeScope === 'real_only') {
+      return [...filtered].sort((a, b) => {
+        const dateA = (a.isInstallment && a.installmentNumber === 1 && a.purchaseDate)
+          ? parseLocalYYYYMMDD(a.purchaseDate).getTime()
+          : (a.date instanceof Date ? a.date.getTime() : new Date(a.date).getTime());
+        const dateB = (b.isInstallment && b.installmentNumber === 1 && b.purchaseDate)
+          ? parseLocalYYYYMMDD(b.purchaseDate).getTime()
+          : (b.date instanceof Date ? b.date.getTime() : new Date(b.date).getTime());
+        return dateB - dateA;
+      });
     }
 
     return filtered;
@@ -266,13 +288,15 @@ export const History: React.FC = () => {
   const groupedTransactions = useMemo(() => {
     const groups: { [key: string]: any[] } = {};
     paginatedTransactions.forEach(t => {
-      const date = t.date instanceof Date ? t.date : new Date(t.date);
-      const dateKey = isNaN(date.getTime()) ? 'Fecha Desconocida' : dateGroupFormatter.format(date);
+      const effectiveDate = (timeScope === 'real_only' && t.isInstallment && t.installmentNumber === 1 && t.purchaseDate)
+        ? parseLocalYYYYMMDD(t.purchaseDate)
+        : (t.date instanceof Date ? t.date : new Date(t.date));
+      const dateKey = isNaN(effectiveDate.getTime()) ? 'Fecha Desconocida' : dateGroupFormatter.format(effectiveDate);
       if (!groups[dateKey]) groups[dateKey] = [];
       groups[dateKey].push(t);
     });
     return groups;
-  }, [paginatedTransactions]);
+  }, [paginatedTransactions, timeScope]);
 
   if (loading) {
     return (
@@ -576,7 +600,9 @@ export const History: React.FC = () => {
                   const endOfToday = new Date();
                   endOfToday.setHours(23, 59, 59, 999);
                   const tDate = t.date instanceof Date ? t.date : new Date(t.date);
-                  const isFuture = tDate > endOfToday;
+                  const isFuture = (timeScope === 'real_only' && t.isInstallment && t.installmentNumber === 1 && t.purchaseDate)
+                    ? false
+                    : (tDate > endOfToday);
 
                   return (
                     <div 
@@ -605,6 +631,9 @@ export const History: React.FC = () => {
                               <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tight bg-blue-500/10 text-blue-600 shrink-0">
                                 <Layers size={9} />
                                 <span>Cuota {t.installmentNumber}/{t.totalInstallments}</span>
+                                {t.installmentNumber === 1 && t.purchaseDate && (
+                                  <span className="opacity-75 font-medium hidden sm:inline"> • Vence {formatDisplayDate(t.date, false)}</span>
+                                )}
                               </div>
                             )}
                             {t.classification && (
@@ -622,7 +651,7 @@ export const History: React.FC = () => {
                               {category ? category.name : (t.categoryName || (t.categoryId ? 'Cargando...' : 'Otros'))}
                             </span>
                             <span className="w-1 h-1 rounded-full bg-on-surface-variant/20 shrink-0" />
-                            <span className="text-[10px] font-black text-primary uppercase tracking-wider leading-none shrink-0">{userNames[t.authorId] || 'Usuario'}</span>
+                            <span className="text-[10px] font-black text-primary uppercase tracking-wider leading-none shrink-0">{userNames[t.authorId] || (t.authorId === user?.uid ? 'Tú' : 'Usuario')}</span>
                             {t.projectId && (
                               <>
                                 <span className="w-1 h-1 rounded-full bg-on-surface-variant/20 shrink-0" />

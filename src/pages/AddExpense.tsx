@@ -326,7 +326,8 @@ export const AddExpense: React.FC = () => {
           cardId,
           cardName,
           projectId: destination === 'shared' ? selectedProjectId : null,
-          firstDueDate: firstDueDate || date
+          firstDueDate: firstDueDate || date,
+          purchaseDate: date
         });
         trackEvent('add_installment_expense', { installments, totalAmount: currentTotalAmount });
         navigate(-1);
@@ -339,6 +340,7 @@ export const AddExpense: React.FC = () => {
         type,
         description,
         date,
+        purchaseDate: date,
         paymentMethod,
         classification,
         categoryId: selectedCategory.id,

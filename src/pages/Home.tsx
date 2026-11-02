@@ -31,7 +31,8 @@ import {
   Eye,
   EyeOff,
   Plus,
-  CreditCard
+  CreditCard,
+  Users
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import logo from '../assets/logo.png';
@@ -39,7 +40,7 @@ import { formatCurrency, cn } from '@/src/lib/utils';
 import { useAuth } from '../lib/AuthContext';
 import { useData } from '../lib/DataContext';
 import { getTransactions, cleanupDuplicateCategories, Shortcut } from '../services/firestoreService';
-import { formatDisplayDate, getLocalMonth, parseLocalMonth } from '../lib/dateUtils';
+import { formatDisplayDate, getLocalMonth, parseLocalMonth, parseLocalYYYYMMDD } from '../lib/dateUtils';
 import { ShortcutKeypadModal } from '../components/ShortcutKeypadModal';
 import { ShortcutIconComponent, ShortcutBadge } from './ManageShortcuts';
 import { getProjectGradient } from '../lib/constants';
@@ -82,6 +83,13 @@ export const Home: React.FC = () => {
       currency: string;
       name: string;
       cardColor?: string | null;
+      isPersonal: boolean;
+      totalExpensesAllTime: number;
+      myContribution: number;
+      myContributionPercent: number;
+      membersCount: number;
+      projectInstallmentsRemaining: number;
+      projectInstallmentsCount: number;
     }> = {
       personal: {
         income: 0,
@@ -91,7 +99,14 @@ export const Home: React.FC = () => {
         currentExpenses: 0,
         currency: profile?.currency || 'ARS',
         name: 'Personal',
-        cardColor: profile?.personalCardColor || 'navy'
+        cardColor: profile?.personalCardColor || 'navy',
+        isPersonal: true,
+        totalExpensesAllTime: 0,
+        myContribution: 0,
+        myContributionPercent: 100,
+        membersCount: 1,
+        projectInstallmentsRemaining: 0,
+        projectInstallmentsCount: 0
       }
     };
 
@@ -104,7 +119,14 @@ export const Home: React.FC = () => {
         currentExpenses: 0,
         currency: p.currency || profile?.currency || 'ARS',
         name: p.name,
-        cardColor: p.cardColor || 'slate'
+        cardColor: p.cardColor || 'slate',
+        isPersonal: false,
+        totalExpensesAllTime: 0,
+        myContribution: 0,
+        myContributionPercent: 0,
+        membersCount: p.memberIds?.length || 1,
+        projectInstallmentsRemaining: 0,
+        projectInstallmentsCount: 0
       };
     });
 
@@ -112,6 +134,9 @@ export const Home: React.FC = () => {
     const activeDate = parseLocalMonth(budgetMonth);
     const activeMonth = activeDate.getMonth();
     const activeYear = activeDate.getFullYear();
+    const currentMonthKey = getLocalMonth();
+
+    const projectPlanSets: Record<string, Set<string>> = {};
 
     transactions.forEach(t => {
       const projectId = t.projectId || 'personal';
@@ -119,7 +144,7 @@ export const Home: React.FC = () => {
       const currency = project?.currency || profile?.currency || 'ARS';
       const projectName = projectId === 'personal' ? 'Personal' : (project?.name || 'Proyecto');
       
-      const tDate = new Date(t.date);
+      const tDate = t.date instanceof Date ? t.date : new Date(t.date);
 
       if (!projectTotals[projectId]) {
         projectTotals[projectId] = { 
@@ -130,31 +155,62 @@ export const Home: React.FC = () => {
           currentExpenses: 0,
           currency,
           name: projectName,
-          cardColor: projectId === 'personal' ? (profile?.personalCardColor || 'navy') : (project?.cardColor || 'slate')
+          cardColor: projectId === 'personal' ? (profile?.personalCardColor || 'navy') : (project?.cardColor || 'slate'),
+          isPersonal: projectId === 'personal',
+          totalExpensesAllTime: 0,
+          myContribution: 0,
+          myContributionPercent: 0,
+          membersCount: project?.memberIds?.length || 1,
+          projectInstallmentsRemaining: 0,
+          projectInstallmentsCount: 0
         };
       }
       
       // Total general acumulado
       if (t.type === 'income') {
         projectTotals[projectId].total += t.amount;
+        projectTotals[projectId].income += t.amount;
       } else {
         projectTotals[projectId].total -= t.amount;
+        projectTotals[projectId].expenses += t.amount;
+        projectTotals[projectId].totalExpensesAllTime += t.amount;
+        if (t.authorId === user?.uid) {
+          projectTotals[projectId].myContribution += t.amount;
+        }
       }
 
-      // Actividad del mes seleccionado
-      if (tDate.getMonth() === activeMonth && tDate.getFullYear() === activeYear) {
+      // Actividad del mes seleccionado (comparar por purchaseDate si es cuota 1, sino fecha de vencimiento)
+      const effectiveDate = (t.isInstallment && t.installmentNumber === 1 && t.purchaseDate)
+        ? parseLocalYYYYMMDD(t.purchaseDate)
+        : tDate;
+
+      if (effectiveDate.getMonth() === activeMonth && effectiveDate.getFullYear() === activeYear) {
         if (t.type === 'income') {
           projectTotals[projectId].currentIncome += t.amount;
         } else {
           projectTotals[projectId].currentExpenses += t.amount;
         }
       }
-      
-      // Totales históricos (para las tarjetas de abajo)
-      if (t.type === 'income') {
-        projectTotals[projectId].income += t.amount;
-      } else {
-        projectTotals[projectId].expenses += t.amount;
+
+      // Track future installments in project
+      if (t.isInstallment && projectId !== 'personal') {
+        const itemMonthKey = getLocalMonth(tDate);
+        if (itemMonthKey >= currentMonthKey) {
+          projectTotals[projectId].projectInstallmentsRemaining += (t.amount || 0);
+          if (!projectPlanSets[projectId]) {
+            projectPlanSets[projectId] = new Set();
+          }
+          projectPlanSets[projectId].add(t.parentPlanId || t.installmentPlanId || t.id);
+        }
+      }
+    });
+
+    Object.entries(projectTotals).forEach(([pId, pt]) => {
+      if (pt.totalExpensesAllTime > 0) {
+        pt.myContributionPercent = Math.min(100, Math.round((pt.myContribution / pt.totalExpensesAllTime) * 100));
+      }
+      if (projectPlanSets[pId]) {
+        pt.projectInstallmentsCount = projectPlanSets[pId].size;
       }
     });
 
@@ -192,7 +248,7 @@ export const Home: React.FC = () => {
       .map(item => [item.id, item.data] as [string, any]);
 
     return { balancesByProject: sortedBalances };
-  }, [transactions, projects, profile, budgetMonth]);
+  }, [transactions, projects, profile, budgetMonth, user?.uid]);
 
   const recentTransactions = useMemo(() => {
     const endOfToday = new Date();
@@ -200,10 +256,26 @@ export const Home: React.FC = () => {
 
     return transactions
       .filter(t => {
-        const tDate = t.date instanceof Date ? t.date : new Date(t.date);
-        return !isNaN(tDate.getTime()) && tDate <= endOfToday;
+        // If it's an installment plan, only installment 1 represents the initial purchase; exclude future installments > 1
+        if (t.isInstallment && t.installmentNumber && t.installmentNumber > 1) {
+          return false;
+        }
+
+        const effectiveDate = (t.purchaseDate && t.installmentNumber === 1)
+          ? parseLocalYYYYMMDD(t.purchaseDate)
+          : (t.date instanceof Date ? t.date : new Date(t.date));
+
+        return !isNaN(effectiveDate.getTime()) && effectiveDate <= endOfToday;
       })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .sort((a, b) => {
+        const timeA = (a.purchaseDate && a.installmentNumber === 1)
+          ? parseLocalYYYYMMDD(a.purchaseDate).getTime()
+          : (a.date instanceof Date ? a.date.getTime() : new Date(a.date).getTime());
+        const timeB = (b.purchaseDate && b.installmentNumber === 1)
+          ? parseLocalYYYYMMDD(b.purchaseDate).getTime()
+          : (b.date instanceof Date ? b.date.getTime() : new Date(b.date).getTime());
+        return timeB - timeA;
+      })
       .slice(0, 5);
   }, [transactions]);
 
@@ -308,99 +380,170 @@ export const Home: React.FC = () => {
 
       {/* Main Balance Cards (Dynamic by Project) */}
       <div className="space-y-6 mb-8 sm:mb-12">
-        {balancesByProject.map(([id, data], idx) => (
-          <motion.div 
-            key={id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.1 }}
-            className={cn(
-              "relative overflow-hidden rounded-[2.5rem] sm:rounded-[3.5rem] p-6 sm:p-10 text-white shadow-2xl group border border-white/10",
-              getProjectGradient(data.cardColor, id === 'personal')
-            )}
-          >
-            {/* Decorative elements */}
-            <div className="absolute top-0 right-0 w-64 h-64 sm:w-80 sm:h-80 bg-white/10 blur-[60px] sm:blur-[90px] rounded-full -mr-24 -mt-24 sm:-mr-32 sm:-mt-32 transition-transform group-hover:scale-125 duration-1000" />
-            
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-6 sm:mb-10">
-                <div className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-white/10 rounded-full backdrop-blur-md border border-white/10 shadow-inner">
-                  <Wallet size={14} className="text-white sm:w-[16px] sm:h-[16px]" />
-                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-white/80">{data.name} • {data.currency}</span>
+        {balancesByProject.map(([id, data], idx) => {
+          const isPersonal = id === 'personal';
+          return (
+            <motion.div 
+              key={id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.1 }}
+              onClick={() => isPersonal ? navigate('/history') : navigate(`/project/${id}`)}
+              className={cn(
+                "relative overflow-hidden rounded-[2.5rem] sm:rounded-[3.5rem] p-6 sm:p-10 text-white shadow-2xl group border border-white/10 cursor-pointer active:scale-[0.99] transition-all",
+                getProjectGradient(data.cardColor, isPersonal)
+              )}
+            >
+              {/* Decorative elements */}
+              <div className="absolute top-0 right-0 w-64 h-64 sm:w-80 sm:h-80 bg-white/10 blur-[60px] sm:blur-[90px] rounded-full -mr-24 -mt-24 sm:-mr-32 sm:-mt-32 transition-transform group-hover:scale-125 duration-1000" />
+              
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-6 sm:mb-10">
+                  <div className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-white/10 rounded-full backdrop-blur-md border border-white/10 shadow-inner">
+                    {isPersonal ? <Wallet size={14} className="text-white sm:w-[16px] sm:h-[16px]" /> : <Users size={14} className="text-white sm:w-[16px] sm:h-[16px]" />}
+                    <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-white/80">{data.name} • {data.currency}</span>
+                    {!isPersonal && (
+                      <span className="bg-white/20 px-2 py-0.5 rounded-full text-[8px] font-bold text-white uppercase tracking-wider">
+                        Compartido
+                      </span>
+                    )}
+                  </div>
+                  {!isCurrentMonth && (
+                     <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 rounded-full backdrop-blur-md border border-amber-500/10">
+                       <span className="text-[8px] font-black uppercase text-amber-200 tracking-widest">Archivo Histórico</span>
+                     </div>
+                  )}
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleShowBalances();
+                      }}
+                      className="p-2 bg-white/10 hover:bg-white/20 rounded-xl backdrop-blur-md border border-white/10 transition-colors"
+                      title={showBalances ? "Ocultar saldos" : "Mostrar saldos"}
+                    >
+                      {showBalances ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                    {!isPersonal ? (
+                      <div className="flex items-center gap-1 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl backdrop-blur-md text-[11px] font-black uppercase tracking-wider text-white transition-colors">
+                        <span>Ver</span>
+                        <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                      </div>
+                    ) : (
+                      <TrendingUp size={24} className="text-white/40 sm:w-[28px] sm:h-[28px]" />
+                    )}
+                  </div>
                 </div>
-                {!isCurrentMonth && (
-                   <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 rounded-full backdrop-blur-md border border-amber-500/10">
-                     <span className="text-[8px] font-black uppercase text-amber-200 tracking-widest">Archivo Histórico</span>
-                   </div>
+                
+                {isPersonal ? (
+                  <>
+                    <h1 className="text-5xl sm:text-7xl font-black tracking-tighter mb-2 font-headline drop-shadow-lg break-all leading-tight">
+                      {showBalances ? formatCurrency(data.total, data.currency) : '••••••'}
+                    </h1>
+                    
+                    <div className="flex flex-wrap gap-4 sm:gap-8 mb-6 sm:mb-10 mt-2 px-1">
+                      <div className="flex flex-col">
+                        <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-0.5">Saldo Anterior</span>
+                        <span className="text-sm sm:text-base font-black font-headline opacity-95">
+                          {showBalances ? formatCurrency(data.total - (data.currentIncome - data.currentExpenses), data.currency) : '••••••'}
+                        </span>
+                      </div>
+                      <div className="flex flex-col border-l border-white/10 pl-4 sm:pl-8">
+                        <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-0.5">Resultado Mes</span>
+                        <span className={cn(
+                          "text-sm sm:text-base font-black font-headline opacity-95",
+                          (data.currentIncome - data.currentExpenses) >= 0 ? "text-emerald-300" : "text-rose-300"
+                        )}>
+                          {(data.currentIncome - data.currentExpenses) >= 0 ? '+' : ''}
+                          {showBalances ? formatCurrency(data.currentIncome - data.currentExpenses, data.currency) : '••••••'}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5">
+                      <div className="bg-white/10 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] backdrop-blur-md border border-white/5 group-hover:bg-white/15 transition-all shadow-inner">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-emerald-400/20 flex items-center justify-center shadow-inner">
+                            <ArrowDownLeft size={16} className="text-emerald-400 sm:w-[18px] sm:h-[18px]" />
+                          </div>
+                          <div className="text-left">
+                            <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1 leading-none">Ingresos</p>
+                            <p className="text-lg sm:text-xl font-black text-white leading-none tracking-tight">
+                              {showBalances ? formatCurrency(data.currentIncome, data.currency) : '••••••'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-white/10 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] backdrop-blur-md border border-white/5 group-hover:bg-white/15 transition-all shadow-inner">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-rose-400/20 flex items-center justify-center shadow-inner">
+                            <ArrowUpRight size={16} className="text-rose-400 sm:w-[18px] sm:h-[18px]" />
+                          </div>
+                          <div className="text-left">
+                            <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1 leading-none">Gastos</p>
+                            <p className="text-lg sm:text-xl font-black text-white leading-none tracking-tight">
+                              {showBalances ? formatCurrency(data.currentExpenses, data.currency) : '••••••'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-white/60 mb-1">
+                      Gasto Total del Proyecto
+                    </p>
+                    <h1 className="text-5xl sm:text-7xl font-black tracking-tighter mb-2 font-headline drop-shadow-lg break-all leading-tight">
+                      {showBalances ? formatCurrency(data.totalExpensesAllTime, data.currency) : '••••••'}
+                    </h1>
+                    
+                    <div className="flex flex-wrap gap-4 sm:gap-8 mb-6 sm:mb-8 mt-2 px-1">
+                      <div className="flex flex-col">
+                        <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/60 mb-0.5">Mi Aporte ({data.myContributionPercent}%)</span>
+                        <span className="text-sm sm:text-base font-black font-headline text-emerald-300">
+                          {showBalances ? formatCurrency(data.myContribution, data.currency) : '••••••'}
+                        </span>
+                      </div>
+                      <div className="flex flex-col border-l border-white/10 pl-4 sm:pl-8">
+                        <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/60 mb-0.5">Gastos este Mes</span>
+                        <span className="text-sm sm:text-base font-black font-headline opacity-95">
+                          {showBalances ? formatCurrency(data.currentExpenses, data.currency) : '••••••'}
+                        </span>
+                      </div>
+                      <div className="flex flex-col border-l border-white/10 pl-4 sm:pl-8">
+                        <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/60 mb-0.5">Miembros</span>
+                        <span className="text-sm sm:text-base font-black font-headline opacity-95">
+                          {data.membersCount} {data.membersCount === 1 ? 'persona' : 'personas'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {data.projectInstallmentsRemaining > 0 && (
+                      <div className="mb-4 bg-white/10 p-3 sm:p-4 rounded-2xl backdrop-blur-md border border-white/10 flex items-center justify-between text-xs font-bold text-white/90">
+                        <div className="flex items-center gap-2">
+                          <CreditCard size={16} className="text-blue-300 shrink-0" />
+                          <span>{data.projectInstallmentsCount} {data.projectInstallmentsCount === 1 ? 'compra en cuotas' : 'compras en cuotas'}</span>
+                        </div>
+                        <span className="font-headline font-black text-blue-200">
+                          {showBalances ? formatCurrency(data.projectInstallmentsRemaining, data.currency) : '••••'} a liquidar
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs font-bold text-white/70">
+                      <span>Toca la tarjeta para ver balances y liquidación</span>
+                      <span className="flex items-center gap-1 text-white font-extrabold group-hover:translate-x-1 transition-transform">
+                        <span>Ver balances</span>
+                        <ChevronRight size={14} />
+                      </span>
+                    </div>
+                  </>
                 )}
-                <div className="flex items-center gap-3">
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleShowBalances();
-                    }}
-                    className="p-2 bg-white/10 hover:bg-white/20 rounded-xl backdrop-blur-md border border-white/10 transition-colors"
-                  >
-                    {showBalances ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                  <TrendingUp size={24} className="text-white/40 sm:w-[28px] sm:h-[28px]" />
-                </div>
               </div>
-              
-              <h1 className="text-5xl sm:text-7xl font-black tracking-tighter mb-2 font-headline drop-shadow-lg break-all leading-tight">
-                {showBalances ? formatCurrency(data.total, data.currency) : '••••••'}
-              </h1>
-              
-              <div className="flex flex-wrap gap-4 sm:gap-8 mb-6 sm:mb-10 mt-2 px-1">
-                <div className="flex flex-col">
-                  <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-0.5">Saldo Anterior</span>
-                  <span className="text-sm sm:text-base font-black font-headline opacity-95">
-                    {showBalances ? formatCurrency(data.total - (data.currentIncome - data.currentExpenses), data.currency) : '••••••'}
-                  </span>
-                </div>
-                <div className="flex flex-col border-l border-white/10 pl-4 sm:pl-8">
-                  <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-0.5">Resultado Mes</span>
-                  <span className={cn(
-                    "text-sm sm:text-base font-black font-headline opacity-95",
-                    (data.currentIncome - data.currentExpenses) >= 0 ? "text-emerald-300" : "text-rose-300"
-                  )}>
-                    {(data.currentIncome - data.currentExpenses) >= 0 ? '+' : ''}
-                    {showBalances ? formatCurrency(data.currentIncome - data.currentExpenses, data.currency) : '••••••'}
-                  </span>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5">
-                <div className="bg-white/10 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] backdrop-blur-md border border-white/5 group-hover:bg-white/15 transition-all shadow-inner">
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-emerald-400/20 flex items-center justify-center shadow-inner">
-                      <ArrowDownLeft size={16} className="text-emerald-400 sm:w-[18px] sm:h-[18px]" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1 leading-none">Ingresos</p>
-                      <p className="text-lg sm:text-xl font-black text-white leading-none tracking-tight">
-                        {showBalances ? formatCurrency(data.currentIncome, data.currency) : '••••••'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-white/10 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] backdrop-blur-md border border-white/5 group-hover:bg-white/15 transition-all shadow-inner">
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-rose-400/20 flex items-center justify-center shadow-inner">
-                      <ArrowUpRight size={16} className="text-rose-400 sm:w-[18px] sm:h-[18px]" />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1 leading-none">Gastos</p>
-                      <p className="text-lg sm:text-xl font-black text-white leading-none tracking-tight">
-                        {showBalances ? formatCurrency(data.currentExpenses, data.currency) : '••••••'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          );
+        })}
       </div>
 
       {/* Installment Commitments Summary Card */}
@@ -598,6 +741,10 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, category
   const userName = userNames[transaction.authorId] || (transaction.authorId === user?.uid ? 'Tú' : '...');
   const project = projects?.find(p => p.id === transaction.projectId);
 
+  const displayDate = (transaction.purchaseDate && transaction.installmentNumber === 1)
+    ? parseLocalYYYYMMDD(transaction.purchaseDate)
+    : (transaction.date instanceof Date ? transaction.date : new Date(transaction.date));
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
@@ -629,6 +776,9 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, category
                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter shrink-0 bg-blue-500/10 text-blue-600 dark:text-blue-400">
                  <CreditCard size={8} />
                  <span>Cuota {transaction.installmentNumber}/{transaction.totalInstallments}</span>
+                 {transaction.installmentNumber === 1 && transaction.purchaseDate && (
+                   <span className="opacity-70 font-medium hidden sm:inline"> • Vence {formatDisplayDate(transaction.date, false)}</span>
+                 )}
                </div>
             )}
           </div>
@@ -656,7 +806,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, category
           {showBalances ? formatCurrency(transaction.amount, project?.currency || profile?.currency) : '••••'}
         </p>
         <p className="text-[10px] text-on-surface-variant/40 font-bold">
-          {formatDisplayDate(transaction.date, false)}
+          {formatDisplayDate(displayDate, false)}
         </p>
       </div>
     </motion.div>

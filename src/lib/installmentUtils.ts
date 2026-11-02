@@ -62,12 +62,15 @@ export const expandProjectedTransactions = (rawTransactions: any[]): any[] => {
 
         const installmentAmount = override?.amount !== undefined ? override.amount : baseInstallmentAmount;
 
+        const purchaseDateStr = tx.purchaseDate || (tx.firstDueDate ? tx.firstDueDate : (!isNaN(txDate.getTime()) ? formatLocalYYYYMMDD(txDate) : null));
+
         expanded.push({
           ...tx,
           id: `${tx.id}_installment_${i}`,
           parentPlanId: tx.id,
           amount: installmentAmount,
           date: installmentDate,
+          purchaseDate: purchaseDateStr,
           description: `${tx.description} (${i}/${totalInstallments})`,
           isInstallment: true,
           installmentNumber: i,
