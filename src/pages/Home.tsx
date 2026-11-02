@@ -30,7 +30,8 @@ import {
   ChevronLeft,
   Eye,
   EyeOff,
-  Plus
+  Plus,
+  CreditCard
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import logo from '../assets/logo.png';
@@ -196,6 +197,25 @@ export const Home: React.FC = () => {
   const recentTransactions = useMemo(() => {
     return [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 3);
   }, [transactions]);
+
+  const installmentSummary = useMemo(() => {
+    const monthInstallments = transactions.filter(t => t.isInstallment && getLocalMonth(t.date) === budgetMonth);
+    const totalThisMonth = monthInstallments.reduce((sum, t) => sum + (t.amount || 0), 0);
+    
+    const currentMonthKey = getLocalMonth();
+    const futureInstallments = transactions.filter(t => t.isInstallment && getLocalMonth(t.date) >= currentMonthKey);
+    const totalRemaining = futureInstallments.reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    const activePlansCount = new Set(futureInstallments.map(t => t.parentPlanId || t.installmentPlanId)).size;
+
+    return {
+      thisMonthCount: monthInstallments.length,
+      totalThisMonth,
+      totalRemaining,
+      activePlansCount,
+      hasInstallments: monthInstallments.length > 0 || futureInstallments.length > 0
+    };
+  }, [transactions, budgetMonth]);
 
   if (loading) {
     return (
@@ -373,6 +393,65 @@ export const Home: React.FC = () => {
           </motion.div>
         ))}
       </div>
+
+      {/* Installment Commitments Summary Card */}
+      {installmentSummary.hasInstallments && (
+        <section className="mb-8">
+          <div 
+            onClick={() => navigate('/credit-cards')}
+            className="bg-gradient-to-br from-surface-container-lowest to-surface-container-low p-5 sm:p-6 rounded-[2rem] border border-primary/20 shadow-sm hover:border-primary/40 transition-all cursor-pointer group active:scale-[0.99] relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
+
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0 shadow-xs">
+                  <CreditCard size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-on-surface font-headline tracking-tight">
+                    Compromisos en Cuotas
+                  </h3>
+                  <p className="text-[11px] font-bold text-on-surface-variant/70">
+                    {installmentSummary.activePlansCount} {installmentSummary.activePlansCount === 1 ? 'compra financiada' : 'compras financiadas'}
+                  </p>
+                </div>
+              </div>
+
+              <span className="text-xs font-bold text-primary flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                <span>Ver cronograma</span>
+                <ChevronRight size={15} />
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-on-surface/5">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70 block mb-0.5">
+                  Cuotas este mes
+                </span>
+                <span className="text-base sm:text-lg font-black text-on-surface font-headline block">
+                  {showBalances ? formatCurrency(installmentSummary.totalThisMonth, profile?.currency) : '••••••'}
+                </span>
+                <span className="text-[10px] font-bold text-on-surface-variant/60 block">
+                  {installmentSummary.thisMonthCount} {installmentSummary.thisMonthCount === 1 ? 'vencimiento' : 'vencimientos'}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70 block mb-0.5">
+                  Deuda total pendiente
+                </span>
+                <span className="text-base sm:text-lg font-black text-rose-600 font-headline block">
+                  {showBalances ? formatCurrency(installmentSummary.totalRemaining, profile?.currency) : '••••••'}
+                </span>
+                <span className="text-[10px] font-bold text-on-surface-variant/60 block">
+                  En cuotas futuras
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Quick Expense Shortcuts */}
       <section className="mb-8">

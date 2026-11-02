@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   CreditCard as CreditCardIcon, Plus, Edit2, Trash2, ArrowLeft, 
-  Calendar, Check, X, AlertTriangle, ShieldCheck, Sparkles, Building2
+  Calendar, Check, X, AlertTriangle, ShieldCheck, Sparkles, Building2, Layers
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useData } from '../lib/DataContext';
@@ -139,13 +139,22 @@ export const ManageCards: React.FC = () => {
           </div>
         </div>
 
-        <button
-          onClick={openAddModal}
-          className="flex items-center gap-2 px-4 py-2.5 bg-primary text-on-primary font-bold text-sm rounded-2xl shadow-lg shadow-primary/20 hover:bg-primary/90 active:scale-95 transition-all"
-        >
-          <Plus size={18} />
-          <span className="hidden sm:inline">Nueva Tarjeta</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/credit-cards')}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-surface-container rounded-2xl text-on-surface font-bold text-xs border border-on-surface/10 hover:bg-surface-container-high transition-all"
+          >
+            <Layers size={15} className="text-primary" />
+            <span className="hidden sm:inline">Ver Cuotas & Previsión</span>
+          </button>
+          <button
+            onClick={openAddModal}
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-on-primary font-bold text-sm rounded-2xl shadow-lg shadow-primary/20 hover:bg-primary/90 active:scale-95 transition-all"
+          >
+            <Plus size={18} />
+            <span className="hidden sm:inline">Nueva Tarjeta</span>
+          </button>
+        </div>
       </div>
 
       {/* Cards Grid */}

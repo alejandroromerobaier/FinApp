@@ -19,6 +19,7 @@ import { Reports } from './pages/Reports';
 import { Budgets } from './pages/Budgets';
 import { ManageShortcuts } from './pages/ManageShortcuts';
 import { ManageCards } from './pages/ManageCards';
+import { CreditCards } from './pages/CreditCards';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
@@ -63,6 +64,7 @@ function AppContent() {
                   <Route path="/budgets" element={<Budgets />} />
                   <Route path="/shortcuts" element={<ManageShortcuts />} />
                   <Route path="/cards" element={<ManageCards />} />
+                  <Route path="/credit-cards" element={<CreditCards />} />
                   <Route path="/project-demo" element={<ProjectDetail />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

@@ -14,6 +14,7 @@ import {
   Globe, 
   Zap, 
   Edit3, 
+  Layers, 
   ShieldCheck, 
   KeyRound, 
   Phone, 
@@ -360,8 +361,15 @@ export const Settings: React.FC = () => {
             to="/cards" 
             icon={<CreditCard size={20} />} 
             title="Tarjetas de Crédito" 
-            subtitle="Cierres, vencimientos y cuotas" 
+            subtitle="Plásticos, cierres y vencimientos" 
             iconColor="bg-blue-500/10 text-blue-600"
+          />
+          <SettingsLink 
+            to="/credit-cards" 
+            icon={<Layers size={20} />} 
+            title="Compromisos & Cuotas" 
+            subtitle="Cronograma a 12 meses y planes activos" 
+            iconColor="bg-indigo-500/10 text-indigo-600"
           />
           <SettingsLink 
             to="/reports" 
