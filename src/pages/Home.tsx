@@ -31,8 +31,7 @@ import {
   Eye,
   EyeOff,
   Plus,
-  CreditCard,
-  Users
+  CreditCard
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import logo from '../assets/logo.png';
@@ -83,13 +82,6 @@ export const Home: React.FC = () => {
       currency: string;
       name: string;
       cardColor?: string | null;
-      isPersonal: boolean;
-      totalExpensesAllTime: number;
-      myContribution: number;
-      myContributionPercent: number;
-      membersCount: number;
-      projectInstallmentsRemaining: number;
-      projectInstallmentsCount: number;
     }> = {
       personal: {
         income: 0,
@@ -99,14 +91,7 @@ export const Home: React.FC = () => {
         currentExpenses: 0,
         currency: profile?.currency || 'ARS',
         name: 'Personal',
-        cardColor: profile?.personalCardColor || 'navy',
-        isPersonal: true,
-        totalExpensesAllTime: 0,
-        myContribution: 0,
-        myContributionPercent: 100,
-        membersCount: 1,
-        projectInstallmentsRemaining: 0,
-        projectInstallmentsCount: 0
+        cardColor: profile?.personalCardColor || 'navy'
       }
     };
 
@@ -119,14 +104,7 @@ export const Home: React.FC = () => {
         currentExpenses: 0,
         currency: p.currency || profile?.currency || 'ARS',
         name: p.name,
-        cardColor: p.cardColor || 'slate',
-        isPersonal: false,
-        totalExpensesAllTime: 0,
-        myContribution: 0,
-        myContributionPercent: 0,
-        membersCount: p.memberIds?.length || 1,
-        projectInstallmentsRemaining: 0,
-        projectInstallmentsCount: 0
+        cardColor: p.cardColor || 'slate'
       };
     });
 
@@ -134,9 +112,6 @@ export const Home: React.FC = () => {
     const activeDate = parseLocalMonth(budgetMonth);
     const activeMonth = activeDate.getMonth();
     const activeYear = activeDate.getFullYear();
-    const currentMonthKey = getLocalMonth();
-
-    const projectPlanSets: Record<string, Set<string>> = {};
 
     transactions.forEach(t => {
       const projectId = t.projectId || 'personal';
@@ -155,14 +130,7 @@ export const Home: React.FC = () => {
           currentExpenses: 0,
           currency,
           name: projectName,
-          cardColor: projectId === 'personal' ? (profile?.personalCardColor || 'navy') : (project?.cardColor || 'slate'),
-          isPersonal: projectId === 'personal',
-          totalExpensesAllTime: 0,
-          myContribution: 0,
-          myContributionPercent: 0,
-          membersCount: project?.memberIds?.length || 1,
-          projectInstallmentsRemaining: 0,
-          projectInstallmentsCount: 0
+          cardColor: projectId === 'personal' ? (profile?.personalCardColor || 'navy') : (project?.cardColor || 'slate')
         };
       }
       
@@ -173,14 +141,10 @@ export const Home: React.FC = () => {
       } else {
         projectTotals[projectId].total -= t.amount;
         projectTotals[projectId].expenses += t.amount;
-        projectTotals[projectId].totalExpensesAllTime += t.amount;
-        if (t.authorId === user?.uid) {
-          projectTotals[projectId].myContribution += t.amount;
-        }
       }
 
-      // Actividad del mes seleccionado (comparar por purchaseDate si es cuota 1, sino fecha de vencimiento)
-      const effectiveDate = (t.isInstallment && t.installmentNumber === 1 && t.purchaseDate)
+      // Actividad del mes seleccionado (si es compra en cuotas con purchaseDate o gasto regular)
+      const effectiveDate = (t.purchaseDate && (!t.installmentNumber || t.installmentNumber === 1))
         ? parseLocalYYYYMMDD(t.purchaseDate)
         : tDate;
 
@@ -190,27 +154,6 @@ export const Home: React.FC = () => {
         } else {
           projectTotals[projectId].currentExpenses += t.amount;
         }
-      }
-
-      // Track future installments in project
-      if (t.isInstallment && projectId !== 'personal') {
-        const itemMonthKey = getLocalMonth(tDate);
-        if (itemMonthKey >= currentMonthKey) {
-          projectTotals[projectId].projectInstallmentsRemaining += (t.amount || 0);
-          if (!projectPlanSets[projectId]) {
-            projectPlanSets[projectId] = new Set();
-          }
-          projectPlanSets[projectId].add(t.parentPlanId || t.installmentPlanId || t.id);
-        }
-      }
-    });
-
-    Object.entries(projectTotals).forEach(([pId, pt]) => {
-      if (pt.totalExpensesAllTime > 0) {
-        pt.myContributionPercent = Math.min(100, Math.round((pt.myContribution / pt.totalExpensesAllTime) * 100));
-      }
-      if (projectPlanSets[pId]) {
-        pt.projectInstallmentsCount = projectPlanSets[pId].size;
       }
     });
 
@@ -248,7 +191,7 @@ export const Home: React.FC = () => {
       .map(item => [item.id, item.data] as [string, any]);
 
     return { balancesByProject: sortedBalances };
-  }, [transactions, projects, profile, budgetMonth, user?.uid]);
+  }, [transactions, projects, profile, budgetMonth]);
 
   const recentTransactions = useMemo(() => {
     const endOfToday = new Date();
@@ -380,170 +323,100 @@ export const Home: React.FC = () => {
 
       {/* Main Balance Cards (Dynamic by Project) */}
       <div className="space-y-6 mb-8 sm:mb-12">
-        {balancesByProject.map(([id, data], idx) => {
-          const isPersonal = id === 'personal';
-          return (
-            <motion.div 
-              key={id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1 }}
-              onClick={() => isPersonal ? navigate('/history') : navigate(`/project/${id}`)}
-              className={cn(
-                "relative overflow-hidden rounded-[2.5rem] sm:rounded-[3.5rem] p-6 sm:p-10 text-white shadow-2xl group border border-white/10 cursor-pointer active:scale-[0.99] transition-all",
-                getProjectGradient(data.cardColor, isPersonal)
-              )}
-            >
-              {/* Decorative elements */}
-              <div className="absolute top-0 right-0 w-64 h-64 sm:w-80 sm:h-80 bg-white/10 blur-[60px] sm:blur-[90px] rounded-full -mr-24 -mt-24 sm:-mr-32 sm:-mt-32 transition-transform group-hover:scale-125 duration-1000" />
+        {balancesByProject.map(([id, data], idx) => (
+          <motion.div 
+            key={id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: idx * 0.1 }}
+            className={cn(
+              "relative overflow-hidden rounded-[2.5rem] sm:rounded-[3.5rem] p-6 sm:p-10 text-white shadow-2xl group border border-white/10",
+              getProjectGradient(data.cardColor, id === 'personal')
+            )}
+          >
+            {/* Decorative elements */}
+            <div className="absolute top-0 right-0 w-64 h-64 sm:w-80 sm:h-80 bg-white/10 blur-[60px] sm:blur-[90px] rounded-full -mr-24 -mt-24 sm:-mr-32 sm:-mt-32 transition-transform group-hover:scale-125 duration-1000" />
+            
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-6 sm:mb-10">
+                <div className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-white/10 rounded-full backdrop-blur-md border border-white/10 shadow-inner">
+                  <Wallet size={14} className="text-white sm:w-[16px] sm:h-[16px]" />
+                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-white/80">{data.name} • {data.currency}</span>
+                </div>
+                {!isCurrentMonth && (
+                   <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 rounded-full backdrop-blur-md border border-amber-500/10">
+                     <span className="text-[8px] font-black uppercase text-amber-200 tracking-widest">Archivo Histórico</span>
+                   </div>
+                )}
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleShowBalances();
+                    }}
+                    className="p-2 bg-white/10 hover:bg-white/20 rounded-xl backdrop-blur-md border border-white/10 transition-colors"
+                    title={showBalances ? "Ocultar saldos" : "Mostrar saldos"}
+                  >
+                    {showBalances ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                  <TrendingUp size={24} className="text-white/40 sm:w-[28px] sm:h-[28px]" />
+                </div>
+              </div>
               
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-6 sm:mb-10">
-                  <div className="flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-white/10 rounded-full backdrop-blur-md border border-white/10 shadow-inner">
-                    {isPersonal ? <Wallet size={14} className="text-white sm:w-[16px] sm:h-[16px]" /> : <Users size={14} className="text-white sm:w-[16px] sm:h-[16px]" />}
-                    <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-white/80">{data.name} • {data.currency}</span>
-                    {!isPersonal && (
-                      <span className="bg-white/20 px-2 py-0.5 rounded-full text-[8px] font-bold text-white uppercase tracking-wider">
-                        Compartido
-                      </span>
-                    )}
-                  </div>
-                  {!isCurrentMonth && (
-                     <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 rounded-full backdrop-blur-md border border-amber-500/10">
-                       <span className="text-[8px] font-black uppercase text-amber-200 tracking-widest">Archivo Histórico</span>
-                     </div>
-                  )}
-                  <div className="flex items-center gap-3">
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleShowBalances();
-                      }}
-                      className="p-2 bg-white/10 hover:bg-white/20 rounded-xl backdrop-blur-md border border-white/10 transition-colors"
-                      title={showBalances ? "Ocultar saldos" : "Mostrar saldos"}
-                    >
-                      {showBalances ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                    {!isPersonal ? (
-                      <div className="flex items-center gap-1 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl backdrop-blur-md text-[11px] font-black uppercase tracking-wider text-white transition-colors">
-                        <span>Ver</span>
-                        <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
-                      </div>
-                    ) : (
-                      <TrendingUp size={24} className="text-white/40 sm:w-[28px] sm:h-[28px]" />
-                    )}
+              <h1 className="text-5xl sm:text-7xl font-black tracking-tighter mb-2 font-headline drop-shadow-lg break-all leading-tight">
+                {showBalances ? formatCurrency(data.total, data.currency) : '••••••'}
+              </h1>
+              
+              <div className="flex flex-wrap gap-4 sm:gap-8 mb-6 sm:mb-10 mt-2 px-1">
+                <div className="flex flex-col">
+                  <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-0.5">Saldo Anterior</span>
+                  <span className="text-sm sm:text-base font-black font-headline opacity-95">
+                    {showBalances ? formatCurrency(data.total - (data.currentIncome - data.currentExpenses), data.currency) : '••••••'}
+                  </span>
+                </div>
+                <div className="flex flex-col border-l border-white/10 pl-4 sm:pl-8">
+                  <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-0.5">Resultado Mes</span>
+                  <span className={cn(
+                    "text-sm sm:text-base font-black font-headline opacity-95",
+                    (data.currentIncome - data.currentExpenses) >= 0 ? "text-emerald-300" : "text-rose-300"
+                  )}>
+                    {(data.currentIncome - data.currentExpenses) >= 0 ? '+' : ''}
+                    {showBalances ? formatCurrency(data.currentIncome - data.currentExpenses, data.currency) : '••••••'}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5">
+                <div className="bg-white/10 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] backdrop-blur-md border border-white/5 group-hover:bg-white/15 transition-all shadow-inner">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-emerald-400/20 flex items-center justify-center shadow-inner">
+                      <ArrowDownLeft size={16} className="text-emerald-400 sm:w-[18px] sm:h-[18px]" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1 leading-none">Ingresos</p>
+                      <p className="text-lg sm:text-xl font-black text-white leading-none tracking-tight">
+                        {showBalances ? formatCurrency(data.currentIncome, data.currency) : '••••••'}
+                      </p>
+                    </div>
                   </div>
                 </div>
-                
-                {isPersonal ? (
-                  <>
-                    <h1 className="text-5xl sm:text-7xl font-black tracking-tighter mb-2 font-headline drop-shadow-lg break-all leading-tight">
-                      {showBalances ? formatCurrency(data.total, data.currency) : '••••••'}
-                    </h1>
-                    
-                    <div className="flex flex-wrap gap-4 sm:gap-8 mb-6 sm:mb-10 mt-2 px-1">
-                      <div className="flex flex-col">
-                        <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-0.5">Saldo Anterior</span>
-                        <span className="text-sm sm:text-base font-black font-headline opacity-95">
-                          {showBalances ? formatCurrency(data.total - (data.currentIncome - data.currentExpenses), data.currency) : '••••••'}
-                        </span>
-                      </div>
-                      <div className="flex flex-col border-l border-white/10 pl-4 sm:pl-8">
-                        <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-0.5">Resultado Mes</span>
-                        <span className={cn(
-                          "text-sm sm:text-base font-black font-headline opacity-95",
-                          (data.currentIncome - data.currentExpenses) >= 0 ? "text-emerald-300" : "text-rose-300"
-                        )}>
-                          {(data.currentIncome - data.currentExpenses) >= 0 ? '+' : ''}
-                          {showBalances ? formatCurrency(data.currentIncome - data.currentExpenses, data.currency) : '••••••'}
-                        </span>
-                      </div>
+                <div className="bg-white/10 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] backdrop-blur-md border border-white/5 group-hover:bg-white/15 transition-all shadow-inner">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-rose-400/20 flex items-center justify-center shadow-inner">
+                      <ArrowUpRight size={16} className="text-rose-400 sm:w-[18px] sm:h-[18px]" />
                     </div>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5">
-                      <div className="bg-white/10 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] backdrop-blur-md border border-white/5 group-hover:bg-white/15 transition-all shadow-inner">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-emerald-400/20 flex items-center justify-center shadow-inner">
-                            <ArrowDownLeft size={16} className="text-emerald-400 sm:w-[18px] sm:h-[18px]" />
-                          </div>
-                          <div className="text-left">
-                            <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1 leading-none">Ingresos</p>
-                            <p className="text-lg sm:text-xl font-black text-white leading-none tracking-tight">
-                              {showBalances ? formatCurrency(data.currentIncome, data.currency) : '••••••'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="bg-white/10 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] backdrop-blur-md border border-white/5 group-hover:bg-white/15 transition-all shadow-inner">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-rose-400/20 flex items-center justify-center shadow-inner">
-                            <ArrowUpRight size={16} className="text-rose-400 sm:w-[18px] sm:h-[18px]" />
-                          </div>
-                          <div className="text-left">
-                            <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1 leading-none">Gastos</p>
-                            <p className="text-lg sm:text-xl font-black text-white leading-none tracking-tight">
-                              {showBalances ? formatCurrency(data.currentExpenses, data.currency) : '••••••'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
+                    <div className="text-left">
+                      <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1 leading-none">Gastos</p>
+                      <p className="text-lg sm:text-xl font-black text-white leading-none tracking-tight">
+                        {showBalances ? formatCurrency(data.currentExpenses, data.currency) : '••••••'}
+                      </p>
                     </div>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-white/60 mb-1">
-                      Gasto Total del Proyecto
-                    </p>
-                    <h1 className="text-5xl sm:text-7xl font-black tracking-tighter mb-2 font-headline drop-shadow-lg break-all leading-tight">
-                      {showBalances ? formatCurrency(data.totalExpensesAllTime, data.currency) : '••••••'}
-                    </h1>
-                    
-                    <div className="flex flex-wrap gap-4 sm:gap-8 mb-6 sm:mb-8 mt-2 px-1">
-                      <div className="flex flex-col">
-                        <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/60 mb-0.5">Mi Aporte ({data.myContributionPercent}%)</span>
-                        <span className="text-sm sm:text-base font-black font-headline text-emerald-300">
-                          {showBalances ? formatCurrency(data.myContribution, data.currency) : '••••••'}
-                        </span>
-                      </div>
-                      <div className="flex flex-col border-l border-white/10 pl-4 sm:pl-8">
-                        <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/60 mb-0.5">Gastos este Mes</span>
-                        <span className="text-sm sm:text-base font-black font-headline opacity-95">
-                          {showBalances ? formatCurrency(data.currentExpenses, data.currency) : '••••••'}
-                        </span>
-                      </div>
-                      <div className="flex flex-col border-l border-white/10 pl-4 sm:pl-8">
-                        <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/60 mb-0.5">Miembros</span>
-                        <span className="text-sm sm:text-base font-black font-headline opacity-95">
-                          {data.membersCount} {data.membersCount === 1 ? 'persona' : 'personas'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {data.projectInstallmentsRemaining > 0 && (
-                      <div className="mb-4 bg-white/10 p-3 sm:p-4 rounded-2xl backdrop-blur-md border border-white/10 flex items-center justify-between text-xs font-bold text-white/90">
-                        <div className="flex items-center gap-2">
-                          <CreditCard size={16} className="text-blue-300 shrink-0" />
-                          <span>{data.projectInstallmentsCount} {data.projectInstallmentsCount === 1 ? 'compra en cuotas' : 'compras en cuotas'}</span>
-                        </div>
-                        <span className="font-headline font-black text-blue-200">
-                          {showBalances ? formatCurrency(data.projectInstallmentsRemaining, data.currency) : '••••'} a liquidar
-                        </span>
-                      </div>
-                    )}
-                    
-                    <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs font-bold text-white/70">
-                      <span>Toca la tarjeta para ver balances y liquidación</span>
-                      <span className="flex items-center gap-1 text-white font-extrabold group-hover:translate-x-1 transition-transform">
-                        <span>Ver balances</span>
-                        <ChevronRight size={14} />
-                      </span>
-                    </div>
-                  </>
-                )}
+                  </div>
+                </div>
               </div>
-            </motion.div>
-          );
-        })}
+            </div>
+          </motion.div>
+        ))}
       </div>
 
       {/* Installment Commitments Summary Card */}

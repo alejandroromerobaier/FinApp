@@ -47,9 +47,14 @@ export const expandProjectedTransactions = (rawTransactions: any[]): any[] => {
           continue;
         }
 
+        const purchaseDateStr = tx.purchaseDate || (tx.firstDueDate ? tx.firstDueDate : (!isNaN(txDate.getTime()) ? formatLocalYYYYMMDD(txDate) : null));
+
         let installmentDate: Date;
         if (override?.date) {
           installmentDate = parseLocalYYYYMMDD(override.date);
+          installmentDate.setHours(hours, minutes, seconds);
+        } else if (i === 1 && purchaseDateStr) {
+          installmentDate = parseLocalYYYYMMDD(purchaseDateStr);
           installmentDate.setHours(hours, minutes, seconds);
         } else {
           const totalMonthIndex = startMonth + (i - 1);
@@ -61,8 +66,6 @@ export const expandProjectedTransactions = (rawTransactions: any[]): any[] => {
         }
 
         const installmentAmount = override?.amount !== undefined ? override.amount : baseInstallmentAmount;
-
-        const purchaseDateStr = tx.purchaseDate || (tx.firstDueDate ? tx.firstDueDate : (!isNaN(txDate.getTime()) ? formatLocalYYYYMMDD(txDate) : null));
 
         expanded.push({
           ...tx,
