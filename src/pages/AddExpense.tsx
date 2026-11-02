@@ -61,12 +61,23 @@ const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => 
 
 const computeDefaultFirstDueDate = (purchaseDateStr: string, card?: CreditCardType | null): string => {
   if (!purchaseDateStr) return getLocalToday();
-  if (!card || !card.closingDay) return purchaseDateStr;
 
   const [yearStr, monthStr, dayStr] = purchaseDateStr.split('-');
   let year = parseInt(yearStr, 10);
   let month = parseInt(monthStr, 10);
   const day = parseInt(dayStr, 10);
+
+  if (!card || !card.closingDay) {
+    let targetMonth = month + 1;
+    let targetYear = year;
+    if (targetMonth > 12) {
+      targetMonth -= 12;
+      targetYear += 1;
+    }
+    const maxDays = new Date(targetYear, targetMonth, 0).getDate();
+    const finalDay = Math.min(day, maxDays);
+    return `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(finalDay).padStart(2, '0')}`;
+  }
 
   let targetMonth = month;
   let targetYear = year;

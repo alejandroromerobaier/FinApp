@@ -94,20 +94,26 @@ export const ProjectDetail: React.FC = () => {
   }, [project?.memberIds]);
 
   const stats = useMemo(() => {
-    const total = transactions.reduce((acc, t) => acc + (t.type === 'expense' ? t.amount : 0), 0);
-    const byMember: Record<string, number> = {};
-    
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
+    const endOfCurrentMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999);
+
+    const validTransactions = transactions.filter(t => {
+      const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+      return !isNaN(tDate.getTime()) && tDate <= endOfCurrentMonth;
+    });
+
+    const total = validTransactions.reduce((acc, t) => acc + (t.type === 'expense' ? t.amount : 0), 0);
+    const byMember: Record<string, number> = {};
 
     let currentMonthTotal = 0;
 
-    transactions.forEach(t => {
+    validTransactions.forEach(t => {
       if (t.type === 'expense') {
         byMember[t.authorId] = (byMember[t.authorId] || 0) + t.amount;
         
-        const tDate = new Date(t.date);
+        const tDate = t.date instanceof Date ? t.date : new Date(t.date);
         if (tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear) {
           currentMonthTotal += t.amount;
         }

@@ -112,6 +112,7 @@ export const Home: React.FC = () => {
     const activeDate = parseLocalMonth(budgetMonth);
     const activeMonth = activeDate.getMonth();
     const activeYear = activeDate.getFullYear();
+    const endOfActiveMonth = new Date(activeYear, activeMonth + 1, 0, 23, 59, 59, 999);
 
     transactions.forEach(t => {
       const projectId = t.projectId || 'personal';
@@ -120,6 +121,12 @@ export const Home: React.FC = () => {
       const projectName = projectId === 'personal' ? 'Personal' : (project?.name || 'Proyecto');
       
       const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+      if (isNaN(tDate.getTime())) return;
+
+      // Transactions beyond the active month do not reduce this month's balance or monthly expenses
+      if (tDate > endOfActiveMonth) {
+        return;
+      }
 
       if (!projectTotals[projectId]) {
         projectTotals[projectId] = { 
@@ -134,7 +141,7 @@ export const Home: React.FC = () => {
         };
       }
       
-      // Total general acumulado
+      // Total general acumulado hasta el fin del mes activo
       if (t.type === 'income') {
         projectTotals[projectId].total += t.amount;
         projectTotals[projectId].income += t.amount;
