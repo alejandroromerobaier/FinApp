@@ -32,7 +32,8 @@ import {
   CreditCard,
   Clock,
   Layers,
-  AlertTriangle
+  AlertTriangle,
+  CheckCircle2
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/src/lib/utils';
 import { getGlobalTransactions, deleteTransaction, deleteInstallmentPlan, deleteSingleVirtualInstallment } from '../services/firestoreService';
@@ -66,6 +67,8 @@ const formatTime = (rawDate: any): string => {
 
 const PAGE_SIZE = 35;
 
+export type TimeScope = 'real_only' | 'all' | 'future_only';
+
 export const History: React.FC = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
@@ -76,7 +79,8 @@ export const History: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterProject, setFilterProject] = useState<string>('all');
   const [filterClassification, setFilterClassification] = useState<'all' | 'fixed' | 'variable'>('all');
-  const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'all'>('all');
+  const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'all'>('monthly');
+  const [timeScope, setTimeScope] = useState<TimeScope>('real_only');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showFilters, setShowFilters] = useState(false);
   const [planToDelete, setPlanToDelete] = useState<{
@@ -167,7 +171,10 @@ export const History: React.FC = () => {
   };
 
   const filteredTransactions = useMemo(() => {
-    return transactions.filter(t => {
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const filtered = transactions.filter(t => {
       const matchesSearch = t.description?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                            t.categoryName?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesType = filterType === 'all' || t.type === filterType;
@@ -179,9 +186,18 @@ export const History: React.FC = () => {
           : t.projectId === filterProject;
       const matchesClassification = filterClassification === 'all' || t.classification === filterClassification;
       
+      const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+      const isFuture = tDate > endOfToday;
+
+      let matchesTimeScope = true;
+      if (timeScope === 'real_only') {
+        matchesTimeScope = !isFuture;
+      } else if (timeScope === 'future_only') {
+        matchesTimeScope = isFuture;
+      }
+
       let matchesPeriod = true;
       if (selectedPeriod !== 'all') {
-        const tDate = new Date(t.date);
         const months = selectedPeriod === 'monthly' ? 1 : selectedPeriod === 'quarterly' ? 3 : selectedPeriod === 'semiannual' ? 6 : 12;
         const year = currentDate.getFullYear();
         const month = currentDate.getMonth();
@@ -192,9 +208,16 @@ export const History: React.FC = () => {
         matchesPeriod = tDate >= start && tDate <= end;
       }
 
-      return matchesSearch && matchesType && matchesCategory && matchesProject && matchesClassification && matchesPeriod;
+      return matchesSearch && matchesType && matchesCategory && matchesProject && matchesClassification && matchesPeriod && matchesTimeScope;
     });
-  }, [transactions, searchQuery, filterType, filterCategory, filterProject, filterClassification, selectedPeriod, currentDate]);
+
+    if (timeScope === 'future_only') {
+      // Sort upcoming installments closest first
+      return [...filtered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }
+
+    return filtered;
+  }, [transactions, searchQuery, filterType, filterCategory, filterProject, filterClassification, selectedPeriod, currentDate, timeScope]);
 
   const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -203,7 +226,7 @@ export const History: React.FC = () => {
   // Reset pagination limit when any filter or search changes
   useEffect(() => {
     setVisibleLimit(PAGE_SIZE);
-  }, [searchQuery, filterType, filterCategory, filterProject, filterClassification, selectedPeriod, currentDate]);
+  }, [searchQuery, filterType, filterCategory, filterProject, filterClassification, selectedPeriod, currentDate, timeScope]);
 
   const hasMore = visibleLimit < filteredTransactions.length;
 
@@ -348,6 +371,50 @@ export const History: React.FC = () => {
           )}
         </AnimatePresence>
       </section>
+
+      {/* Time Scope Switcher: Hasta Hoy (Día a Día) vs Todo el Período vs Solo Cuotas Futuras */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none mb-6">
+        <button
+          type="button"
+          onClick={() => setTimeScope('real_only')}
+          className={cn(
+            "px-3.5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 border",
+            timeScope === 'real_only'
+              ? "bg-on-surface text-surface-container-lowest border-on-surface shadow-md"
+              : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:bg-surface-container"
+          )}
+        >
+          <CheckCircle2 size={14} className={timeScope === 'real_only' ? "text-emerald-400" : "text-on-surface-variant/40"} />
+          <span>Hasta Hoy (Día a Día)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setTimeScope('all')}
+          className={cn(
+            "px-3.5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 border",
+            timeScope === 'all'
+              ? "bg-on-surface text-surface-container-lowest border-on-surface shadow-md"
+              : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:bg-surface-container"
+          )}
+        >
+          <span>Todo el Período</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setTimeScope('future_only')}
+          className={cn(
+            "px-3.5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 border",
+            timeScope === 'future_only'
+              ? "bg-primary text-white border-primary shadow-md"
+              : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:bg-surface-container"
+          )}
+        >
+          <Clock size={14} />
+          <span>Solo Cuotas Futuras</span>
+        </button>
+      </div>
 
       {/* Search Bar */}
       <div className="relative mb-8">
@@ -506,10 +573,20 @@ export const History: React.FC = () => {
               <div className="space-y-3">
                 {(items as any[]).map((t) => {
                   const category = categories.find(c => c.id === t.categoryId);
+                  const endOfToday = new Date();
+                  endOfToday.setHours(23, 59, 59, 999);
+                  const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+                  const isFuture = tDate > endOfToday;
+
                   return (
                     <div 
                       key={t.id}
-                      className="bg-surface-container-lowest p-3.5 sm:p-4 rounded-2xl border border-on-surface/5 flex items-center justify-between gap-2 sm:gap-4 group hover:bg-on-surface/5 active:scale-[0.99] transition-all cursor-pointer shadow-sm min-w-0"
+                      className={cn(
+                        "p-3.5 sm:p-4 rounded-2xl border flex items-center justify-between gap-2 sm:gap-4 group active:scale-[0.99] transition-all cursor-pointer shadow-sm min-w-0",
+                        isFuture 
+                          ? "bg-surface-container-low/60 border-blue-500/20 hover:bg-surface-container-low" 
+                          : "bg-surface-container-lowest border-on-surface/5 hover:bg-on-surface/5"
+                      )}
                       onClick={() => navigate(`/edit/${t.id}`)}
                     >
                       <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
@@ -574,9 +651,16 @@ export const History: React.FC = () => {
                               projects.find(p => p.id === t.projectId)?.currency || profile?.currency || 'ARS'
                             )}
                           </div>
-                          <div className="text-[9px] sm:text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">
-                            {formatTime(t.date)}
-                          </div>
+                          {isFuture ? (
+                            <div className="flex items-center justify-end gap-1 text-[9px] font-black text-blue-600 bg-blue-500/10 px-1.5 py-0.5 rounded-md uppercase tracking-tight">
+                              <Clock size={9} />
+                              <span>Vencimiento</span>
+                            </div>
+                          ) : (
+                            <div className="text-[9px] sm:text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">
+                              {formatTime(t.date)}
+                            </div>
+                          )}
                         </div>
                         <button 
                           onClick={(e) => {

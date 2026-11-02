@@ -195,7 +195,16 @@ export const Home: React.FC = () => {
   }, [transactions, projects, profile, budgetMonth]);
 
   const recentTransactions = useMemo(() => {
-    return [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 3);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    return transactions
+      .filter(t => {
+        const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+        return !isNaN(tDate.getTime()) && tDate <= endOfToday;
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5);
   }, [transactions]);
 
   const installmentSummary = useMemo(() => {
@@ -614,6 +623,12 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, category
                )}>
                  {transaction.classification === 'fixed' ? <Clock size={8} /> : <Zap size={8} />}
                  {transaction.classification === 'fixed' ? 'Fijo' : 'Var'}
+               </div>
+            )}
+            {transaction.isInstallment && transaction.installmentNumber && transaction.totalInstallments && (
+               <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter shrink-0 bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                 <CreditCard size={8} />
+                 <span>Cuota {transaction.installmentNumber}/{transaction.totalInstallments}</span>
                </div>
             )}
           </div>
