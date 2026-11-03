@@ -647,52 +647,69 @@ export const History: React.FC = () => {
                           <IconComponent name={category?.icon || t.categoryIcon || 'MoreHorizontal'} size={20} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 sm:gap-2">
+                          {/* Row 1: Description gets full width, never squeezed */}
+                          <div className="flex items-center gap-2 min-w-0">
                             <h4 className="font-bold text-on-surface tracking-tight leading-snug truncate text-sm sm:text-base">
                               {t.description || category?.name || t.categoryName || 'Gasto'}
                             </h4>
-                            {t.installmentNumber && t.totalInstallments && (
-                              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tight bg-blue-500/10 text-blue-600 shrink-0">
-                                <Layers size={9} />
-                                <span>Cuota {t.installmentNumber}/{t.totalInstallments}</span>
-                              </div>
-                            )}
-                            {t.classification && (
-                              <div className={cn(
-                                "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter shrink-0",
-                                t.classification === 'fixed' ? "bg-primary/10 text-primary" : "bg-orange-500/10 text-orange-600"
-                              )}>
-                                {t.classification === 'fixed' ? <Clock size={8} /> : <Zap size={8} />}
-                                {t.classification === 'fixed' ? 'Fijo' : 'Var'}
-                              </div>
-                            )}
                           </div>
+
+                          {/* Row 2: Badges wrap cleanly without squeezing description */}
                           <div className="flex flex-wrap items-center gap-1.5 mt-1 min-w-0">
-                            <span className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-wider leading-none truncate max-w-[100px] sm:max-w-none">
+                            <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider leading-none truncate max-w-[110px] sm:max-w-none">
                               {category ? category.name : (t.categoryName || (t.categoryId ? 'Cargando...' : 'Otros'))}
                             </span>
                             {t.projectId && (
                               <>
-                                <span className="w-1 h-1 rounded-full bg-on-surface-variant/20 shrink-0" />
-                                <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1 leading-none shrink-0">
+                                <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
+                                <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1 leading-none shrink-0">
                                   {projects.find(p => p.id === t.projectId)?.name || 'Compartido'}
                                 </span>
                               </>
                             )}
-                            <span className="w-1 h-1 rounded-full bg-on-surface-variant/20 shrink-0" />
+                            <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
                             <span className={cn(
-                              "text-[10px] font-black uppercase tracking-wider leading-none shrink-0 px-1.5 py-0.5 rounded-md",
+                              "text-[9px] font-bold uppercase tracking-wider leading-none shrink-0 px-1.5 py-0.5 rounded-md",
                               t.authorId === user?.uid 
-                                ? "bg-primary/10 text-primary" 
+                                ? "bg-primary/10 text-primary dark:text-blue-400" 
                                 : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
                             )}>
                               {t.authorId === user?.uid ? 'Pagado por Ti' : `Por: ${userNames[t.authorId] || 'Miembro'}`}
                             </span>
-                            <span className="w-1 h-1 rounded-full bg-on-surface-variant/20 shrink-0" />
-                            <span className="text-[10px] font-bold text-on-surface-variant/70 uppercase tracking-wider flex items-center gap-1 leading-none shrink-0">
-                              {(t.paymentMethod === 'Tarjeta' || t.paymentMethod === 'Tarjeta de Crédito') ? <CreditCard size={10} className="text-primary" /> : <Wallet size={10} />}
-                              <span>{t.cardName ? t.cardName : (t.paymentMethod || 'Efectivo')}</span>
-                            </span>
+
+                            {t.installmentNumber && t.totalInstallments ? (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
+                                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-tight bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/10 leading-none shrink-0">
+                                  <CreditCard size={9} />
+                                  <span>Cuota {t.installmentNumber}/{t.totalInstallments}</span>
+                                  {t.cardName && <span className="font-semibold hidden sm:inline">• {t.cardName}</span>}
+                                </span>
+                              </>
+                            ) : (t.cardName || t.paymentMethod) ? (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
+                                <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1 leading-none shrink-0">
+                                  {(t.paymentMethod === 'Tarjeta' || t.paymentMethod === 'Tarjeta de Crédito') ? <CreditCard size={10} className="text-primary dark:text-blue-400" /> : <Wallet size={10} />}
+                                  <span>{t.cardName ? t.cardName : (t.paymentMethod || 'Efectivo')}</span>
+                                </span>
+                              </>
+                            ) : null}
+
+                            {t.classification && (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0 hidden sm:inline-block" />
+                                <div className={cn(
+                                  "hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter shrink-0",
+                                  t.classification === 'fixed' 
+                                    ? "bg-primary/10 text-primary dark:text-blue-400" 
+                                    : "bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                                )}>
+                                  {t.classification === 'fixed' ? <Clock size={8} /> : <Zap size={8} />}
+                                  {t.classification === 'fixed' ? 'Fijo' : 'Var'}
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -701,7 +718,7 @@ export const History: React.FC = () => {
                         <div className="text-right shrink-0">
                           <div className={cn(
                             "text-sm sm:text-lg font-black font-headline tracking-tight whitespace-nowrap",
-                            t.type === 'expense' ? "text-on-surface" : "text-emerald-600"
+                            t.type === 'expense' ? "text-on-surface" : "text-emerald-600 dark:text-emerald-400"
                           )}>
                             {t.type === 'expense' ? '-' : '+'}{formatCurrency(
                               t.amount, 
@@ -709,12 +726,12 @@ export const History: React.FC = () => {
                             )}
                           </div>
                           {isFuture ? (
-                            <div className="flex items-center justify-end gap-1 text-[9px] font-black text-blue-600 bg-blue-500/10 px-1.5 py-0.5 rounded-md uppercase tracking-tight">
+                            <div className="flex items-center justify-end gap-1 text-[9px] font-black text-blue-600 dark:text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-md uppercase tracking-tight">
                               <Clock size={9} />
                               <span>Vencimiento</span>
                             </div>
                           ) : (
-                            <div className="text-[9px] sm:text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">
+                            <div className="text-[9px] sm:text-[10px] font-semibold text-on-surface-variant/70 uppercase tracking-widest">
                               {formatTime(t.date)}
                             </div>
                           )}

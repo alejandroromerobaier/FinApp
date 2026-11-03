@@ -366,34 +366,34 @@ export const ProjectDetail: React.FC = () => {
                       <div 
                         key={t.id} 
                         onClick={() => navigate(`/edit/${t.id}`)}
-                        className="bg-surface-container-lowest p-6 rounded-[2rem] flex items-center justify-between hover:shadow-md transition-all border border-on-surface/10 cursor-pointer group active:scale-[0.99]"
+                        className="bg-surface-container-lowest p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] flex items-center justify-between hover:shadow-md transition-all border border-on-surface/10 cursor-pointer group active:scale-[0.99] gap-3 min-w-0"
                       >
-                        <div className="flex items-center gap-5 overflow-hidden">
+                        <div className="flex items-center gap-3.5 sm:gap-5 min-w-0 flex-1">
                           <div className={cn(
-                            "w-14 h-14 rounded-full flex items-center justify-center shadow-sm transition-transform group-hover:scale-110 shrink-0",
+                            "w-11 h-11 sm:w-14 sm:h-14 rounded-2xl sm:rounded-full flex items-center justify-center shadow-sm transition-transform group-hover:scale-110 shrink-0",
                             cat?.color || 'bg-slate-500'
                           )}>
                             <div className="text-white">
-                              <IconComponent name={cat?.icon || 'Tag'} size={24} />
+                              <IconComponent name={cat?.icon || 'Tag'} size={20} />
                             </div>
                           </div>
-                          <div className="truncate">
-                            <h3 className="font-bold text-on-surface text-lg leading-tight truncate">{t.description || 'Sin descripción'}</h3>
-                            <div className="flex items-center gap-2 mt-1 flex-wrap">
-                              <span className="text-xs font-medium text-on-surface-variant/70">Por <span className="text-primary font-bold">{member?.name || 'Usuario'}</span></span>
-                              <span className="w-1 h-1 rounded-full bg-on-surface/10"></span>
-                              <span className="text-[10px] font-black text-on-surface-variant/70 uppercase tracking-widest">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-bold text-on-surface text-base sm:text-lg leading-tight truncate">{t.description || 'Sin descripción'}</h3>
+                            <div className="flex items-center gap-1.5 sm:gap-2 mt-1 flex-wrap min-w-0">
+                              <span className="text-xs font-medium text-on-surface-variant">Por <span className="text-primary dark:text-blue-400 font-bold">{member?.name || 'Usuario'}</span></span>
+                              <span className="w-1 h-1 rounded-full bg-on-surface-variant/30"></span>
+                              <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest truncate max-w-[100px] sm:max-w-none">
                                 {cat?.name || 'Otros'}
                               </span>
                               {t.isInstallment && (
                                 <>
-                                  <span className="w-1 h-1 rounded-full bg-on-surface/10"></span>
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-black">
+                                  <span className="w-1 h-1 rounded-full bg-on-surface-variant/30"></span>
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 text-primary dark:text-blue-400 text-[10px] font-black border border-primary/10">
                                     <CreditCard size={11} />
                                     <span>Cuota {t.installmentNumber}/{t.totalInstallments}</span>
                                   </span>
                                   {t.cardName && (
-                                    <span className="text-[10px] text-on-surface-variant/60 font-medium">
+                                    <span className="text-[10px] text-on-surface-variant font-medium">
                                       ({t.cardName})
                                     </span>
                                   )}
@@ -402,14 +402,14 @@ export const ProjectDetail: React.FC = () => {
                             </div>
                           </div>
                         </div>
-                        <div className="text-right shrink-0">
+                        <div className="text-right shrink-0 ml-2">
                           <div className={cn(
-                            "text-2xl font-black tracking-tight font-headline",
+                            "text-base sm:text-2xl font-black tracking-tight font-headline whitespace-nowrap",
                             t.type === 'expense' ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
                           )}>
                             {t.type === 'expense' ? '-' : '+'}{formatCurrency(t.amount, project.currency)}
                           </div>
-                          <div className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-widest mt-0.5">
+                          <div className="text-[10px] font-bold text-on-surface-variant/70 uppercase tracking-widest mt-0.5">
                             {new Date(t.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
                           </div>
                         </div>

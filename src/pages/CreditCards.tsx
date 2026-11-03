@@ -385,14 +385,14 @@ export const CreditCards: React.FC = () => {
         <div className="bg-surface-container-lowest p-4 sm:p-5 rounded-3xl border border-on-surface/5 shadow-sm space-y-1">
           <div className="flex items-center justify-between text-on-surface-variant/70 mb-1">
             <span className="text-[10px] font-black uppercase tracking-wider">Este Mes</span>
-            <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
               <Calendar size={14} />
             </div>
           </div>
           <div className="text-lg sm:text-2xl font-black font-headline text-on-surface">
             {formatCurrency(kpis.thisMonthTotal, defaultCurrency)}
           </div>
-          <p className="text-[10px] font-bold text-on-surface-variant/60">
+          <p className="text-[10px] font-bold text-on-surface-variant">
             {kpis.thisMonthCount} {kpis.thisMonthCount === 1 ? 'cuota activa' : 'cuotas activas'}
           </p>
         </div>
@@ -401,14 +401,14 @@ export const CreditCards: React.FC = () => {
         <div className="bg-surface-container-lowest p-4 sm:p-5 rounded-3xl border border-on-surface/5 shadow-sm space-y-1">
           <div className="flex items-center justify-between text-on-surface-variant/70 mb-1">
             <span className="text-[10px] font-black uppercase tracking-wider">Saldo Pendiente</span>
-            <div className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-600 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center">
               <TrendingUp size={14} />
             </div>
           </div>
-          <div className="text-lg sm:text-2xl font-black font-headline text-rose-600">
+          <div className="text-lg sm:text-2xl font-black font-headline text-rose-600 dark:text-rose-400">
             {formatCurrency(kpis.remainingDebt, defaultCurrency)}
           </div>
-          <p className="text-[10px] font-bold text-on-surface-variant/60">
+          <p className="text-[10px] font-bold text-on-surface-variant">
             Total en cuotas futuras
           </p>
         </div>
@@ -417,14 +417,14 @@ export const CreditCards: React.FC = () => {
         <div className="bg-surface-container-lowest p-4 sm:p-5 rounded-3xl border border-on-surface/5 shadow-sm space-y-1">
           <div className="flex items-center justify-between text-on-surface-variant/70 mb-1">
             <span className="text-[10px] font-black uppercase tracking-wider">Planes Activos</span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
               <Layers size={14} />
             </div>
           </div>
           <div className="text-lg sm:text-2xl font-black font-headline text-on-surface">
             {kpis.activePlansCount}
           </div>
-          <p className="text-[10px] font-bold text-on-surface-variant/60">
+          <p className="text-[10px] font-bold text-on-surface-variant">
             Compras financiadas
           </p>
         </div>
@@ -433,14 +433,14 @@ export const CreditCards: React.FC = () => {
         <div className="bg-surface-container-lowest p-4 sm:p-5 rounded-3xl border border-on-surface/5 shadow-sm space-y-1">
           <div className="flex items-center justify-between text-on-surface-variant/70 mb-1">
             <span className="text-[10px] font-black uppercase tracking-wider">Fin de Cuotas</span>
-            <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
               <CheckCircle2 size={14} />
             </div>
           </div>
           <div className="text-sm sm:text-base font-extrabold text-on-surface truncate capitalize pt-1">
             {kpis.finishMonthLabel}
           </div>
-          <p className="text-[10px] font-bold text-on-surface-variant/60">
+          <p className="text-[10px] font-bold text-on-surface-variant">
             Último resumen proyectado
           </p>
         </div>
@@ -553,35 +553,35 @@ export const CreditCards: React.FC = () => {
                     )}>
                       <Layers size={16} />
                     </div>
-                    <div className="truncate">
+                    <div className="min-w-0 flex-1">
                       <p className="text-xs font-black text-on-surface truncate">
                         {inst.description}
                       </p>
                       <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                         {inst.projectId && (
-                          <span className="px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 font-black uppercase text-[9px]">
+                          <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold uppercase text-[9px]">
                             {projects.find(p => p.id === inst.projectId)?.name || 'Proyecto'}
                           </span>
                         )}
                         <span className={cn(
-                          "px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider",
+                          "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider",
                           inst.authorId === user?.uid 
-                            ? "bg-primary/10 text-primary" 
+                            ? "bg-primary/10 text-primary dark:text-blue-400" 
                             : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
                         )}>
                           {inst.authorId === user?.uid ? 'Tú' : (userNames[inst.authorId] || 'Miembro')}
                         </span>
-                        <p className="text-[10px] text-on-surface-variant/70 font-bold truncate">
+                        <p className="text-[10px] text-on-surface-variant font-bold truncate">
                           {inst.cardName || 'Tarjeta'} • {formatDisplayDate(inst.date)}
                         </p>
                       </div>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
+                  <div className="text-right shrink-0 ml-2">
                     <p className="text-xs font-black text-on-surface">
                       {formatCurrency(inst.amount, defaultCurrency)}
                     </p>
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-primary/10 text-primary">
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-primary/10 text-primary dark:text-blue-400 border border-primary/10">
                       {inst.installmentNumber}/{inst.totalInstallments}
                     </span>
                   </div>
@@ -653,23 +653,23 @@ export const CreditCards: React.FC = () => {
                       )}>
                         <CreditCardIcon size={20} />
                       </div>
-                      <div className="truncate">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 sm:gap-2 mb-1 flex-wrap">
                           {plan.projectId ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-600 text-[10px] font-black uppercase tracking-wider">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-wider">
                               <Users size={11} />
                               <span>{projects.find(p => p.id === plan.projectId)?.name || 'Proyecto'}</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface-container-high text-on-surface-variant text-[10px] font-black uppercase tracking-wider">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface-container-high text-on-surface-variant text-[10px] font-bold uppercase tracking-wider">
                               <User size={11} />
                               <span>Personal</span>
                             </span>
                           )}
                           <span className={cn(
-                            "inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider",
+                            "inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider",
                             plan.authorId === user?.uid 
-                              ? "bg-primary/10 text-primary" 
+                              ? "bg-primary/10 text-primary dark:text-blue-400" 
                               : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
                           )}>
                             {plan.authorId === user?.uid 
@@ -681,8 +681,8 @@ export const CreditCards: React.FC = () => {
                         <h3 className="text-sm sm:text-base font-black text-on-surface truncate">
                           {plan.description}
                         </h3>
-                        <p className="text-[11px] font-bold text-on-surface-variant/70 flex items-center gap-1.5 mt-0.5">
-                          <span className="text-primary font-black">{plan.cardName || 'Tarjeta'}</span>
+                        <p className="text-[11px] font-bold text-on-surface-variant flex items-center gap-1.5 mt-0.5">
+                          <span className="text-primary dark:text-blue-400 font-black">{plan.cardName || 'Tarjeta'}</span>
                           <span>•</span>
                           <span>{plan.categoryName || 'General'}</span>
                         </p>

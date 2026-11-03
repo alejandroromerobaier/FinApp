@@ -617,61 +617,82 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, category
           <IconComponent name={category?.icon || transaction.categoryIcon || 'MoreHorizontal'} size={20} />
         </div>
         <div className="flex flex-col min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <p className="font-bold text-on-surface text-sm leading-tight truncate">{transaction.description || category?.name || transaction.categoryName || 'Sin descripción'}</p>
-            {transaction.classification && (
-               <div className={cn(
-                 "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter shrink-0",
-                 transaction.classification === 'fixed' ? "bg-primary/10 text-primary" : "bg-orange-500/10 text-orange-600"
-               )}>
-                 {transaction.classification === 'fixed' ? <Clock size={8} /> : <Zap size={8} />}
-                 {transaction.classification === 'fixed' ? 'Fijo' : 'Var'}
-               </div>
-            )}
-            {transaction.isInstallment && transaction.installmentNumber && transaction.totalInstallments ? (
-              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter shrink-0 bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                <CreditCard size={8} />
-                <span>Cuota {transaction.installmentNumber}/{transaction.totalInstallments}</span>
-                {transaction.cardName && <span className="font-bold hidden sm:inline">• {transaction.cardName}</span>}
-              </div>
-            ) : transaction.cardName ? (
-              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter shrink-0 bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                <CreditCard size={8} />
-                <span>{transaction.cardName}</span>
-              </div>
-            ) : null}
+          {/* Row 1: Description gets full width, never squeezed */}
+          <div className="flex items-center gap-2 min-w-0">
+            <p className="font-bold text-on-surface text-sm sm:text-base leading-tight truncate">
+              {transaction.description || category?.name || transaction.categoryName || 'Sin descripción'}
+            </p>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 mt-0.5 min-w-0">
-            <p className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-widest truncate max-w-[100px] sm:max-w-none">
+
+          {/* Row 2: Badges wrap cleanly without squeezing description */}
+          <div className="flex flex-wrap items-center gap-1.5 mt-1 min-w-0">
+            <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider truncate max-w-[110px] sm:max-w-none">
               {category?.name || transaction.categoryName || (transaction.categoryId ? 'Cargando...' : 'Otros')}
             </p>
+
             {project && (
               <>
-                <span className="w-1 h-1 rounded-full bg-on-surface/10 shrink-0" />
-                <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest leading-none shrink-0">{project.name}</p>
+                <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
+                <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider leading-none shrink-0">{project.name}</p>
               </>
             )}
-            <span className="w-1 h-1 rounded-full bg-on-surface/10 shrink-0" />
+
+            <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
             <p className={cn(
-              "text-[9px] font-black uppercase tracking-widest shrink-0 px-1.5 py-0.5 rounded-md",
+              "text-[9px] font-bold uppercase tracking-wider shrink-0 px-1.5 py-0.5 rounded-md",
               transaction.authorId === user?.uid 
-                ? "bg-primary/10 text-primary" 
+                ? "bg-primary/10 text-primary dark:text-blue-400" 
                 : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
             )}>
               {transaction.authorId === user?.uid ? 'Tú' : userName}
             </p>
+
+            {/* Installment Badge or Card Badge */}
+            {transaction.isInstallment && transaction.installmentNumber && transaction.totalInstallments ? (
+              <>
+                <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
+                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-tight shrink-0 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/10">
+                  <CreditCard size={9} />
+                  <span>Cuota {transaction.installmentNumber}/{transaction.totalInstallments}</span>
+                  {transaction.cardName && <span className="font-semibold hidden sm:inline">• {transaction.cardName}</span>}
+                </div>
+              </>
+            ) : transaction.cardName ? (
+              <>
+                <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
+                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-tight shrink-0 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/10">
+                  <CreditCard size={9} />
+                  <span>{transaction.cardName}</span>
+                </div>
+              </>
+            ) : null}
+
+            {transaction.classification && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0 hidden sm:inline-block" />
+                <div className={cn(
+                  "hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter shrink-0",
+                  transaction.classification === 'fixed' 
+                    ? "bg-primary/10 text-primary dark:text-blue-400" 
+                    : "bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                )}>
+                  {transaction.classification === 'fixed' ? <Clock size={8} /> : <Zap size={8} />}
+                  {transaction.classification === 'fixed' ? 'Fijo' : 'Var'}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
       <div className="text-right shrink-0 ml-2">
         <p className={cn(
           "font-bold font-headline tracking-tighter text-sm sm:text-base whitespace-nowrap",
-          transaction.type === 'expense' ? "text-on-surface" : "text-emerald-600"
+          transaction.type === 'expense' ? "text-on-surface" : "text-emerald-600 dark:text-emerald-400"
         )}>
           {transaction.type === 'expense' ? '-' : '+'}
           {showBalances ? formatCurrency(transaction.amount, project?.currency || profile?.currency) : '••••'}
         </p>
-        <p className="text-[10px] text-on-surface-variant/40 font-bold">
+        <p className="text-[10px] text-on-surface-variant/70 font-semibold">
           {formatDisplayDate(transaction.date, false)}
         </p>
       </div>
