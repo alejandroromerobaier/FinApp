@@ -32,7 +32,8 @@ import {
   Layers,
   CalendarCheck,
   AlertCircle,
-  Plus
+  Plus,
+  Info
 } from 'lucide-react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { cn, formatCurrencyInput, formatAmountForDisplay, parseFormattedAmount, formatCurrency } from '../lib/utils';
@@ -46,8 +47,15 @@ import {
   createInstallmentExpense,
   CreditCard as CreditCardType
 } from '../services/firestoreService';
-import { getLocalToday, formatDisplayDate, formatLocalYYYYMMDD } from '../lib/dateUtils';
+import { getLocalToday, formatDisplayDate, formatLocalYYYYMMDD, parseLocalYYYYMMDD } from '../lib/dateUtils';
 import { trackEvent } from '../lib/analytics';
+
+const formatMonthLabel = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const d = parseLocalYYYYMMDD(dateStr);
+  const formatted = d.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+};
 
 const ICON_MAP: Record<string, any> = {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
@@ -135,6 +143,7 @@ export const AddExpense: React.FC = () => {
   const [isCustomInstallments, setIsCustomInstallments] = useState(false);
   const [calcMode, setCalcMode] = useState<'total' | 'installment'>('total');
   const [firstDueDate, setFirstDueDate] = useState<string>(getLocalToday());
+  const [imputationMode, setImputationMode] = useState<'statement_cycle' | 'current_month'>('statement_cycle');
 
   // Existing Installment context (when editing)
   const [isExistingInstallment, setIsExistingInstallment] = useState(false);
@@ -210,6 +219,19 @@ export const AddExpense: React.FC = () => {
             setPaymentMethod(pm);
             if (t.cardId) setSelectedCardId(t.cardId);
             if (t.cardName) setCustomCardName(t.cardName);
+
+            if (t.purchaseDate) {
+              const pDate = typeof t.purchaseDate === 'string' ? t.purchaseDate : formatLocalYYYYMMDD(t.purchaseDate);
+              setDate(pDate);
+              setFirstDueDate(localDateStr);
+              if (pDate === localDateStr) {
+                setImputationMode('current_month');
+              } else {
+                setImputationMode('statement_cycle');
+              }
+            } else {
+              setFirstDueDate(localDateStr);
+            }
 
             if (t.isInstallment) {
               setIsExistingInstallment(true);
@@ -348,8 +370,8 @@ export const AddExpense: React.FC = () => {
       }
 
       // Regular single transaction (or update)
-      const transactionDate = (!id && paymentMethod === 'Tarjeta de Crédito' && firstDueDate) 
-        ? firstDueDate 
+      const transactionDate = (paymentMethod === 'Tarjeta de Crédito') 
+        ? (imputationMode === 'current_month' ? date : (firstDueDate || date))
         : date;
 
       const transactionData = {
@@ -969,28 +991,79 @@ export const AddExpense: React.FC = () => {
                       </div>
                     )}
 
-                    {/* If installments === 1: Due date for 1-pago credit card */}
+                    {/* If installments === 1: Imputation mode toggle for 1-pago credit card */}
                     {parsedInstallments === 1 && (
-                      <div className="mt-3 p-3.5 rounded-2xl bg-surface-container-lowest border border-on-surface/10 space-y-2">
+                      <div className="mt-3 p-4 rounded-2xl bg-surface-container-lowest border border-on-surface/10 space-y-3">
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">
-                            Fecha Vencimiento del Resumen
-                          </span>
+                          <label className="text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70">
+                            Imputación Contable
+                          </label>
                           {selectedCard?.closingDay && (
                             <span className="text-[10px] font-bold text-primary">
                               Cierre día {selectedCard.closingDay}
                             </span>
                           )}
                         </div>
-                        <input
-                          type="date"
-                          value={firstDueDate}
-                          onChange={(e) => setFirstDueDate(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-on-surface/10 text-xs font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40"
-                        />
-                        <p className="text-[10px] text-on-surface-variant/60">
-                          El pago impactará en el balance del mes correspondiente a este vencimiento.
-                        </p>
+
+                        {/* Segmented Button Selector */}
+                        <div className="grid grid-cols-2 gap-2 bg-surface-container-low p-1 rounded-xl">
+                          <button
+                            type="button"
+                            onClick={() => setImputationMode('statement_cycle')}
+                            className={cn(
+                              "py-2.5 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 text-center",
+                              imputationMode === 'statement_cycle'
+                                ? "bg-surface-container-lowest text-primary shadow-sm border border-primary/20"
+                                : "text-on-surface-variant/70 hover:text-on-surface border border-transparent"
+                            )}
+                          >
+                            <CalendarCheck size={14} className={imputationMode === 'statement_cycle' ? 'text-primary' : 'text-on-surface-variant/50'} />
+                            <span>Cierre de Tarjeta</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setImputationMode('current_month')}
+                            className={cn(
+                              "py-2.5 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 text-center",
+                              imputationMode === 'current_month'
+                                ? "bg-surface-container-lowest text-emerald-600 dark:text-emerald-400 shadow-sm border border-emerald-500/30"
+                                : "text-on-surface-variant/70 hover:text-on-surface border border-transparent"
+                            )}
+                          >
+                            <Zap size={14} className={imputationMode === 'current_month' ? 'text-emerald-600 dark:text-emerald-400' : 'text-on-surface-variant/50'} />
+                            <span>Mes en Curso</span>
+                          </button>
+                        </div>
+
+                        {/* Conditional UI & Explanatory message based on imputationMode */}
+                        {imputationMode === 'statement_cycle' ? (
+                          <div className="space-y-2 pt-1 border-t border-on-surface/5">
+                            <label className="block text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">
+                              Fecha Vencimiento del Resumen
+                            </label>
+                            <input
+                              type="date"
+                              value={firstDueDate}
+                              onChange={(e) => setFirstDueDate(e.target.value)}
+                              className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-on-surface/10 text-xs font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40"
+                            />
+                            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-primary/5 border border-primary/10 text-primary">
+                              <Info size={15} className="shrink-0 mt-0.5" />
+                              <p className="text-[11px] leading-relaxed">
+                                <strong>Respeta el ciclo de la tarjeta:</strong> El gasto se computará en el balance e historial a partir del vencimiento del resumen (<strong>{firstDueDate ? formatMonthLabel(firstDueDate) : 'próximo vencimiento'}</strong>).
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="pt-1 border-t border-on-surface/5">
+                            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400">
+                              <Zap size={15} className="shrink-0 mt-0.5" />
+                              <p className="text-[11px] leading-relaxed">
+                                <strong>Imputación inmediata:</strong> El gasto impactará directamente en el balance y presupuesto de <strong>este mes ({formatMonthLabel(date)})</strong> con la fecha de compra, sin esperar al cierre o vencimiento de la tarjeta.
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
