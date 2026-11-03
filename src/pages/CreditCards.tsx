@@ -30,14 +30,14 @@ import { formatCurrency, cn } from '../lib/utils';
 import { getLocalToday, getLocalMonth, formatDisplayDate, formatLocalYYYYMMDD, parseLocalMonth } from '../lib/dateUtils';
 import { deleteInstallmentPlan, deleteSingleVirtualInstallment } from '../services/firestoreService';
 
-export type ScopeFilter = 'personal' | 'shared_mine' | 'shared_all' | 'all';
+export type ScopeFilter = 'all' | 'personal' | 'shared_mine' | 'shared_all';
 
 export const CreditCards: React.FC = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const { transactions, cards, projects, userNames } = useData();
 
-  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>('personal');
+  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>('all');
   const [selectedCardFilter, setSelectedCardFilter] = useState<string>('all');
   const [selectedMonthKey, setSelectedMonthKey] = useState<string>(getLocalMonth());
   const [expandedPlanId, setExpandedPlanId] = useState<string | null>(null);
@@ -48,6 +48,16 @@ export const CreditCards: React.FC = () => {
   const today = new Date();
   const currentMonthKey = getLocalMonth(today);
 
+  // Helper to identify credit card expenses (both multi-installment plans and 1-payment charges)
+  const isCreditCardTx = (t: any): boolean => {
+    if (t.type === 'income') return false;
+    if (t.isInstallment) return true;
+    if (t.parentPlanId || t.installmentPlanId) return true;
+    if (t.paymentMethod === 'Tarjeta de Crédito' || t.paymentMethod === 'Tarjeta') return true;
+    if (Boolean(t.cardId || t.cardName)) return true;
+    return false;
+  };
+
   // Helper to match scope
   const matchScope = (item: { projectId?: string | null; authorId?: string }) => {
     const isPersonal = !item.projectId || item.projectId === 'personal' || item.projectId === 'null';
@@ -57,7 +67,7 @@ export const CreditCards: React.FC = () => {
     return true; // 'all'
   };
 
-  // Group transactions into cohesive installment plans
+  // Group transactions into cohesive installment plans and card charges
   const allPlans = useMemo(() => {
     const map: Record<string, {
       id: string;
@@ -79,16 +89,19 @@ export const CreditCards: React.FC = () => {
     }> = {};
 
     transactions.forEach(t => {
-      const planId = t.parentPlanId || t.installmentPlanId;
-      if (planId && t.isInstallment) {
+      if (!isCreditCardTx(t)) return;
+
+      const planId = t.parentPlanId || t.installmentPlanId || t.id;
+      if (planId) {
         if (!map[planId]) {
           const cleanDesc = (t.description || '').replace(/\s*\(\d+\/\d+\)$/, '').trim();
+          const totInst = t.totalInstallments || 1;
           map[planId] = {
             id: planId,
-            description: cleanDesc || 'Compra en cuotas',
-            totalAmount: t.originalPurchaseAmount || (t.amount * (t.totalInstallments || 1)),
-            installmentAmount: t.amount,
-            totalInstallments: t.totalInstallments || 1,
+            description: cleanDesc || 'Compra con tarjeta',
+            totalAmount: t.originalPurchaseAmount || (totInst > 1 ? t.amount * totInst : t.amount),
+            installmentAmount: t.installmentAmount || t.amount,
+            totalInstallments: totInst,
             cardId: t.cardId,
             cardName: t.cardName,
             categoryId: t.categoryId,
@@ -102,7 +115,11 @@ export const CreditCards: React.FC = () => {
             installments: []
           };
         }
-        map[planId].installments.push(t);
+        map[planId].installments.push({
+          ...t,
+          installmentNumber: t.installmentNumber || 1,
+          totalInstallments: t.totalInstallments || 1
+        });
       }
     });
 
@@ -113,7 +130,7 @@ export const CreditCards: React.FC = () => {
     });
   }, [transactions, userNames]);
 
-  // Filter plans based on scope and card selection
+  // Filter plans based on scope and card selection, prioritizing active/pending plans
   const filteredPlans = useMemo(() => {
     return allPlans.filter(p => {
       if (!matchScope(p)) return false;
@@ -121,8 +138,14 @@ export const CreditCards: React.FC = () => {
         if (p.cardId !== selectedCardFilter && p.cardName !== selectedCardFilter) return false;
       }
       return true;
+    }).sort((a, b) => {
+      const aHasPending = a.installments.some(i => getLocalMonth(i.date) >= currentMonthKey);
+      const bHasPending = b.installments.some(i => getLocalMonth(i.date) >= currentMonthKey);
+      if (aHasPending && !bHasPending) return -1;
+      if (!aHasPending && bHasPending) return 1;
+      return new Date(b.firstDueDate).getTime() - new Date(a.firstDueDate).getTime();
     });
-  }, [allPlans, scopeFilter, selectedCardFilter, user?.uid]);
+  }, [allPlans, scopeFilter, selectedCardFilter, user?.uid, currentMonthKey]);
 
   // Generate 12-month timeline starting from current month
   const timelineMonths = useMemo(() => {
@@ -143,9 +166,9 @@ export const CreditCards: React.FC = () => {
       const label = targetDate.toLocaleDateString('es-ES', { month: 'short' });
       const year = targetDate.getFullYear();
 
-      // Find all installments in this month (respecting scope and card filter)
+      // Find all credit card installments and charges in this month (respecting scope and card filter)
       const matchingInstallments = transactions.filter(t => {
-        if (!t.isInstallment) return false;
+        if (!isCreditCardTx(t)) return false;
         if (!matchScope(t)) return false;
         if (selectedCardFilter !== 'all') {
           if (t.cardId !== selectedCardFilter && t.cardName !== selectedCardFilter) return false;
@@ -161,7 +184,11 @@ export const CreditCards: React.FC = () => {
         year,
         totalAmount,
         installmentsCount: matchingInstallments.length,
-        installments: matchingInstallments
+        installments: matchingInstallments.map(item => ({
+          ...item,
+          installmentNumber: item.installmentNumber || 1,
+          totalInstallments: item.totalInstallments || 1
+        }))
       });
     }
 
@@ -180,12 +207,12 @@ export const CreditCards: React.FC = () => {
     const thisMonthTotal = currentMonthData?.totalAmount || 0;
     const thisMonthCount = currentMonthData?.installmentsCount || 0;
 
-    // Remaining future commitment: all installments from this month forward
+    // Remaining future commitment: all card charges and installments from this month forward
     let remainingDebt = 0;
     let lastMaturityDate: Date | null = null;
 
     transactions.forEach(t => {
-      if (t.isInstallment) {
+      if (isCreditCardTx(t)) {
         if (!matchScope(t)) return;
         if (selectedCardFilter !== 'all') {
           if (t.cardId !== selectedCardFilter && t.cardName !== selectedCardFilter) return;
@@ -278,6 +305,22 @@ export const CreditCards: React.FC = () => {
           <button
             type="button"
             onClick={() => {
+              setScopeFilter('all');
+              setSelectedCardFilter('all');
+            }}
+            className={cn(
+              "px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0 flex items-center gap-2 border",
+              scopeFilter === 'all'
+                ? "bg-on-surface text-surface-container-lowest border-on-surface shadow-md"
+                : "bg-surface-container-low text-on-surface-variant border-transparent hover:bg-surface-container"
+            )}
+          >
+            <Globe size={14} />
+            <span>Todos los gastos</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               setScopeFilter('personal');
               setSelectedCardFilter('all');
             }}
@@ -289,7 +332,7 @@ export const CreditCards: React.FC = () => {
             )}
           >
             <User size={14} />
-            <span>Mis Tarjetas</span>
+            <span>Solo Personal</span>
           </button>
           <button
             type="button"
@@ -322,22 +365,6 @@ export const CreditCards: React.FC = () => {
           >
             <Users size={14} />
             <span>Proyectos (Todos)</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setScopeFilter('all');
-              setSelectedCardFilter('all');
-            }}
-            className={cn(
-              "px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0 flex items-center gap-2 border",
-              scopeFilter === 'all'
-                ? "bg-on-surface text-surface-container-lowest border-on-surface shadow-md"
-                : "bg-surface-container-low text-on-surface-variant border-transparent hover:bg-surface-container"
-            )}
-          >
-            <Globe size={14} />
-            <span>Todos</span>
           </button>
         </div>
       )}
@@ -582,7 +609,7 @@ export const CreditCards: React.FC = () => {
                       {formatCurrency(inst.amount, defaultCurrency)}
                     </p>
                     <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-primary/10 text-primary dark:text-blue-400 border border-primary/10">
-                      {inst.installmentNumber}/{inst.totalInstallments}
+                      {inst.totalInstallments > 1 ? `${inst.installmentNumber}/${inst.totalInstallments}` : '1 pago'}
                     </span>
                   </div>
                 </div>
@@ -692,10 +719,14 @@ export const CreditCards: React.FC = () => {
                     <div className="text-right shrink-0">
                       <p className="text-sm sm:text-base font-black text-on-surface font-headline">
                         {formatCurrency(plan.installmentAmount, defaultCurrency)}
-                        <span className="text-[10px] text-on-surface-variant/60 font-medium"> /mes</span>
+                        {plan.totalInstallments > 1 && (
+                          <span className="text-[10px] text-on-surface-variant/60 font-medium"> /mes</span>
+                        )}
                       </p>
                       <p className="text-[10px] font-extrabold text-rose-600">
-                        Resta: {formatCurrency(remainingAmount, defaultCurrency)}
+                        {remainingAmount > 0 
+                          ? `Resta: ${formatCurrency(remainingAmount, defaultCurrency)}`
+                          : 'Cancelado'}
                       </p>
                     </div>
                   </div>
@@ -704,7 +735,9 @@ export const CreditCards: React.FC = () => {
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-bold text-on-surface">
-                        Cuota {currentNumber} de {plan.totalInstallments}
+                        {plan.totalInstallments > 1 
+                          ? `Cuota ${currentNumber} de ${plan.totalInstallments}` 
+                          : '1 pago único'}
                       </span>
                       <span className="font-black text-primary text-[11px]">
                         {progressPercent}% completado
@@ -721,21 +754,27 @@ export const CreditCards: React.FC = () => {
                     </div>
 
                     <div className="flex items-center justify-between text-[10px] text-on-surface-variant/60 font-medium pt-0.5">
-                      <span>Total financiado: {formatCurrency(plan.totalAmount, defaultCurrency)}</span>
-                      <span>Inicio: {plan.firstDueDate}</span>
+                      <span>{plan.totalInstallments > 1 ? 'Total financiado' : 'Monto total'}: {formatCurrency(plan.totalAmount, defaultCurrency)}</span>
+                      <span>{plan.totalInstallments > 1 ? 'Inicio' : 'Vencimiento'}: {plan.firstDueDate}</span>
                     </div>
                   </div>
 
                   {/* Plan Action Buttons */}
                   <div className="flex items-center justify-between pt-2 border-t border-on-surface/5">
-                    <button
-                      type="button"
-                      onClick={() => setExpandedPlanId(isExpanded ? null : plan.id)}
-                      className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
-                    >
-                      <span>{isExpanded ? 'Ocultar cronograma' : 'Ver las cuotas'}</span>
-                      <ChevronDown size={14} className={cn("transition-transform", isExpanded && "rotate-180")} />
-                    </button>
+                    {plan.totalInstallments > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedPlanId(isExpanded ? null : plan.id)}
+                        className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+                      >
+                        <span>{isExpanded ? 'Ocultar cronograma' : 'Ver las cuotas'}</span>
+                        <ChevronDown size={14} className={cn("transition-transform", isExpanded && "rotate-180")} />
+                      </button>
+                    ) : (
+                      <span className="text-[11px] font-bold text-on-surface-variant/70">
+                        Pago único al vencimiento
+                      </span>
+                    )}
 
                     {plan.authorId === user?.uid || !plan.authorId ? (
                       <button
@@ -744,7 +783,7 @@ export const CreditCards: React.FC = () => {
                         className="flex items-center gap-1 text-xs font-bold text-error/80 hover:text-error px-2.5 py-1 rounded-xl hover:bg-error/10 transition-colors"
                       >
                         <Trash2 size={13} />
-                        <span>Cancelar Plan</span>
+                        <span>{plan.totalInstallments > 1 ? 'Cancelar Plan' : 'Eliminar Gasto'}</span>
                       </button>
                     ) : (
                       <span className="text-[10px] text-on-surface-variant/50 font-medium italic">
@@ -831,9 +870,14 @@ export const CreditCards: React.FC = () => {
               </div>
 
               <div className="text-center space-y-1">
-                <h3 className="text-lg font-black text-on-surface">¿Cancelar plan de cuotas?</h3>
+                <h3 className="text-lg font-black text-on-surface">
+                  {planToDelete.totalInstallments > 1 ? '¿Cancelar plan de cuotas?' : '¿Eliminar gasto de tarjeta?'}
+                </h3>
                 <p className="text-xs text-on-surface-variant">
-                  Vas a eliminar el plan completo de <strong className="text-on-surface">{planToDelete.description}</strong> ({planToDelete.totalInstallments} cuotas). Esta acción no se puede deshacer.
+                  {planToDelete.totalInstallments > 1 
+                    ? `Vas a eliminar el plan completo de ${planToDelete.description} (${planToDelete.totalInstallments} cuotas). Esta acción no se puede deshacer.`
+                    : `Vas a eliminar el gasto con tarjeta ${planToDelete.description}. Esta acción no se puede deshacer.`
+                  }
                 </p>
               </div>
 
@@ -852,7 +896,7 @@ export const CreditCards: React.FC = () => {
                   onClick={handleDeletePlan}
                   className="flex-1 py-2.5 rounded-xl bg-error text-white font-bold text-xs hover:bg-error/90 transition-colors disabled:opacity-50"
                 >
-                  {isDeleting ? 'Eliminando...' : 'Sí, eliminar plan'}
+                  {isDeleting ? 'Eliminando...' : (planToDelete.totalInstallments > 1 ? 'Sí, eliminar plan' : 'Sí, eliminar')}
                 </button>
               </div>
             </motion.div>

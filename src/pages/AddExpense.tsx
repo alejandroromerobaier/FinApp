@@ -370,7 +370,8 @@ export const AddExpense: React.FC = () => {
       }
 
       // Regular single transaction (or update)
-      const transactionDate = (paymentMethod === 'Tarjeta de Crédito') 
+      const isCreditCard = paymentMethod === 'Tarjeta de Crédito';
+      const transactionDate = isCreditCard 
         ? (imputationMode === 'current_month' ? date : (firstDueDate || date))
         : date;
 
@@ -387,8 +388,12 @@ export const AddExpense: React.FC = () => {
         categoryIcon: selectedCategory.icon,
         categoryColor: selectedCategory.color,
         projectId: destination === 'shared' ? selectedProjectId : null,
-        cardId: paymentMethod === 'Tarjeta de Crédito' ? cardId : null,
-        cardName: paymentMethod === 'Tarjeta de Crédito' ? cardName : null,
+        cardId: isCreditCard ? cardId : null,
+        cardName: isCreditCard ? cardName : null,
+        isInstallment: isCreditCard,
+        installmentNumber: isCreditCard ? 1 : null,
+        totalInstallments: isCreditCard ? 1 : null,
+        firstDueDate: isCreditCard ? (firstDueDate || date) : null,
         originalDate: originalDate // Pass original date to preserve time during update
       };
 

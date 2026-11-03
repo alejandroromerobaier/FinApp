@@ -650,7 +650,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, category
             </p>
 
             {/* Installment Badge or Card Badge */}
-            {transaction.isInstallment && transaction.installmentNumber && transaction.totalInstallments ? (
+            {transaction.isInstallment && transaction.installmentNumber && transaction.totalInstallments && transaction.totalInstallments > 1 ? (
               <>
                 <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
                 <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-tight shrink-0 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/10">
