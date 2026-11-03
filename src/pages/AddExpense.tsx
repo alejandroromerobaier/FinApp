@@ -28,15 +28,34 @@ import {
   Trash2,
   CreditCard,
   Wallet,
-  Clock
+  Clock,
+  Layers,
+  CalendarCheck,
+  AlertCircle,
+  Plus,
+  Info
 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { cn, formatCurrencyInput, formatAmountForDisplay, parseFormattedAmount } from '../lib/utils';
+import { useNavigate, useParams, Link } from 'react-router-dom';
+import { cn, formatCurrencyInput, formatAmountForDisplay, parseFormattedAmount, formatCurrency } from '../lib/utils';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
-import { addTransaction, updateTransaction, deleteTransaction, getTransaction } from '../services/firestoreService';
-import { getLocalToday, formatDisplayDate, formatLocalYYYYMMDD } from '../lib/dateUtils';
+import { 
+  addTransaction, 
+  updateTransaction, 
+  deleteTransaction, 
+  getTransaction,
+  createInstallmentExpense,
+  CreditCard as CreditCardType
+} from '../services/firestoreService';
+import { getLocalToday, formatDisplayDate, formatLocalYYYYMMDD, parseLocalYYYYMMDD } from '../lib/dateUtils';
 import { trackEvent } from '../lib/analytics';
+
+const formatMonthLabel = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const d = parseLocalYYYYMMDD(dateStr);
+  const formatted = d.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+};
 
 const ICON_MAP: Record<string, any> = {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
@@ -48,11 +67,57 @@ const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => 
   return <Icon size={size} />;
 };
 
+const computeDefaultFirstDueDate = (purchaseDateStr: string, card?: CreditCardType | null): string => {
+  if (!purchaseDateStr) return getLocalToday();
+
+  const [yearStr, monthStr, dayStr] = purchaseDateStr.split('-');
+  let year = parseInt(yearStr, 10);
+  let month = parseInt(monthStr, 10);
+  const day = parseInt(dayStr, 10);
+
+  if (!card || !card.closingDay) {
+    let targetMonth = month + 1;
+    let targetYear = year;
+    if (targetMonth > 12) {
+      targetMonth -= 12;
+      targetYear += 1;
+    }
+    const maxDays = new Date(targetYear, targetMonth, 0).getDate();
+    const finalDay = Math.min(day, maxDays);
+    return `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(finalDay).padStart(2, '0')}`;
+  }
+
+  let targetMonth = month;
+  let targetYear = year;
+
+  if (day <= card.closingDay) {
+    if (card.dueDay <= card.closingDay) {
+      targetMonth += 1;
+    }
+  } else {
+    if (card.dueDay <= card.closingDay) {
+      targetMonth += 2;
+    } else {
+      targetMonth += 1;
+    }
+  }
+
+  while (targetMonth > 12) {
+    targetMonth -= 12;
+    targetYear += 1;
+  }
+
+  const maxDays = new Date(targetYear, targetMonth, 0).getDate();
+  const finalDay = Math.min(card.dueDay || day, maxDays);
+
+  return `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(finalDay).padStart(2, '0')}`;
+};
+
 export const AddExpense: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { user, profile } = useAuth();
-  const { categories: allCategories, projects, loading: dataLoading } = useData();
+  const { categories: allCategories, projects, cards, loading: dataLoading } = useData();
   
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<'expense' | 'income'>('expense');
@@ -63,13 +128,28 @@ export const AddExpense: React.FC = () => {
   const [showProjectSheet, setShowProjectSheet] = useState(false);
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(getLocalToday());
-  const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Tarjeta'>('Efectivo');
+  const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Débito' | 'Tarjeta de Crédito'>('Efectivo');
   const [classification, setClassification] = useState<'fixed' | 'variable'>('variable');
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [initialLoading, setInitialLoading] = useState(!!id);
   const [authorId, setAuthorId] = useState<string | null>(null);
   const [originalDate, setOriginalDate] = useState<Date | null>(null);
+
+  // Credit Card & Installments State
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [customCardName, setCustomCardName] = useState('');
+  const [installments, setInstallments] = useState<number | string>(1);
+  const [isCustomInstallments, setIsCustomInstallments] = useState(false);
+  const [calcMode, setCalcMode] = useState<'total' | 'installment'>('total');
+  const [firstDueDate, setFirstDueDate] = useState<string>(getLocalToday());
+  const [imputationMode, setImputationMode] = useState<'statement_cycle' | 'current_month'>('statement_cycle');
+
+  // Existing Installment context (when editing)
+  const [isExistingInstallment, setIsExistingInstallment] = useState(false);
+  const [existingInstallmentNumber, setExistingInstallmentNumber] = useState<number | null>(null);
+  const [existingTotalInstallments, setExistingTotalInstallments] = useState<number | null>(null);
+  const [existingPlanId, setExistingPlanId] = useState<string | null>(null);
 
   const isAuthor = !id || authorId === user?.uid;
 
@@ -133,7 +213,34 @@ export const AddExpense: React.FC = () => {
             setDate(localDateStr);
             setOriginalDate(t.date);
             setAuthorId(t.authorId);
-            setPaymentMethod(t.paymentMethod || 'Efectivo');
+            
+            // Normalize paymentMethod
+            const pm = t.paymentMethod === 'Tarjeta' ? 'Tarjeta de Crédito' : (t.paymentMethod || 'Efectivo');
+            setPaymentMethod(pm);
+            if (t.cardId) setSelectedCardId(t.cardId);
+            if (t.cardName) setCustomCardName(t.cardName);
+
+            if (t.purchaseDate) {
+              const pDate = typeof t.purchaseDate === 'string' ? t.purchaseDate : formatLocalYYYYMMDD(t.purchaseDate);
+              setDate(pDate);
+              setFirstDueDate(localDateStr);
+              if (pDate === localDateStr) {
+                setImputationMode('current_month');
+              } else {
+                setImputationMode('statement_cycle');
+              }
+            } else {
+              setFirstDueDate(localDateStr);
+            }
+
+            if (t.isInstallment) {
+              setIsExistingInstallment(true);
+              setExistingInstallmentNumber(t.installmentNumber || null);
+              setExistingTotalInstallments(t.totalInstallments || null);
+              setExistingPlanId(t.installmentPlanId || null);
+              setInstallments(t.totalInstallments || 1);
+            }
+
             setClassification(t.classification || 'variable');
 
             if (t.projectId) {
@@ -162,6 +269,24 @@ export const AddExpense: React.FC = () => {
       }
     }
   }, [id, allCategories]);
+
+  const selectedCard = useMemo(() => {
+    return cards.find(c => c.id === selectedCardId) || null;
+  }, [cards, selectedCardId]);
+
+  // Auto-select first card if user has cards and none is selected yet
+  useEffect(() => {
+    if (!id && !selectedCardId && cards.length > 0) {
+      setSelectedCardId(cards[0].id);
+    }
+  }, [cards, id, selectedCardId]);
+
+  // Automatically update statement due date when date or selectedCard changes (new expenses only)
+  useEffect(() => {
+    if (!id) {
+      setFirstDueDate(computeDefaultFirstDueDate(date, selectedCard));
+    }
+  }, [date, selectedCard, id]);
 
   const handleTypeChange = (newType: 'expense' | 'income') => {
     setType(newType);
@@ -193,6 +318,19 @@ export const AddExpense: React.FC = () => {
   const parsedAmount = parseFormattedAmount(amount);
   const isValidAmount = Boolean(amount && !isNaN(parsedAmount) && parsedAmount > 0);
 
+  const activeCurrency = destination === 'shared' 
+    ? (projects.find(p => p.id === selectedProjectId)?.currency || 'ARS') 
+    : (profile?.currency || 'ARS');
+
+  const parsedInstallments = Math.max(1, typeof installments === 'number' ? installments : (parseInt(String(installments), 10) || 1));
+
+  const currentTotalAmount = calcMode === 'total' 
+    ? parsedAmount 
+    : parsedAmount * parsedInstallments;
+  const currentInstallmentAmount = calcMode === 'total' 
+    ? (parsedInstallments > 0 ? Math.round((parsedAmount / parsedInstallments) * 100) / 100 : parsedAmount) 
+    : parsedAmount;
+
   const handleSave = async () => {
     if (!isValidAmount || !selectedCategory) return;
     if (destination === 'shared' && !selectedProjectId) {
@@ -202,11 +340,47 @@ export const AddExpense: React.FC = () => {
     
     setIsSaving(true);
     try {
+      const cardName = selectedCard 
+        ? selectedCard.name 
+        : (customCardName.trim() || (paymentMethod === 'Tarjeta de Crédito' ? 'Tarjeta de Crédito' : null));
+      const cardId = selectedCard?.id || null;
+
+      // Handle installment expense creation (new expenses with > 1 installments)
+      if (!id && type === 'expense' && paymentMethod === 'Tarjeta de Crédito' && parsedInstallments > 1) {
+        await createInstallmentExpense({
+          totalAmount: currentTotalAmount,
+          installmentAmount: currentInstallmentAmount,
+          installments: parsedInstallments,
+          description: description.trim() || `Compra con ${cardName || 'Tarjeta'}`,
+          categoryId: selectedCategory.id,
+          categoryName: selectedCategory.name,
+          categoryIcon: selectedCategory.icon,
+          categoryColor: selectedCategory.color,
+          paymentMethod: 'Tarjeta de Crédito',
+          classification,
+          cardId,
+          cardName,
+          projectId: destination === 'shared' ? selectedProjectId : null,
+          firstDueDate: firstDueDate || date,
+          purchaseDate: date
+        });
+        trackEvent('add_installment_expense', { installments: parsedInstallments, totalAmount: currentTotalAmount });
+        navigate(-1);
+        return;
+      }
+
+      // Regular single transaction (or update)
+      const isCreditCard = paymentMethod === 'Tarjeta de Crédito';
+      const transactionDate = isCreditCard 
+        ? (imputationMode === 'current_month' ? date : (firstDueDate || date))
+        : date;
+
       const transactionData = {
         amount: parsedAmount,
         type,
         description,
-        date,
+        date: transactionDate,
+        purchaseDate: date,
         paymentMethod,
         classification,
         categoryId: selectedCategory.id,
@@ -214,6 +388,12 @@ export const AddExpense: React.FC = () => {
         categoryIcon: selectedCategory.icon,
         categoryColor: selectedCategory.color,
         projectId: destination === 'shared' ? selectedProjectId : null,
+        cardId: isCreditCard ? cardId : null,
+        cardName: isCreditCard ? cardName : null,
+        isInstallment: isCreditCard,
+        installmentNumber: isCreditCard ? 1 : null,
+        totalInstallments: isCreditCard ? 1 : null,
+        firstDueDate: isCreditCard ? (firstDueDate || date) : null,
         originalDate: originalDate // Pass original date to preserve time during update
       };
 
@@ -234,7 +414,10 @@ export const AddExpense: React.FC = () => {
   };
 
   const handleDelete = async () => {
-    if (!id || !window.confirm('¿Estás seguro de que deseas eliminar esta transacción?')) return;
+    const confirmMsg = isExistingInstallment 
+      ? `¿Estás seguro de que deseas eliminar esta cuota individual (${existingInstallmentNumber}/${existingTotalInstallments})?`
+      : '¿Estás seguro de que deseas eliminar esta transacción?';
+    if (!id || !window.confirm(confirmMsg)) return;
     
     setIsDeleting(true);
     try {
@@ -320,6 +503,16 @@ export const AddExpense: React.FC = () => {
           <div className="bg-amber-500/10 border border-amber-500/10 p-4 rounded-2xl flex items-center gap-3 text-amber-700">
             <ShieldCheck size={20} />
             <p className="text-sm font-bold leading-tight">Solo el autor puede modificar esta transacción.</p>
+          </div>
+        )}
+
+        {isExistingInstallment && (
+          <div className="bg-primary/10 border border-primary/20 p-4 rounded-2xl flex items-center gap-3 text-primary">
+            <Layers size={22} className="shrink-0" />
+            <div className="text-xs">
+              <p className="font-black text-sm">Cuota {existingInstallmentNumber} de {existingTotalInstallments}</p>
+              <p className="text-on-surface-variant font-medium">Esta transacción pertenece a un plan en cuotas. Los cambios aplicarán únicamente a esta cuota mensual.</p>
+            </div>
           </div>
         )}
 
@@ -525,31 +718,363 @@ export const AddExpense: React.FC = () => {
 
           {/* Payment Method Selector */}
           <div className={cn("bg-surface-container-low p-6 rounded-[2rem] border border-on-surface/5 shadow-sm space-y-4", !isAuthor && "pointer-events-none opacity-60")}>
-            <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70">
-              Método de Pago
-            </label>
-            <div className="flex gap-3">
-              {(['Efectivo', 'Tarjeta'] as const).map((method) => (
-                <button
-                  key={method}
-                  onClick={() => setPaymentMethod(method)}
-                  className={cn(
-                    "flex-1 py-4 px-2 rounded-2xl font-black text-xs transition-all uppercase tracking-widest flex items-center justify-center gap-2 border-2",
-                    paymentMethod === method 
-                      ? "bg-primary/10 border-primary text-primary shadow-inner" 
-                      : "bg-surface-container-lowest border-transparent text-on-surface-variant/70 hover:bg-on-surface/5 hover:text-on-surface"
-                  )}
+            <div className="flex items-center justify-between">
+              <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70">
+                Método de Pago
+              </label>
+              {paymentMethod === 'Tarjeta de Crédito' && (
+                <Link 
+                  to="/cards" 
+                  className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1"
                 >
-                  <div className={cn(
-                    "w-6 h-6 rounded-lg flex items-center justify-center",
-                    paymentMethod === method ? "bg-primary text-white" : "bg-on-surface-variant/10 text-on-surface-variant/70"
-                  )}>
-                    {method === 'Efectivo' ? <Wallet size={14} /> : <CreditCard size={14} />}
-                  </div>
-                  {method}
-                </button>
-              ))}
+                  <CreditCard size={13} />
+                  <span>Mis Tarjetas</span>
+                </Link>
+              )}
             </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: 'Efectivo', label: 'Efectivo', icon: Wallet },
+                { id: 'Débito', label: 'Débito', icon: Landmark },
+                { id: 'Tarjeta de Crédito', label: 'Crédito', icon: CreditCard }
+              ].map((m) => {
+                const Icon = m.icon;
+                const isSelected = paymentMethod === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setPaymentMethod(m.id as any)}
+                    className={cn(
+                      "py-3.5 px-2 rounded-2xl font-black text-xs transition-all uppercase tracking-wider flex flex-col sm:flex-row items-center justify-center gap-2 border-2",
+                      isSelected 
+                        ? "bg-primary/10 border-primary text-primary shadow-inner" 
+                        : "bg-surface-container-lowest border-transparent text-on-surface-variant/70 hover:bg-on-surface/5 hover:text-on-surface"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-7 h-7 rounded-xl flex items-center justify-center shrink-0",
+                      isSelected ? "bg-primary text-white" : "bg-on-surface-variant/10 text-on-surface-variant/70"
+                    )}>
+                      <Icon size={14} />
+                    </div>
+                    <span className="truncate">{m.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Credit Card options if Tarjeta de Crédito and expense */}
+            {paymentMethod === 'Tarjeta de Crédito' && type === 'expense' && (
+              <div className="mt-4 pt-4 border-t border-on-surface/10 space-y-4">
+                {/* Card Selector */}
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70 mb-2">
+                    Tarjeta Utilizada
+                  </label>
+                  {cards.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {cards.map((c) => {
+                          const isSelected = selectedCardId === c.id;
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedCardId(c.id);
+                                setCustomCardName('');
+                              }}
+                              className={cn(
+                                "p-3 rounded-2xl text-left border-2 transition-all flex items-center justify-between",
+                                isSelected 
+                                  ? "border-primary bg-primary/5 text-on-surface shadow-sm ring-1 ring-primary/20" 
+                                  : "border-on-surface/5 bg-surface-container-lowest text-on-surface hover:border-on-surface/20"
+                              )}
+                            >
+                              <div className="flex items-center gap-2.5 overflow-hidden">
+                                <div className={`w-8 h-6 rounded-lg ${c.color || 'bg-slate-800'} text-white flex items-center justify-center text-[10px] font-black shrink-0 shadow-sm`}>
+                                  <CreditCard size={13} />
+                                </div>
+                                <div className="truncate">
+                                  <p className="text-xs font-black truncate">{c.name}</p>
+                                  <p className="text-[10px] text-on-surface-variant/70 font-mono">
+                                    {c.bank ? `${c.bank} ` : ''}{c.last4Digits ? `•••• ${c.last4Digits}` : ''}
+                                  </p>
+                                </div>
+                              </div>
+                              {isSelected && <Check size={16} className="text-primary shrink-0" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      
+                      {/* Option to type custom or unselect */}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCardId(null)}
+                        className={cn(
+                          "w-full py-2 px-3 rounded-xl text-left text-xs font-bold transition-colors flex items-center justify-between border",
+                          selectedCardId === null
+                            ? "border-primary/40 bg-primary/5 text-primary"
+                            : "border-dashed border-on-surface/15 text-on-surface-variant hover:text-on-surface"
+                        )}
+                      >
+                        <span>Otra tarjeta / Sin registrar</span>
+                        {selectedCardId === null && <Check size={14} />}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="bg-surface-container-lowest p-3 rounded-2xl border border-on-surface/5 space-y-2">
+                      <input
+                        type="text"
+                        placeholder="Ej: Visa Santander, Amex (opcional)"
+                        value={customCardName}
+                        onChange={(e) => setCustomCardName(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-on-surface/10 text-xs font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      />
+                      <div className="flex items-center justify-between text-[11px] text-on-surface-variant">
+                        <span>¿Tenés fechas fijas de cierre?</span>
+                        <Link to="/cards" className="text-primary font-bold hover:underline flex items-center gap-1">
+                          <Plus size={12} />
+                          <span>Crear tarjeta</span>
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Installment Selector (Only when creating new transaction) */}
+                {!id && (
+                  <div className="space-y-3 pt-2">
+                    <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70">
+                      Cantidad de Cuotas
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {[1, 3, 6, 12, 18, 24].map((num) => (
+                        <button
+                          key={num}
+                          type="button"
+                          onClick={() => {
+                            setInstallments(num);
+                            setIsCustomInstallments(false);
+                          }}
+                          className={cn(
+                            "px-3.5 py-2 rounded-xl text-xs font-black transition-all",
+                            parsedInstallments === num && !isCustomInstallments
+                              ? "bg-primary text-on-primary shadow-sm"
+                              : "bg-surface-container-lowest border border-on-surface/5 text-on-surface-variant hover:text-on-surface"
+                          )}
+                        >
+                          {num === 1 ? '1 pago' : `${num} cuotas`}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCustomInstallments(true);
+                          setInstallments('');
+                        }}
+                        className={cn(
+                          "px-3.5 py-2 rounded-xl text-xs font-black transition-all",
+                          isCustomInstallments
+                            ? "bg-primary text-on-primary shadow-sm"
+                            : "bg-surface-container-lowest border border-on-surface/5 text-on-surface-variant hover:text-on-surface"
+                        )}
+                      >
+                        Otro...
+                      </button>
+                    </div>
+
+                    {isCustomInstallments && (
+                      <div className="flex items-center gap-3 mt-2">
+                        <span className="text-xs font-bold text-on-surface-variant">Cantidad:</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          placeholder="2"
+                          value={installments}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '');
+                            if (val === '') {
+                              setInstallments('');
+                            } else {
+                              const num = parseInt(val, 10);
+                              setInstallments(Math.min(72, num));
+                            }
+                          }}
+                          onBlur={() => {
+                            if (installments === '' || Number(installments) < 1) {
+                              setInstallments(2);
+                            }
+                          }}
+                          autoFocus
+                          className="w-24 px-3 py-1.5 rounded-xl bg-surface-container-lowest border border-on-surface/10 text-center font-black text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        />
+                        <span className="text-xs font-medium text-on-surface-variant">cuotas</span>
+                      </div>
+                    )}
+
+                    {/* If installments > 1: Calculation Mode & Preview */}
+                    {parsedInstallments > 1 && (
+                      <div className="mt-4 p-4 rounded-2xl bg-surface-container-lowest border border-on-surface/10 space-y-3">
+                        {/* Calc Mode Toggle */}
+                        <div>
+                          <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70 block mb-1.5">
+                            Modo de cálculo
+                          </span>
+                          <div className="flex bg-surface-container-low p-1 rounded-xl">
+                            <button
+                              type="button"
+                              onClick={() => setCalcMode('total')}
+                              className={cn(
+                                "flex-1 py-1.5 px-2 rounded-lg text-xs font-black transition-all",
+                                calcMode === 'total' 
+                                  ? "bg-surface-container-lowest text-primary shadow-sm" 
+                                  : "text-on-surface-variant/70 hover:text-on-surface"
+                              )}
+                            >
+                              Monto Total
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCalcMode('installment')}
+                              className={cn(
+                                "flex-1 py-1.5 px-2 rounded-lg text-xs font-black transition-all",
+                                calcMode === 'installment' 
+                                  ? "bg-surface-container-lowest text-primary shadow-sm" 
+                                  : "text-on-surface-variant/70 hover:text-on-surface"
+                              )}
+                            >
+                              Monto x Cuota
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Live Breakdown */}
+                        <div className="p-3 rounded-xl bg-primary/5 border border-primary/10 space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-on-surface-variant font-medium">Impacto mensual:</span>
+                            <span className="font-black text-primary text-sm">
+                              {parsedInstallments}x {formatCurrency(currentInstallmentAmount, activeCurrency)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs pt-1 border-t border-primary/10">
+                            <span className="text-on-surface-variant font-medium">Total financiado:</span>
+                            <span className="font-extrabold text-on-surface">
+                              {formatCurrency(currentTotalAmount, activeCurrency)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Statement cycle / First Due Date */}
+                        <div className="pt-1">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">
+                              Fecha 1er Vencimiento / Resumen
+                            </span>
+                            {selectedCard?.closingDay && (
+                              <span className="text-[10px] font-bold text-primary">
+                                Cierre día {selectedCard.closingDay}
+                              </span>
+                            )}
+                          </div>
+                          <div className="relative">
+                            <input
+                              type="date"
+                              value={firstDueDate}
+                              onChange={(e) => setFirstDueDate(e.target.value)}
+                              className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-on-surface/10 text-xs font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40"
+                            />
+                          </div>
+                          <p className="text-[10px] text-on-surface-variant/60 mt-1">
+                            Se distribuirá 1 cuota por mes a partir de esta fecha en el historial y presupuesto.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* If installments === 1: Imputation mode toggle for 1-pago credit card */}
+                    {parsedInstallments === 1 && (
+                      <div className="mt-3 p-4 rounded-2xl bg-surface-container-lowest border border-on-surface/10 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70">
+                            Imputación Contable
+                          </label>
+                          {selectedCard?.closingDay && (
+                            <span className="text-[10px] font-bold text-primary">
+                              Cierre día {selectedCard.closingDay}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Segmented Button Selector */}
+                        <div className="grid grid-cols-2 gap-2 bg-surface-container-low p-1 rounded-xl">
+                          <button
+                            type="button"
+                            onClick={() => setImputationMode('statement_cycle')}
+                            className={cn(
+                              "py-2.5 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 text-center",
+                              imputationMode === 'statement_cycle'
+                                ? "bg-surface-container-lowest text-primary shadow-sm border border-primary/20"
+                                : "text-on-surface-variant/70 hover:text-on-surface border border-transparent"
+                            )}
+                          >
+                            <CalendarCheck size={14} className={imputationMode === 'statement_cycle' ? 'text-primary' : 'text-on-surface-variant/50'} />
+                            <span>Cierre de Tarjeta</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setImputationMode('current_month')}
+                            className={cn(
+                              "py-2.5 px-3 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 text-center",
+                              imputationMode === 'current_month'
+                                ? "bg-surface-container-lowest text-emerald-600 dark:text-emerald-400 shadow-sm border border-emerald-500/30"
+                                : "text-on-surface-variant/70 hover:text-on-surface border border-transparent"
+                            )}
+                          >
+                            <Zap size={14} className={imputationMode === 'current_month' ? 'text-emerald-600 dark:text-emerald-400' : 'text-on-surface-variant/50'} />
+                            <span>Mes en Curso</span>
+                          </button>
+                        </div>
+
+                        {/* Conditional UI & Explanatory message based on imputationMode */}
+                        {imputationMode === 'statement_cycle' ? (
+                          <div className="space-y-2 pt-1 border-t border-on-surface/5">
+                            <label className="block text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">
+                              Fecha Vencimiento del Resumen
+                            </label>
+                            <input
+                              type="date"
+                              value={firstDueDate}
+                              onChange={(e) => setFirstDueDate(e.target.value)}
+                              className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-on-surface/10 text-xs font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40"
+                            />
+                            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-primary/5 border border-primary/10 text-primary">
+                              <Info size={15} className="shrink-0 mt-0.5" />
+                              <p className="text-[11px] leading-relaxed">
+                                <strong>Respeta el ciclo de la tarjeta:</strong> El gasto se computará en el balance e historial a partir del vencimiento del resumen (<strong>{firstDueDate ? formatMonthLabel(firstDueDate) : 'próximo vencimiento'}</strong>).
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="pt-1 border-t border-on-surface/5">
+                            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400">
+                              <Zap size={15} className="shrink-0 mt-0.5" />
+                              <p className="text-[11px] leading-relaxed">
+                                <strong>Imputación inmediata:</strong> El gasto impactará directamente en el balance y presupuesto de <strong>este mes ({formatMonthLabel(date)})</strong> con la fecha de compra, sin esperar al cierre o vencimiento de la tarjeta.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Classification Selector (Fixed/Variable) */}

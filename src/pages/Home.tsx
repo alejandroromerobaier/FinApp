@@ -30,7 +30,8 @@ import {
   ChevronLeft,
   Eye,
   EyeOff,
-  Plus
+  Plus,
+  CreditCard
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import logo from '../assets/logo.png';
@@ -51,6 +52,16 @@ const ICON_MAP: Record<string, any> = {
 const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => {
   const Icon = ICON_MAP[name] || MoreHorizontal;
   return <Icon size={size} />;
+};
+
+// Helper to identify all credit card expenses (installments and single-payment statement charges)
+const isCreditCardTx = (t: any): boolean => {
+  if (t.type === 'income') return false;
+  if (t.isInstallment) return true;
+  if (t.parentPlanId || t.installmentPlanId) return true;
+  if (t.paymentMethod === 'Tarjeta de Crédito' || t.paymentMethod === 'Tarjeta') return true;
+  if (Boolean(t.cardId || t.cardName)) return true;
+  return false;
 };
 
 export const Home: React.FC = () => {
@@ -111,6 +122,7 @@ export const Home: React.FC = () => {
     const activeDate = parseLocalMonth(budgetMonth);
     const activeMonth = activeDate.getMonth();
     const activeYear = activeDate.getFullYear();
+    const endOfActiveMonth = new Date(activeYear, activeMonth + 1, 0, 23, 59, 59, 999);
 
     transactions.forEach(t => {
       const projectId = t.projectId || 'personal';
@@ -118,7 +130,13 @@ export const Home: React.FC = () => {
       const currency = project?.currency || profile?.currency || 'ARS';
       const projectName = projectId === 'personal' ? 'Personal' : (project?.name || 'Proyecto');
       
-      const tDate = new Date(t.date);
+      const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+      if (isNaN(tDate.getTime())) return;
+
+      // Transactions beyond the active month do not reduce this month's balance or monthly expenses
+      if (tDate > endOfActiveMonth) {
+        return;
+      }
 
       if (!projectTotals[projectId]) {
         projectTotals[projectId] = { 
@@ -133,11 +151,13 @@ export const Home: React.FC = () => {
         };
       }
       
-      // Total general acumulado
+      // Total general acumulado hasta el fin del mes activo
       if (t.type === 'income') {
         projectTotals[projectId].total += t.amount;
+        projectTotals[projectId].income += t.amount;
       } else {
         projectTotals[projectId].total -= t.amount;
+        projectTotals[projectId].expenses += t.amount;
       }
 
       // Actividad del mes seleccionado
@@ -147,13 +167,6 @@ export const Home: React.FC = () => {
         } else {
           projectTotals[projectId].currentExpenses += t.amount;
         }
-      }
-      
-      // Totales históricos (para las tarjetas de abajo)
-      if (t.type === 'income') {
-        projectTotals[projectId].income += t.amount;
-      } else {
-        projectTotals[projectId].expenses += t.amount;
       }
     });
 
@@ -194,8 +207,40 @@ export const Home: React.FC = () => {
   }, [transactions, projects, profile, budgetMonth]);
 
   const recentTransactions = useMemo(() => {
-    return [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 3);
-  }, [transactions]);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    return transactions
+      .filter(t => {
+        const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+        if (isNaN(tDate.getTime())) return false;
+        if (tDate > endOfToday) return false;
+        return getLocalMonth(tDate) === budgetMonth;
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 3);
+  }, [transactions, budgetMonth]);
+
+  const installmentSummary = useMemo(() => {
+    const currentMonthKey = getLocalMonth();
+    const monthInstallments = transactions.filter(t => isCreditCardTx(t) && getLocalMonth(t.date) === budgetMonth);
+    const totalThisMonth = monthInstallments.reduce((sum, t) => sum + (t.amount || 0), 0);
+    
+    const futureInstallments = transactions.filter(t => isCreditCardTx(t) && getLocalMonth(t.date) >= currentMonthKey);
+    const totalRemaining = futureInstallments.reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    const activePlansCount = new Set(
+      transactions.filter(isCreditCardTx).map(t => t.parentPlanId || t.installmentPlanId || t.id)
+    ).size;
+
+    return {
+      thisMonthCount: monthInstallments.length,
+      totalThisMonth,
+      totalRemaining,
+      activePlansCount,
+      hasInstallments: monthInstallments.length > 0 || futureInstallments.length > 0 || activePlansCount > 0
+    };
+  }, [transactions, budgetMonth]);
 
   if (loading) {
     return (
@@ -311,6 +356,7 @@ export const Home: React.FC = () => {
                       toggleShowBalances();
                     }}
                     className="p-2 bg-white/10 hover:bg-white/20 rounded-xl backdrop-blur-md border border-white/10 transition-colors"
+                    title={showBalances ? "Ocultar saldos" : "Mostrar saldos"}
                   >
                     {showBalances ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -373,6 +419,65 @@ export const Home: React.FC = () => {
           </motion.div>
         ))}
       </div>
+
+      {/* Installment Commitments Summary Card */}
+      {installmentSummary.hasInstallments && (
+        <section className="mb-8">
+          <div 
+            onClick={() => navigate('/credit-cards')}
+            className="bg-gradient-to-br from-surface-container-lowest to-surface-container-low p-5 sm:p-6 rounded-[2rem] border border-primary/20 shadow-sm hover:border-primary/40 transition-all cursor-pointer group active:scale-[0.99] relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
+
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0 shadow-xs">
+                  <CreditCard size={20} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-on-surface font-headline tracking-tight">
+                    Compromisos & Tarjetas
+                  </h3>
+                  <p className="text-[11px] font-bold text-on-surface-variant/70">
+                    {installmentSummary.activePlansCount} {installmentSummary.activePlansCount === 1 ? 'compra financiada' : 'compras financiadas'}
+                  </p>
+                </div>
+              </div>
+
+              <span className="text-xs font-bold text-primary flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                <span>Ver cronograma</span>
+                <ChevronRight size={15} />
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-on-surface/5">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70 block mb-0.5">
+                  Vence este mes
+                </span>
+                <span className="text-base sm:text-lg font-black text-on-surface font-headline block">
+                  {showBalances ? formatCurrency(installmentSummary.totalThisMonth, profile?.currency) : '••••••'}
+                </span>
+                <span className="text-[10px] font-bold text-on-surface-variant/60 block">
+                  {installmentSummary.thisMonthCount} {installmentSummary.thisMonthCount === 1 ? 'vencimiento' : 'vencimientos'}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70 block mb-0.5">
+                  Deuda total pendiente
+                </span>
+                <span className="text-base sm:text-lg font-black text-rose-600 font-headline block">
+                  {showBalances ? formatCurrency(installmentSummary.totalRemaining, profile?.currency) : '••••••'}
+                </span>
+                <span className="text-[10px] font-bold text-on-surface-variant/60 block">
+                  En cuotas futuras
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Quick Expense Shortcuts */}
       <section className="mb-8">
@@ -526,28 +631,68 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, category
           <IconComponent name={category?.icon || transaction.categoryIcon || 'MoreHorizontal'} size={20} />
         </div>
         <div className="flex flex-col min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <p className="font-bold text-on-surface text-sm leading-tight truncate">{transaction.description || category?.name || transaction.categoryName || 'Sin descripción'}</p>
-            {transaction.classification && (
-               <div className={cn(
-                 "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter shrink-0",
-                 transaction.classification === 'fixed' ? "bg-primary/10 text-primary" : "bg-orange-500/10 text-orange-600"
-               )}>
-                 {transaction.classification === 'fixed' ? <Clock size={8} /> : <Zap size={8} />}
-                 {transaction.classification === 'fixed' ? 'Fijo' : 'Var'}
-               </div>
-            )}
+          {/* Row 1: Description gets full width, never squeezed */}
+          <div className="flex items-center gap-2 min-w-0">
+            <p className="font-bold text-on-surface text-sm sm:text-base leading-tight truncate">
+              {transaction.description || category?.name || transaction.categoryName || 'Sin descripción'}
+            </p>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 mt-0.5 min-w-0">
-            <p className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-widest truncate max-w-[100px] sm:max-w-none">
+
+          {/* Row 2: Badges wrap cleanly without squeezing description */}
+          <div className="flex flex-wrap items-center gap-1.5 mt-1 min-w-0">
+            <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider truncate max-w-[110px] sm:max-w-none">
               {category?.name || transaction.categoryName || (transaction.categoryId ? 'Cargando...' : 'Otros')}
             </p>
-            <span className="w-1 h-1 rounded-full bg-on-surface/10 shrink-0" />
-            <p className="text-[10px] font-black text-primary uppercase tracking-widest shrink-0">{userName}</p>
+
             {project && (
               <>
-                <span className="w-1 h-1 rounded-full bg-on-surface/10 shrink-0" />
-                <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest leading-none shrink-0">{project.name}</p>
+                <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
+                <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider leading-none shrink-0">{project.name}</p>
+              </>
+            )}
+
+            <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
+            <p className={cn(
+              "text-[9px] font-bold uppercase tracking-wider shrink-0 px-1.5 py-0.5 rounded-md",
+              transaction.authorId === user?.uid 
+                ? "bg-primary/10 text-primary dark:text-blue-400" 
+                : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+            )}>
+              {transaction.authorId === user?.uid ? 'Tú' : userName}
+            </p>
+
+            {/* Installment Badge or Card Badge */}
+            {transaction.isInstallment && transaction.installmentNumber && transaction.totalInstallments && transaction.totalInstallments > 1 ? (
+              <>
+                <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
+                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-tight shrink-0 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/10">
+                  <CreditCard size={9} />
+                  <span>Cuota {transaction.installmentNumber}/{transaction.totalInstallments}</span>
+                  {transaction.cardName && <span className="font-semibold hidden sm:inline">• {transaction.cardName}</span>}
+                </div>
+              </>
+            ) : transaction.cardName ? (
+              <>
+                <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
+                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-tight shrink-0 bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/10">
+                  <CreditCard size={9} />
+                  <span>{transaction.cardName}</span>
+                </div>
+              </>
+            ) : null}
+
+            {transaction.classification && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0 hidden sm:inline-block" />
+                <div className={cn(
+                  "hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter shrink-0",
+                  transaction.classification === 'fixed' 
+                    ? "bg-primary/10 text-primary dark:text-blue-400" 
+                    : "bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                )}>
+                  {transaction.classification === 'fixed' ? <Clock size={8} /> : <Zap size={8} />}
+                  {transaction.classification === 'fixed' ? 'Fijo' : 'Var'}
+                </div>
               </>
             )}
           </div>
@@ -556,12 +701,12 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, category
       <div className="text-right shrink-0 ml-2">
         <p className={cn(
           "font-bold font-headline tracking-tighter text-sm sm:text-base whitespace-nowrap",
-          transaction.type === 'expense' ? "text-on-surface" : "text-emerald-600"
+          transaction.type === 'expense' ? "text-on-surface" : "text-emerald-600 dark:text-emerald-400"
         )}>
           {transaction.type === 'expense' ? '-' : '+'}
           {showBalances ? formatCurrency(transaction.amount, project?.currency || profile?.currency) : '••••'}
         </p>
-        <p className="text-[10px] text-on-surface-variant/40 font-bold">
+        <p className="text-[10px] text-on-surface-variant/70 font-semibold">
           {formatDisplayDate(transaction.date, false)}
         </p>
       </div>

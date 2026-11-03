@@ -21,7 +21,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
-import { parseLocalYYYYMMDD, getLocalMonth } from '../lib/dateUtils';
+import { parseLocalYYYYMMDD, getLocalMonth, formatLocalYYYYMMDD } from '../lib/dateUtils';
 import { formatCurrency } from '../lib/utils';
 
 export enum OperationType {
@@ -772,13 +772,57 @@ export const getGlobalTransactions = (projectIds: string[], callback: (transacti
 
 export const getTransaction = async (transactionId: string): Promise<any> => {
   try {
-    const transactionDoc = await getDoc(doc(db, 'transactions', transactionId));
+    let actualId = transactionId;
+    let installmentNumber: number | null = null;
+
+    if (transactionId.includes('_installment_')) {
+      const parts = transactionId.split('_installment_');
+      actualId = parts[0];
+      installmentNumber = parseInt(parts[1], 10);
+    }
+
+    const transactionDoc = await getDoc(doc(db, 'transactions', actualId));
     if (transactionDoc.exists()) {
       const data = transactionDoc.data();
+      const baseDate = safeToDate(data.date);
+
+      if (installmentNumber !== null && data.isInstallmentPlan) {
+        const override = data.overrides?.[installmentNumber];
+        const installmentAmount = override?.amount !== undefined 
+          ? override.amount 
+          : (data.installmentAmount || Math.round((data.amount / (data.totalInstallments || 1)) * 100) / 100);
+
+        const baseDueDateStr = data.firstDueDate || formatLocalYYYYMMDD(baseDate);
+        const baseDueDate = parseLocalYYYYMMDD(baseDueDateStr);
+        const startYear = baseDueDate.getFullYear();
+        const startMonth = baseDueDate.getMonth();
+        const targetDay = baseDueDate.getDate();
+
+        const totalMonthIndex = startMonth + (installmentNumber - 1);
+        const targetYear = startYear + Math.floor(totalMonthIndex / 12);
+        const targetMonth = totalMonthIndex % 12;
+        const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+        const finalDay = Math.min(targetDay, daysInTargetMonth);
+        const installmentDate = new Date(targetYear, targetMonth, finalDay, baseDate.getHours(), baseDate.getMinutes(), baseDate.getSeconds());
+
+        return {
+          id: transactionId,
+          parentPlanId: actualId,
+          ...data,
+          amount: installmentAmount,
+          description: data.description,
+          date: installmentDate,
+          isInstallment: true,
+          installmentNumber,
+          totalInstallments: data.totalInstallments,
+          isVirtualInstallment: true
+        };
+      }
+
       return {
         id: transactionDoc.id,
         ...data,
-        date: safeToDate(data.date)
+        date: baseDate
       };
     }
     return null;
@@ -806,10 +850,13 @@ export const notifyCollaboratorsOnExpenseAdded = async (transaction: any) => {
 
     const projectName = projectData.name || 'Proyecto compartido';
     const currency = projectData.currency || 'ARS';
+    const catName = transaction.categoryName || transaction.description || 'General';
     const formattedAmount = formatCurrency(transaction.amount, currency);
-    const catName = transaction.categoryName || 'Gasto';
-
-    const content = `${authorName} registró un ${transaction.type === 'income' ? 'ingreso' : 'gasto'} de ${formattedAmount} en "${projectName}" (${catName})`;
+    let content = `${authorName} registró un ${transaction.type === 'income' ? 'ingreso' : 'gasto'} de ${formattedAmount} en "${projectName}" (${catName})`;
+    if (transaction.isInstallmentPlan && transaction.totalInstallments > 1) {
+      const formattedInstallment = formatCurrency(transaction.installmentAmount, currency);
+      content = `${authorName} financió una compra de ${formattedAmount} en ${transaction.totalInstallments} cuotas de ${formattedInstallment} en "${projectName}" (${catName})`;
+    }
 
     for (const memberId of targetMemberIds) {
       await addNotification({
@@ -819,7 +866,9 @@ export const notifyCollaboratorsOnExpenseAdded = async (transaction: any) => {
         data: {
           projectId: transaction.projectId,
           amount: transaction.amount,
-          categoryName: catName
+          categoryName: catName,
+          isInstallmentPlan: !!transaction.isInstallmentPlan,
+          totalInstallments: transaction.totalInstallments || 1
         }
       });
     }
@@ -971,6 +1020,7 @@ export const addTransaction = async (transaction: any) => {
       authorId: auth.currentUser?.uid,
       createdAt: serverTimestamp(),
       date: Timestamp.fromDate(transactionDate),
+      purchaseDate: transaction.purchaseDate || formatLocalYYYYMMDD(transactionDate),
       paymentMethod: transaction.paymentMethod || 'Efectivo',
       // Denormalized category data for better collaboration visibility
       categoryName: transaction.categoryName,
@@ -998,6 +1048,44 @@ export const addTransaction = async (transaction: any) => {
 
 export const updateTransaction = async (transactionId: string, transaction: any) => {
   try {
+    const rawProjectId = transaction.projectId;
+    const finalProjectId = (rawProjectId && typeof rawProjectId === 'string' && rawProjectId !== 'personal' && rawProjectId !== 'null' && rawProjectId.trim() !== '') 
+      ? rawProjectId.trim() 
+      : null;
+
+    // Support updating virtual installments by routing to parent plan
+    if (transactionId.includes('_installment_')) {
+      const parts = transactionId.split('_installment_');
+      const parentId = parts[0];
+      const installmentNum = parseInt(parts[1], 10);
+      const parentRef = doc(db, 'transactions', parentId);
+      const parentSnap = await getDoc(parentRef);
+
+      if (parentSnap.exists()) {
+        const parentData = parentSnap.data();
+        const cleanDesc = (transaction.description || '').replace(/\s*\(\d+\/\d+\)$/, '').trim();
+        const updates: any = {
+          description: cleanDesc || parentData.description,
+          categoryId: transaction.categoryId || parentData.categoryId,
+          categoryName: transaction.categoryName || parentData.categoryName,
+          categoryIcon: transaction.categoryIcon || parentData.categoryIcon,
+          categoryColor: transaction.categoryColor || parentData.categoryColor,
+          cardId: transaction.cardId !== undefined ? transaction.cardId : parentData.cardId,
+          cardName: transaction.cardName !== undefined ? transaction.cardName : parentData.cardName,
+          projectId: finalProjectId,
+          classification: transaction.classification || parentData.classification,
+          updatedAt: serverTimestamp()
+        };
+
+        if (transaction.amount !== undefined && transaction.amount !== parentData.installmentAmount) {
+          updates[`overrides.${installmentNum}.amount`] = transaction.amount;
+        }
+
+        await updateDoc(parentRef, updates);
+        return;
+      }
+    }
+
     const transactionRef = doc(db, 'transactions', transactionId);
     
     // Parse the date part based on local time
@@ -1014,11 +1102,6 @@ export const updateTransaction = async (transactionId: string, transaction: any)
 
     // Remove the temporary originalDate before saving to Firestore
     const { originalDate, ...saveData } = transaction;
-
-    const rawProjectId = transaction.projectId;
-    const finalProjectId = (rawProjectId && typeof rawProjectId === 'string' && rawProjectId !== 'personal' && rawProjectId !== 'null' && rawProjectId.trim() !== '') 
-      ? rawProjectId.trim() 
-      : null;
     
     await updateDoc(transactionRef, {
       ...saveData,
@@ -1045,6 +1128,12 @@ export const updateTransaction = async (transactionId: string, transaction: any)
 
 export const deleteTransaction = async (transactionId: string) => {
   try {
+    if (transactionId.includes('_installment_')) {
+      const parts = transactionId.split('_installment_');
+      const parentId = parts[0];
+      const installmentNum = parseInt(parts[1], 10);
+      return await deleteSingleVirtualInstallment(parentId, installmentNum);
+    }
     await deleteDoc(doc(db, 'transactions', transactionId));
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `transactions/${transactionId}`);
@@ -1323,4 +1412,222 @@ export const testConnection = async () => {
       console.error("Please check your Firebase configuration. ");
     }
   }
+};
+
+// --- Credit Cards & Installments ---
+
+export interface CreditCard {
+  id: string;
+  name: string;
+  bank?: string;
+  last4Digits?: string;
+  currency: string;
+  closingDay: number;
+  dueDay: number;
+  color: string;
+  userId: string;
+  createdAt?: any;
+  updatedAt?: any;
 }
+
+export const getCards = (callback: (cards: CreditCard[]) => void) => {
+  if (!auth.currentUser) return () => {};
+  const q = query(
+    collection(db, 'cards'),
+    where('userId', '==', auth.currentUser.uid)
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const cards = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CreditCard));
+    cards.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    callback(cards);
+  }, (error) => {
+    console.error('Error fetching credit cards:', error);
+  });
+};
+
+export const createCard = async (cardData: Omit<CreditCard, 'id' | 'userId'>) => {
+  try {
+    if (!auth.currentUser) return;
+    const docRef = await addDoc(collection(db, 'cards'), {
+      ...cardData,
+      userId: auth.currentUser.uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    return docRef;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, 'cards');
+  }
+};
+
+export const updateCard = async (id: string, cardData: Partial<CreditCard>) => {
+  try {
+    const cardRef = doc(db, 'cards', id);
+    await updateDoc(cardRef, {
+      ...cardData,
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `cards/${id}`);
+  }
+};
+
+export const deleteCard = async (id: string) => {
+  try {
+    await deleteDoc(doc(db, 'cards', id));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `cards/${id}`);
+  }
+};
+
+export interface CreateInstallmentParams {
+  totalAmount: number;
+  installmentAmount: number;
+  installments: number;
+  description: string;
+  categoryId: string;
+  categoryName: string;
+  categoryIcon: string;
+  categoryColor: string;
+  paymentMethod?: string;
+  classification?: 'fixed' | 'variable';
+  cardId?: string | null;
+  cardName?: string | null;
+  projectId?: string | null;
+  firstDueDate: string; // YYYY-MM-DD
+  purchaseDate?: string; // YYYY-MM-DD
+}
+
+/**
+ * Creates a single parent installment transaction in Firestore with plan metadata.
+ * Virtual monthly installments are projected dynamically on the client side.
+ */
+export const createInstallmentExpense = async (params: CreateInstallmentParams) => {
+  try {
+    if (!auth.currentUser) return;
+    const uid = auth.currentUser.uid;
+    const now = new Date();
+
+    const rawProjectId = params.projectId;
+    const finalProjectId = (rawProjectId && typeof rawProjectId === 'string' && rawProjectId !== 'personal' && rawProjectId !== 'null' && rawProjectId.trim() !== '') 
+      ? rawProjectId.trim() 
+      : null;
+
+    const baseDate = parseLocalYYYYMMDD(params.firstDueDate);
+    const firstDueDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), now.getHours(), now.getMinutes(), now.getSeconds());
+
+    const purchaseDate = params.purchaseDate || formatLocalYYYYMMDD(now);
+
+    const txData = {
+      amount: params.totalAmount,
+      installmentAmount: params.installmentAmount,
+      originalPurchaseAmount: params.totalAmount,
+      type: 'expense',
+      description: params.description.trim(),
+      date: Timestamp.fromDate(firstDueDate),
+      firstDueDate: params.firstDueDate,
+      purchaseDate,
+      isInstallmentPlan: true,
+      totalInstallments: Number(params.installments),
+      categoryId: params.categoryId,
+      categoryName: params.categoryName,
+      categoryIcon: params.categoryIcon,
+      categoryColor: params.categoryColor,
+      paymentMethod: 'Tarjeta de Crédito',
+      classification: params.classification || 'variable',
+      cardId: params.cardId || null,
+      cardName: params.cardName || null,
+      status: 'active',
+      overrides: {},
+      projectId: finalProjectId,
+      authorId: uid,
+      authorName: auth.currentUser.displayName || 'Usuario',
+      createdAt: serverTimestamp()
+    };
+
+    const docRef = await addDoc(collection(db, 'transactions'), txData);
+
+    // Notify collaborators if in a shared project
+    if (finalProjectId) {
+      notifyCollaboratorsOnExpenseAdded({
+        id: docRef.id,
+        ...txData,
+        amount: params.totalAmount,
+        installmentAmount: params.installmentAmount,
+        projectId: finalProjectId
+      }).catch(err =>
+        console.error('Collaborator notification error on installment plan:', err)
+      );
+    }
+
+    // Check budget alert for the first installment
+    checkAndNotifyBudgetAlerts({
+      id: `${docRef.id}_installment_1`,
+      ...txData,
+      amount: params.installmentAmount,
+      date: firstDueDate
+    }).catch(err =>
+      console.error('Budget alert error on installment:', err)
+    );
+
+    return docRef.id;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, 'transactions (installment plan)');
+    throw error;
+  }
+};
+
+/**
+ * Deletes an installment plan. If parent plan doc exists, removes it.
+ * Also handles backward compatibility for legacy multi-doc plans.
+ */
+export const deleteInstallmentPlan = async (installmentPlanId: string) => {
+  try {
+    if (!auth.currentUser) return;
+
+    // 1. Try deleting parent document directly
+    const planRef = doc(db, 'transactions', installmentPlanId);
+    const planSnap = await getDoc(planRef);
+    if (planSnap.exists()) {
+      await deleteDoc(planRef);
+      return;
+    }
+
+    // 2. Backward compatibility: if plan was created under legacy batch mode
+    const q = query(
+      collection(db, 'transactions'),
+      where('installmentPlanId', '==', installmentPlanId),
+      where('authorId', '==', auth.currentUser.uid)
+    );
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      const batch = writeBatch(db);
+      snapshot.docs.forEach(d => {
+        batch.delete(d.ref);
+      });
+      await batch.commit();
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `transactions (plan: ${installmentPlanId})`);
+    throw error;
+  }
+};
+
+/**
+ * Marks a single virtual installment as deleted in the parent plan overrides.
+ */
+export const deleteSingleVirtualInstallment = async (parentPlanId: string, installmentNumber: number) => {
+  try {
+    if (!auth.currentUser) return;
+    const planRef = doc(db, 'transactions', parentPlanId);
+    await updateDoc(planRef, {
+      [`overrides.${installmentNumber}.status`]: 'deleted',
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `transactions (installment override: ${parentPlanId})`);
+    throw error;
+  }
+};
+

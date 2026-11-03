@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Calendar, Users, Utensils, Hotel, Car, ShoppingCart, ArrowLeft, Bell, ExternalLink, Plus, X, UserPlus, Trash2, Loader2, MoreHorizontal, ShoppingBag, Play, Heart, Book, Landmark, Tag, Gift, Briefcase, Home, Plane, Coffee, Zap, Smartphone, ShieldCheck } from 'lucide-react';
+import { Calendar, Users, Utensils, Hotel, Car, ShoppingCart, ArrowLeft, Bell, ExternalLink, Plus, X, UserPlus, Trash2, Loader2, MoreHorizontal, ShoppingBag, Play, Heart, Book, Landmark, Tag, Gift, Briefcase, Home, Plane, Coffee, Zap, Smartphone, ShieldCheck, CreditCard, Layers, TrendingUp, Clock, CheckCircle2 } from 'lucide-react';
 import { formatCurrency, cn } from '@/src/lib/utils';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getTransactions, removeMemberFromProject, inviteUserToProjectByEmail, getUsersByIds } from '../services/firestoreService';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
+import { expandProjectedTransactions } from '../lib/installmentUtils';
+import { getLocalMonth } from '../lib/dateUtils';
 
 const ICON_MAP: Record<string, any> = {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
@@ -25,9 +27,11 @@ export const ProjectDetail: React.FC = () => {
   const { projects, categories } = useData();
   const { user: currentUser } = useAuth();
   
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [rawTransactions, setRawTransactions] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'transactions' | 'installments'>('transactions');
+  const [planFilter, setPlanFilter] = useState<'all' | 'mine' | 'others'>('all');
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
@@ -40,12 +44,55 @@ export const ProjectDetail: React.FC = () => {
     if (!id) return;
 
     const unsubscribe = getTransactions(id, (data) => {
-      setTransactions(data);
+      setRawTransactions(data);
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, [id]);
+
+  const transactions = useMemo(() => {
+    return expandProjectedTransactions(rawTransactions);
+  }, [rawTransactions]);
+
+  // Active installment plans for this shared project
+  const projectInstallmentPlans = useMemo(() => {
+    const currentMonthKey = getLocalMonth(new Date());
+    return rawTransactions
+      .filter(t => t.isInstallmentPlan && t.totalInstallments > 1 && t.status !== 'cancelled')
+      .map(t => {
+        const planInstallments = transactions.filter(inst => (inst.parentPlanId === t.id || inst.installmentPlanId === t.id));
+        const paidCount = planInstallments.filter(i => getLocalMonth(i.date) < currentMonthKey).length;
+        const remaining = planInstallments.filter(i => getLocalMonth(i.date) >= currentMonthKey);
+        const remainingAmount = remaining.reduce((acc, i) => acc + (i.amount || 0), 0);
+        const progressPercent = Math.min(100, Math.round((paidCount / t.totalInstallments) * 100));
+        const authorMember = members.find(m => m.id === t.authorId);
+        
+        return {
+          ...t,
+          paidCount,
+          remainingCount: remaining.length,
+          remainingAmount,
+          progressPercent,
+          authorMember,
+          planInstallments
+        };
+      });
+  }, [rawTransactions, transactions, members]);
+
+  const totalCommittedFuture = useMemo(() => {
+    return projectInstallmentPlans.reduce((sum, p) => sum + p.remainingAmount, 0);
+  }, [projectInstallmentPlans]);
+
+  const filteredInstallmentPlans = useMemo(() => {
+    if (planFilter === 'mine') {
+      return projectInstallmentPlans.filter(p => p.authorId === currentUser?.uid);
+    }
+    if (planFilter === 'others') {
+      return projectInstallmentPlans.filter(p => p.authorId !== currentUser?.uid);
+    }
+    return projectInstallmentPlans;
+  }, [projectInstallmentPlans, planFilter, currentUser?.uid]);
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -58,20 +105,26 @@ export const ProjectDetail: React.FC = () => {
   }, [project?.memberIds]);
 
   const stats = useMemo(() => {
-    const total = transactions.reduce((acc, t) => acc + (t.type === 'expense' ? t.amount : 0), 0);
-    const byMember: Record<string, number> = {};
-    
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
+    const endOfCurrentMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999);
+
+    const validTransactions = transactions.filter(t => {
+      const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+      return !isNaN(tDate.getTime()) && tDate <= endOfCurrentMonth;
+    });
+
+    const total = validTransactions.reduce((acc, t) => acc + (t.type === 'expense' ? t.amount : 0), 0);
+    const byMember: Record<string, number> = {};
 
     let currentMonthTotal = 0;
 
-    transactions.forEach(t => {
+    validTransactions.forEach(t => {
       if (t.type === 'expense') {
         byMember[t.authorId] = (byMember[t.authorId] || 0) + t.amount;
         
-        const tDate = new Date(t.date);
+        const tDate = t.date instanceof Date ? t.date : new Date(t.date);
         if (tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear) {
           currentMonthTotal += t.amount;
         }
@@ -247,68 +300,295 @@ export const ProjectDetail: React.FC = () => {
           </div>
         </aside>
 
-        {/* Expense History */}
-        <section className="lg:col-span-8">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-extrabold text-on-surface font-headline">Historial de Gastos</h2>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-on-surface-variant/70">{transactions.length} registros</span>
+        {/* Expense History & Installments Tabs */}
+        <section className="lg:col-span-8 space-y-6">
+          {/* Tabs Selector */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
+            <div className="flex bg-surface-container-low p-1.5 rounded-2xl border border-on-surface/5">
+              <button
+                type="button"
+                onClick={() => setActiveTab('transactions')}
+                className={cn(
+                  "py-2.5 px-4 rounded-xl text-xs font-black transition-all flex items-center gap-2 uppercase tracking-wider",
+                  activeTab === 'transactions'
+                    ? "bg-surface-container-lowest text-primary shadow-sm"
+                    : "text-on-surface-variant/60 hover:text-on-surface"
+                )}
+              >
+                <span>Historial</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-on-surface/5 font-mono">
+                  {transactions.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('installments')}
+                className={cn(
+                  "py-2.5 px-4 rounded-xl text-xs font-black transition-all flex items-center gap-2 uppercase tracking-wider",
+                  activeTab === 'installments'
+                    ? "bg-surface-container-lowest text-primary shadow-sm"
+                    : "text-on-surface-variant/60 hover:text-on-surface"
+                )}
+              >
+                <Layers size={14} />
+                <span>Cuotas & Financiaciones</span>
+                {projectInstallmentPlans.length > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary text-white font-mono font-bold">
+                    {projectInstallmentPlans.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            <div className="text-xs font-bold text-on-surface-variant/70">
+              {activeTab === 'transactions' ? `${transactions.length} registros` : `${projectInstallmentPlans.length} planes activos`}
             </div>
           </div>
-          
-          {transactions.length === 0 ? (
-            <div className="bg-surface-container-low/50 border-2 border-dashed border-on-surface/10 rounded-[2.5rem] p-16 text-center">
-              <div className="w-20 h-20 bg-on-surface/5 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Plus size={40} className="text-on-surface-variant/30" />
-              </div>
-              <h3 className="text-xl font-bold text-on-surface mb-2">Sin gastos registrados</h3>
-              <p className="text-on-surface-variant/70 max-w-xs mx-auto">Comienza a registrar los gastos compartidos de este proyecto.</p>
+
+          {/* TAB 1: Transactions History */}
+          {activeTab === 'transactions' && (
+            <div>
+              {transactions.length === 0 ? (
+                <div className="bg-surface-container-low/50 border-2 border-dashed border-on-surface/10 rounded-[2.5rem] p-16 text-center">
+                  <div className="w-20 h-20 bg-on-surface/5 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Plus size={40} className="text-on-surface-variant/30" />
+                  </div>
+                  <h3 className="text-xl font-bold text-on-surface mb-2">Sin gastos registrados</h3>
+                  <p className="text-on-surface-variant/70 max-w-xs mx-auto">Comienza a registrar los gastos compartidos de este proyecto.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {transactions.map((t) => {
+                    const cat = categories.find(c => c.id === t.categoryId);
+                    const member = members.find(m => m.id === t.authorId);
+                    return (
+                      <div 
+                        key={t.id} 
+                        onClick={() => navigate(`/edit/${t.id}`)}
+                        className="bg-surface-container-lowest p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] flex items-center justify-between hover:shadow-md transition-all border border-on-surface/10 cursor-pointer group active:scale-[0.99] gap-3 min-w-0"
+                      >
+                        <div className="flex items-center gap-3.5 sm:gap-5 min-w-0 flex-1">
+                          <div className={cn(
+                            "w-11 h-11 sm:w-14 sm:h-14 rounded-2xl sm:rounded-full flex items-center justify-center shadow-sm transition-transform group-hover:scale-110 shrink-0",
+                            cat?.color || 'bg-slate-500'
+                          )}>
+                            <div className="text-white">
+                              <IconComponent name={cat?.icon || 'Tag'} size={20} />
+                            </div>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-bold text-on-surface text-base sm:text-lg leading-tight truncate">{t.description || 'Sin descripción'}</h3>
+                            <div className="flex items-center gap-1.5 sm:gap-2 mt-1 flex-wrap min-w-0">
+                              <span className="text-xs font-medium text-on-surface-variant">Por <span className="text-primary dark:text-blue-400 font-bold">{member?.name || 'Usuario'}</span></span>
+                              <span className="w-1 h-1 rounded-full bg-on-surface-variant/30"></span>
+                              <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest truncate max-w-[100px] sm:max-w-none">
+                                {cat?.name || 'Otros'}
+                              </span>
+                              {t.isInstallment && (
+                                <>
+                                  <span className="w-1 h-1 rounded-full bg-on-surface-variant/30"></span>
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary/10 text-primary dark:text-blue-400 text-[10px] font-black border border-primary/10">
+                                    <CreditCard size={11} />
+                                    <span>Cuota {t.installmentNumber}/{t.totalInstallments}</span>
+                                  </span>
+                                  {t.cardName && (
+                                    <span className="text-[10px] text-on-surface-variant font-medium">
+                                      ({t.cardName})
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0 ml-2">
+                          <div className={cn(
+                            "text-base sm:text-2xl font-black tracking-tight font-headline whitespace-nowrap",
+                            t.type === 'expense' ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+                          )}>
+                            {t.type === 'expense' ? '-' : '+'}{formatCurrency(t.amount, project.currency)}
+                          </div>
+                          <div className="text-[10px] font-bold text-on-surface-variant/70 uppercase tracking-widest mt-0.5">
+                            {new Date(t.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="space-y-4">
-              {transactions.map((t) => {
-                const cat = categories.find(c => c.id === t.categoryId);
-                const member = members.find(m => m.id === t.authorId);
-                return (
-                  <div 
-                    key={t.id} 
-                    onClick={() => navigate(`/edit/${t.id}`)}
-                    className="bg-surface-container-lowest p-6 rounded-[2rem] flex items-center justify-between hover:shadow-md transition-all border border-on-surface/10 cursor-pointer group active:scale-[0.99]"
-                  >
-                    <div className="flex items-center gap-5">
-                      <div className={cn(
-                        "w-14 h-14 rounded-full flex items-center justify-center shadow-sm transition-transform group-hover:scale-110",
-                        cat?.color || 'bg-slate-500'
-                      )}>
-                        <div className="text-white">
-                          <IconComponent name={cat?.icon || 'Tag'} size={24} />
-                        </div>
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-on-surface text-lg leading-tight">{t.description || 'Sin descripción'}</h3>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs font-medium text-on-surface-variant/70">Por <span className="text-primary font-bold">{member?.name || 'Usuario'}</span></span>
-                          <span className="w-1 h-1 rounded-full bg-on-surface/10"></span>
-                          <span className="text-[10px] font-black text-on-surface-variant/70 uppercase tracking-widest">
-                            {cat?.name || 'Otros'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className={cn(
-                        "text-2xl font-black tracking-tight font-headline",
-                        t.type === 'expense' ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
-                      )}>
-                        {t.type === 'expense' ? '-' : '+'}{formatCurrency(t.amount, project.currency)}
-                      </div>
-                      <div className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-widest mt-0.5">
-                        {new Date(t.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                      </div>
+          )}
+
+          {/* TAB 2: Cuotas & Financiaciones */}
+          {activeTab === 'installments' && (
+            <div className="space-y-6">
+              {/* Summary Banner */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-surface-container-lowest p-6 rounded-[2rem] border border-on-surface/10 shadow-sm space-y-1">
+                  <div className="flex items-center justify-between text-on-surface-variant/70 mb-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider">Compromiso Futuro del Proyecto</span>
+                    <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center">
+                      <TrendingUp size={16} />
                     </div>
                   </div>
-                );
-              })}
+                  <div className="text-3xl font-black font-headline text-rose-600">
+                    {formatCurrency(totalCommittedFuture, project.currency)}
+                  </div>
+                  <p className="text-xs text-on-surface-variant/70 font-medium pt-1">
+                    Saldo remanente por pagar en cuotas venideras
+                  </p>
+                </div>
+
+                <div className="bg-surface-container-lowest p-6 rounded-[2rem] border border-on-surface/10 shadow-sm space-y-1">
+                  <div className="flex items-center justify-between text-on-surface-variant/70 mb-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider">Compras Financiadas</span>
+                    <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                      <Layers size={16} />
+                    </div>
+                  </div>
+                  <div className="text-3xl font-black font-headline text-on-surface">
+                    {projectInstallmentPlans.length}
+                  </div>
+                  <p className="text-xs text-on-surface-variant/70 font-medium pt-1">
+                    Planes de cuotas activos en esta bóveda
+                  </p>
+                </div>
+              </div>
+
+              {/* Plans List */}
+              {projectInstallmentPlans.length === 0 ? (
+                <div className="bg-surface-container-low/50 border-2 border-dashed border-on-surface/10 rounded-[2.5rem] p-16 text-center space-y-3">
+                  <div className="w-16 h-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mx-auto mb-2">
+                    <CreditCard size={32} />
+                  </div>
+                  <h3 className="text-lg font-bold text-on-surface">Sin compras en cuotas en este proyecto</h3>
+                  <p className="text-xs text-on-surface-variant/70 max-w-sm mx-auto">
+                    Cuando algún colaborador registre un gasto pagado con Tarjeta de Crédito en más de 1 cuota, verás aquí el estado de amortización y los compromisos a futuro.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Sub-filter chips */}
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                    <button
+                      onClick={() => setPlanFilter('all')}
+                      className={cn(
+                        "px-3.5 py-2 rounded-xl text-xs font-bold transition-all border",
+                        planFilter === 'all'
+                          ? "bg-primary text-white border-primary shadow-sm"
+                          : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:bg-surface-container"
+                      )}
+                    >
+                      Todas ({projectInstallmentPlans.length})
+                    </button>
+                    <button
+                      onClick={() => setPlanFilter('mine')}
+                      className={cn(
+                        "px-3.5 py-2 rounded-xl text-xs font-bold transition-all border",
+                        planFilter === 'mine'
+                          ? "bg-primary text-white border-primary shadow-sm"
+                          : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:bg-surface-container"
+                      )}
+                    >
+                      Financiadas por mí ({projectInstallmentPlans.filter(p => p.authorId === currentUser?.uid).length})
+                    </button>
+                    <button
+                      onClick={() => setPlanFilter('others')}
+                      className={cn(
+                        "px-3.5 py-2 rounded-xl text-xs font-bold transition-all border",
+                        planFilter === 'others'
+                          ? "bg-primary text-white border-primary shadow-sm"
+                          : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:bg-surface-container"
+                      )}
+                    >
+                      Financiadas por otros ({projectInstallmentPlans.filter(p => p.authorId !== currentUser?.uid).length})
+                    </button>
+                  </div>
+
+                  {filteredInstallmentPlans.length === 0 ? (
+                    <div className="bg-surface-container-lowest p-8 rounded-[2rem] border border-on-surface/10 text-center text-xs text-on-surface-variant/60 font-medium">
+                      No hay compras en cuotas para el filtro seleccionado.
+                    </div>
+                  ) : (
+                    filteredInstallmentPlans.map((plan) => {
+                      const cat = categories.find(c => c.id === plan.categoryId);
+                      return (
+                        <div 
+                          key={plan.id}
+                          className="bg-surface-container-lowest p-6 rounded-[2rem] border border-on-surface/10 shadow-sm space-y-4"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-center gap-4 overflow-hidden">
+                              <div className={cn(
+                                "w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-sm",
+                                cat?.color || 'bg-slate-700'
+                              )}>
+                                <IconComponent name={cat?.icon || 'Tag'} size={22} />
+                              </div>
+                              <div className="truncate">
+                                <h3 className="font-extrabold text-on-surface text-base truncate leading-tight">
+                                  {plan.description}
+                                </h3>
+                                <div className="flex items-center gap-2 mt-1.5 text-xs text-on-surface-variant/70 flex-wrap">
+                                  <span className={cn(
+                                    "px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider",
+                                    plan.authorId === currentUser?.uid
+                                      ? "bg-primary/10 text-primary"
+                                      : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                                  )}>
+                                    {plan.authorId === currentUser?.uid ? 'Financiado por Ti' : `Financiado por ${plan.authorMember?.name || 'Miembro'}`}
+                                  </span>
+                                  {plan.cardName && (
+                                    <span className="text-[11px] font-bold text-on-surface-variant/70 flex items-center gap-1">
+                                      <CreditCard size={12} className="text-primary" />
+                                      {plan.cardName}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                          <div className="text-right shrink-0">
+                            <p className="text-lg font-black text-on-surface font-headline">
+                              {formatCurrency(plan.installmentAmount, project.currency)}
+                              <span className="text-[10px] text-on-surface-variant/60 font-medium"> /mes</span>
+                            </p>
+                            <p className="text-[10px] font-extrabold text-rose-600">
+                              Resta: {formatCurrency(plan.remainingAmount, project.currency)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Progress Bar & Badges */}
+                        <div className="space-y-1.5 pt-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-bold text-on-surface">
+                              {plan.paidCount} de {plan.totalInstallments} cuotas amortizadas
+                            </span>
+                            <span className="font-black text-primary text-[11px]">
+                              {plan.progressPercent}% completado
+                            </span>
+                          </div>
+
+                          <div className="w-full h-2.5 bg-surface-container-low rounded-full overflow-hidden p-0.5">
+                            <div 
+                              className="h-full rounded-full bg-gradient-to-r from-blue-600 to-indigo-500 shadow-xs transition-all duration-500" 
+                              style={{ width: `${plan.progressPercent}%` }}
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between text-[10px] text-on-surface-variant/60 font-medium pt-0.5">
+                            <span>Total financiado: {formatCurrency(plan.originalPurchaseAmount || plan.amount, project.currency)}</span>
+                            <span>Restan {plan.remainingCount} {plan.remainingCount === 1 ? 'cuota' : 'cuotas'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }))}
+                </div>
+              )}
             </div>
           )}
         </section>

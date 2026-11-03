@@ -30,13 +30,18 @@ import {
   Trash2,
   Wallet,
   CreditCard,
-  Clock
+  Clock,
+  Layers,
+  AlertTriangle,
+  CheckCircle2,
+  User
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/src/lib/utils';
-import { getGlobalTransactions, deleteTransaction } from '../services/firestoreService';
+import { getGlobalTransactions, deleteTransaction, deleteInstallmentPlan, deleteSingleVirtualInstallment } from '../services/firestoreService';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { formatDisplayDate, parseLocalYYYYMMDD } from '../lib/dateUtils';
 
 const ICON_MAP: Record<string, any> = {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
@@ -64,19 +69,61 @@ const formatTime = (rawDate: any): string => {
 
 const PAGE_SIZE = 35;
 
+export type TimeScope = 'real_only' | 'all' | 'future_only';
+
 export const History: React.FC = () => {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const { categories, projects, transactions, userNames, loading: dataLoading } = useData();
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'expense' | 'income'>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterProject, setFilterProject] = useState<string>('all');
+  const [filterAuthor, setFilterAuthor] = useState<string>('all');
   const [filterClassification, setFilterClassification] = useState<'all' | 'fixed' | 'variable'>('all');
-  const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'all'>('all');
+  const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'all'>('monthly');
+  const [timeScope, setTimeScope] = useState<TimeScope>('real_only');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showFilters, setShowFilters] = useState(false);
+  const [planToDelete, setPlanToDelete] = useState<{
+    planId: string;
+    txId: string;
+    installmentNumber?: number;
+    totalInstallments?: number;
+    description: string;
+    isVirtual?: boolean;
+  } | null>(null);
+  const [isDeletingPlan, setIsDeletingPlan] = useState(false);
+
+  const handleDeleteSingle = async () => {
+    if (!planToDelete) return;
+    setIsDeletingPlan(true);
+    try {
+      if (planToDelete.isVirtual && planToDelete.installmentNumber) {
+        await deleteSingleVirtualInstallment(planToDelete.planId, planToDelete.installmentNumber);
+      } else {
+        await deleteTransaction(planToDelete.txId);
+      }
+      setPlanToDelete(null);
+    } catch (err) {
+      console.error('Error deleting single installment:', err);
+    } finally {
+      setIsDeletingPlan(false);
+    }
+  };
+
+  const handleDeleteFullPlan = async (planId: string) => {
+    setIsDeletingPlan(true);
+    try {
+      await deleteInstallmentPlan(planId);
+      setPlanToDelete(null);
+    } catch (err) {
+      console.error('Error deleting installment plan:', err);
+    } finally {
+      setIsDeletingPlan(false);
+    }
+  };
 
   useEffect(() => {
     if (!dataLoading) {
@@ -107,6 +154,18 @@ export const History: React.FC = () => {
     return [...usedCategories, ...denormalizedCats].sort((a, b) => a.name.localeCompare(b.name));
   }, [transactions, categories]);
 
+  // Dynamically get unique authors for filtering
+  const projectAuthors = useMemo(() => {
+    const authorIds = new Set<string>();
+    transactions.forEach(t => {
+      if (t.authorId) authorIds.add(t.authorId);
+    });
+    return Array.from(authorIds).map(id => ({
+      id,
+      name: id === user?.uid ? 'Tú (Mis registros)' : (userNames[id] || 'Colaborador')
+    }));
+  }, [transactions, user?.uid, userNames]);
+
   const periodLabel = useMemo(() => {
     if (selectedPeriod === 'all') return 'Todo el Tiempo';
     const months = selectedPeriod === 'monthly' ? 1 : selectedPeriod === 'quarterly' ? 3 : selectedPeriod === 'semiannual' ? 6 : 12;
@@ -127,7 +186,10 @@ export const History: React.FC = () => {
   };
 
   const filteredTransactions = useMemo(() => {
-    return transactions.filter(t => {
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const filtered = transactions.filter(t => {
       const matchesSearch = t.description?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                            t.categoryName?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesType = filterType === 'all' || t.type === filterType;
@@ -137,11 +199,21 @@ export const History: React.FC = () => {
         : filterProject === 'personal' 
           ? !t.projectId 
           : t.projectId === filterProject;
+      const matchesAuthor = filterAuthor === 'all' || t.authorId === filterAuthor;
       const matchesClassification = filterClassification === 'all' || t.classification === filterClassification;
       
+      const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+      const isFuture = tDate > endOfToday;
+
+      let matchesTimeScope = true;
+      if (timeScope === 'real_only') {
+        matchesTimeScope = !isFuture;
+      } else if (timeScope === 'future_only') {
+        matchesTimeScope = isFuture;
+      }
+
       let matchesPeriod = true;
       if (selectedPeriod !== 'all') {
-        const tDate = new Date(t.date);
         const months = selectedPeriod === 'monthly' ? 1 : selectedPeriod === 'quarterly' ? 3 : selectedPeriod === 'semiannual' ? 6 : 12;
         const year = currentDate.getFullYear();
         const month = currentDate.getMonth();
@@ -149,12 +221,20 @@ export const History: React.FC = () => {
         // Full end of month (e.g. Sept 30th 23:59:59.999 instead of Sept 8th)
         const end = new Date(year, month + 1, 0, 23, 59, 59, 999);
         const start = new Date(year, month - (months - 1), 1, 0, 0, 0, 0);
+        
         matchesPeriod = tDate >= start && tDate <= end;
       }
 
-      return matchesSearch && matchesType && matchesCategory && matchesProject && matchesClassification && matchesPeriod;
+      return matchesSearch && matchesType && matchesCategory && matchesProject && matchesAuthor && matchesClassification && matchesPeriod && matchesTimeScope;
     });
-  }, [transactions, searchQuery, filterType, filterCategory, filterProject, filterClassification, selectedPeriod, currentDate]);
+
+    if (timeScope === 'future_only') {
+      // Sort upcoming installments closest first
+      return [...filtered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }
+
+    return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [transactions, searchQuery, filterType, filterCategory, filterProject, filterAuthor, filterClassification, selectedPeriod, currentDate, timeScope]);
 
   const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -163,7 +243,7 @@ export const History: React.FC = () => {
   // Reset pagination limit when any filter or search changes
   useEffect(() => {
     setVisibleLimit(PAGE_SIZE);
-  }, [searchQuery, filterType, filterCategory, filterProject, filterClassification, selectedPeriod, currentDate]);
+  }, [searchQuery, filterType, filterCategory, filterProject, filterAuthor, filterClassification, selectedPeriod, currentDate, timeScope]);
 
   const hasMore = visibleLimit < filteredTransactions.length;
 
@@ -203,13 +283,15 @@ export const History: React.FC = () => {
   const groupedTransactions = useMemo(() => {
     const groups: { [key: string]: any[] } = {};
     paginatedTransactions.forEach(t => {
-      const date = t.date instanceof Date ? t.date : new Date(t.date);
-      const dateKey = isNaN(date.getTime()) ? 'Fecha Desconocida' : dateGroupFormatter.format(date);
+      const effectiveDate = (timeScope === 'real_only' && t.isInstallment && t.installmentNumber === 1 && t.purchaseDate)
+        ? parseLocalYYYYMMDD(t.purchaseDate)
+        : (t.date instanceof Date ? t.date : new Date(t.date));
+      const dateKey = isNaN(effectiveDate.getTime()) ? 'Fecha Desconocida' : dateGroupFormatter.format(effectiveDate);
       if (!groups[dateKey]) groups[dateKey] = [];
       groups[dateKey].push(t);
     });
     return groups;
-  }, [paginatedTransactions]);
+  }, [paginatedTransactions, timeScope]);
 
   if (loading) {
     return (
@@ -309,6 +391,50 @@ export const History: React.FC = () => {
         </AnimatePresence>
       </section>
 
+      {/* Time Scope Switcher: Hasta Hoy (Día a Día) vs Todo el Período vs Solo Cuotas Futuras */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none mb-6">
+        <button
+          type="button"
+          onClick={() => setTimeScope('real_only')}
+          className={cn(
+            "px-3.5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 border",
+            timeScope === 'real_only'
+              ? "bg-on-surface text-surface-container-lowest border-on-surface shadow-md"
+              : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:bg-surface-container"
+          )}
+        >
+          <CheckCircle2 size={14} className={timeScope === 'real_only' ? "text-emerald-400" : "text-on-surface-variant/40"} />
+          <span>Hasta Hoy (Día a Día)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setTimeScope('all')}
+          className={cn(
+            "px-3.5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 border",
+            timeScope === 'all'
+              ? "bg-on-surface text-surface-container-lowest border-on-surface shadow-md"
+              : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:bg-surface-container"
+          )}
+        >
+          <span>Todo el Período</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setTimeScope('future_only')}
+          className={cn(
+            "px-3.5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 border",
+            timeScope === 'future_only'
+              ? "bg-primary text-white border-primary shadow-md"
+              : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:bg-surface-container"
+          )}
+        >
+          <Clock size={14} />
+          <span>Solo Cuotas Futuras</span>
+        </button>
+      </div>
+
       {/* Search Bar */}
       <div className="relative mb-8">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40" size={20} />
@@ -398,6 +524,37 @@ export const History: React.FC = () => {
                 </div>
               </div>
 
+              {/* Member / Author Filter */}
+              {projectAuthors.length > 1 && (
+                <div>
+                  <p className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-[0.2em] mb-3 ml-1">Colaborador / Miembro</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setFilterAuthor('all')}
+                      className={cn(
+                        "px-3.5 py-2 rounded-lg font-bold text-xs transition-all border",
+                        filterAuthor === 'all' ? "bg-primary text-white border-primary" : "bg-surface-container-low text-on-surface-variant/60 border-transparent"
+                      )}
+                    >
+                      Todos
+                    </button>
+                    {projectAuthors.map((author) => (
+                      <button
+                        key={author.id}
+                        onClick={() => setFilterAuthor(author.id)}
+                        className={cn(
+                          "px-3.5 py-2 rounded-lg font-bold text-xs transition-all border flex items-center gap-1.5",
+                          filterAuthor === author.id ? "bg-primary text-white border-primary" : "bg-surface-container-low text-on-surface-variant/60 border-transparent"
+                        )}
+                      >
+                        <User size={12} />
+                        <span>{author.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Category Filter */}
               <div>
                 <p className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-[0.2em] mb-3 ml-1">Categoría</p>
@@ -466,10 +623,20 @@ export const History: React.FC = () => {
               <div className="space-y-3">
                 {(items as any[]).map((t) => {
                   const category = categories.find(c => c.id === t.categoryId);
+                  const endOfToday = new Date();
+                  endOfToday.setHours(23, 59, 59, 999);
+                  const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+                  const isFuture = tDate > endOfToday;
+
                   return (
                     <div 
                       key={t.id}
-                      className="bg-surface-container-lowest p-3.5 sm:p-4 rounded-2xl border border-on-surface/5 flex items-center justify-between gap-2 sm:gap-4 group hover:bg-on-surface/5 active:scale-[0.99] transition-all cursor-pointer shadow-sm min-w-0"
+                      className={cn(
+                        "p-3.5 sm:p-4 rounded-2xl border flex items-center justify-between gap-2 sm:gap-4 group active:scale-[0.99] transition-all cursor-pointer shadow-sm min-w-0",
+                        isFuture 
+                          ? "bg-surface-container-low/60 border-blue-500/20 hover:bg-surface-container-low" 
+                          : "bg-surface-container-lowest border-on-surface/5 hover:bg-on-surface/5"
+                      )}
                       onClick={() => navigate(`/edit/${t.id}`)}
                     >
                       <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
@@ -480,39 +647,69 @@ export const History: React.FC = () => {
                           <IconComponent name={category?.icon || t.categoryIcon || 'MoreHorizontal'} size={20} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 sm:gap-2">
+                          {/* Row 1: Description gets full width, never squeezed */}
+                          <div className="flex items-center gap-2 min-w-0">
                             <h4 className="font-bold text-on-surface tracking-tight leading-snug truncate text-sm sm:text-base">
                               {t.description || category?.name || t.categoryName || 'Gasto'}
                             </h4>
-                            {t.classification && (
-                              <div className={cn(
-                                "flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter shrink-0",
-                                t.classification === 'fixed' ? "bg-primary/10 text-primary" : "bg-orange-500/10 text-orange-600"
-                              )}>
-                                {t.classification === 'fixed' ? <Clock size={8} /> : <Zap size={8} />}
-                                {t.classification === 'fixed' ? 'Fijo' : 'Var'}
-                              </div>
-                            )}
                           </div>
-                          <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 mt-1 min-w-0">
-                            <span className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-wider leading-none truncate max-w-[100px] sm:max-w-none">
+
+                          {/* Row 2: Badges wrap cleanly without squeezing description */}
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1 min-w-0">
+                            <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider leading-none truncate max-w-[110px] sm:max-w-none">
                               {category ? category.name : (t.categoryName || (t.categoryId ? 'Cargando...' : 'Otros'))}
                             </span>
-                            <span className="w-1 h-1 rounded-full bg-on-surface-variant/20 shrink-0" />
-                            <span className="text-[10px] font-black text-primary uppercase tracking-wider leading-none shrink-0">{userNames[t.authorId] || 'Usuario'}</span>
                             {t.projectId && (
                               <>
-                                <span className="w-1 h-1 rounded-full bg-on-surface-variant/20 shrink-0" />
-                                <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1 leading-none shrink-0">
+                                <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
+                                <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1 leading-none shrink-0">
                                   {projects.find(p => p.id === t.projectId)?.name || 'Compartido'}
                                 </span>
                               </>
                             )}
-                            <span className="w-1 h-1 rounded-full bg-on-surface-variant/20 shrink-0" />
-                            <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider flex items-center gap-1 leading-none shrink-0">
-                              {t.paymentMethod === 'Tarjeta' ? <CreditCard size={10} /> : <Wallet size={10} />}
-                              {t.paymentMethod || 'Efectivo'}
+                            <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
+                            <span className={cn(
+                              "text-[9px] font-bold uppercase tracking-wider leading-none shrink-0 px-1.5 py-0.5 rounded-md",
+                              t.authorId === user?.uid 
+                                ? "bg-primary/10 text-primary dark:text-blue-400" 
+                                : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                            )}>
+                              {t.authorId === user?.uid ? 'Pagado por Ti' : `Por: ${userNames[t.authorId] || 'Miembro'}`}
                             </span>
+
+                            {t.installmentNumber && t.totalInstallments ? (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
+                                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-tight bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/10 leading-none shrink-0">
+                                  <CreditCard size={9} />
+                                  <span>Cuota {t.installmentNumber}/{t.totalInstallments}</span>
+                                  {t.cardName && <span className="font-semibold hidden sm:inline">• {t.cardName}</span>}
+                                </span>
+                              </>
+                            ) : (t.cardName || t.paymentMethod) ? (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
+                                <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider flex items-center gap-1 leading-none shrink-0">
+                                  {(t.paymentMethod === 'Tarjeta' || t.paymentMethod === 'Tarjeta de Crédito') ? <CreditCard size={10} className="text-primary dark:text-blue-400" /> : <Wallet size={10} />}
+                                  <span>{t.cardName ? t.cardName : (t.paymentMethod || 'Efectivo')}</span>
+                                </span>
+                              </>
+                            ) : null}
+
+                            {t.classification && (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0 hidden sm:inline-block" />
+                                <div className={cn(
+                                  "hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter shrink-0",
+                                  t.classification === 'fixed' 
+                                    ? "bg-primary/10 text-primary dark:text-blue-400" 
+                                    : "bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                                )}>
+                                  {t.classification === 'fixed' ? <Clock size={8} /> : <Zap size={8} />}
+                                  {t.classification === 'fixed' ? 'Fijo' : 'Var'}
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -521,22 +718,41 @@ export const History: React.FC = () => {
                         <div className="text-right shrink-0">
                           <div className={cn(
                             "text-sm sm:text-lg font-black font-headline tracking-tight whitespace-nowrap",
-                            t.type === 'expense' ? "text-on-surface" : "text-emerald-600"
+                            t.type === 'expense' ? "text-on-surface" : "text-emerald-600 dark:text-emerald-400"
                           )}>
                             {t.type === 'expense' ? '-' : '+'}{formatCurrency(
                               t.amount, 
                               projects.find(p => p.id === t.projectId)?.currency || profile?.currency || 'ARS'
                             )}
                           </div>
-                          <div className="text-[9px] sm:text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">
-                            {formatTime(t.date)}
-                          </div>
+                          {isFuture ? (
+                            <div className="flex items-center justify-end gap-1 text-[9px] font-black text-blue-600 dark:text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded-md uppercase tracking-tight">
+                              <Clock size={9} />
+                              <span>Vencimiento</span>
+                            </div>
+                          ) : (
+                            <div className="text-[9px] sm:text-[10px] font-semibold text-on-surface-variant/70 uppercase tracking-widest">
+                              {formatTime(t.date)}
+                            </div>
+                          )}
                         </div>
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (window.confirm('¿Estás seguro de que deseas eliminar esta transacción?')) {
-                              deleteTransaction(t.id);
+                            const planId = t.parentPlanId || t.installmentPlanId;
+                            if (planId && t.installmentNumber && t.totalInstallments) {
+                              setPlanToDelete({
+                                planId,
+                                txId: t.id,
+                                installmentNumber: t.installmentNumber,
+                                totalInstallments: t.totalInstallments,
+                                description: t.description || 'Gasto en cuotas',
+                                isVirtual: Boolean(t.isVirtualInstallment || t.parentPlanId)
+                              });
+                            } else {
+                              if (window.confirm('¿Estás seguro de que deseas eliminar esta transacción?')) {
+                                deleteTransaction(t.id);
+                              }
                             }
                           }}
                           className="p-1.5 sm:p-2 text-on-surface-variant/30 hover:text-rose-600 hover:bg-rose-500/10 rounded-lg transition-all opacity-80 sm:opacity-0 sm:group-hover:opacity-100 shrink-0"
@@ -599,6 +815,61 @@ export const History: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Plan Deletion Choice Modal */}
+      <AnimatePresence>
+        {planToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-surface-container-lowest rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-on-surface/10 space-y-4"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto">
+                <AlertTriangle size={24} />
+              </div>
+
+              <div className="text-center space-y-1">
+                <h3 className="text-lg font-black text-on-surface">Eliminar Cuota</h3>
+                <p className="text-xs text-on-surface-variant">
+                  Esta transacción forma parte de un plan de <strong className="text-on-surface">{planToDelete.totalInstallments} cuotas</strong> ({planToDelete.description}). ¿Cómo querés proceder?
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <button
+                  type="button"
+                  disabled={isDeletingPlan}
+                  onClick={handleDeleteSingle}
+                  className="w-full py-3 px-4 rounded-xl border border-on-surface/10 hover:bg-surface-container font-bold text-xs text-on-surface transition-colors flex items-center justify-center gap-2"
+                >
+                  <span>Eliminar solo esta cuota ({planToDelete.installmentNumber}/{planToDelete.totalInstallments})</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isDeletingPlan}
+                  onClick={() => handleDeleteFullPlan(planToDelete.planId)}
+                  className="w-full py-3 px-4 rounded-xl bg-error text-white font-bold text-xs hover:bg-error/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isDeletingPlan ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  <span>Eliminar las {planToDelete.totalInstallments} cuotas del plan</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isDeletingPlan}
+                  onClick={() => setPlanToDelete(null)}
+                  className="w-full py-2.5 rounded-xl font-bold text-xs text-on-surface-variant/70 hover:text-on-surface transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
