@@ -41,7 +41,7 @@ import { getGlobalTransactions, deleteTransaction, deleteInstallmentPlan, delete
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { formatDisplayDate } from '../lib/dateUtils';
+import { formatDisplayDate, parseLocalYYYYMMDD } from '../lib/dateUtils';
 
 const ICON_MAP: Record<string, any> = {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 

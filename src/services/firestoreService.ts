@@ -21,7 +21,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
-import { parseLocalYYYYMMDD, getLocalMonth } from '../lib/dateUtils';
+import { parseLocalYYYYMMDD, getLocalMonth, formatLocalYYYYMMDD } from '../lib/dateUtils';
 import { formatCurrency } from '../lib/utils';
 
 export enum OperationType {
@@ -850,6 +850,7 @@ export const notifyCollaboratorsOnExpenseAdded = async (transaction: any) => {
 
     const projectName = projectData.name || 'Proyecto compartido';
     const currency = projectData.currency || 'ARS';
+    const catName = transaction.categoryName || transaction.description || 'General';
     const formattedAmount = formatCurrency(transaction.amount, currency);
     let content = `${authorName} registró un ${transaction.type === 'income' ? 'ingreso' : 'gasto'} de ${formattedAmount} en "${projectName}" (${catName})`;
     if (transaction.isInstallmentPlan && transaction.totalInstallments > 1) {
