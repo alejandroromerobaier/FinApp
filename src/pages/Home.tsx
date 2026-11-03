@@ -628,25 +628,38 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, category
                  {transaction.classification === 'fixed' ? 'Fijo' : 'Var'}
                </div>
             )}
-            {transaction.isInstallment && transaction.installmentNumber && transaction.totalInstallments && (
-               <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter shrink-0 bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                 <CreditCard size={8} />
-                 <span>Cuota {transaction.installmentNumber}/{transaction.totalInstallments}</span>
-               </div>
-            )}
+            {transaction.isInstallment && transaction.installmentNumber && transaction.totalInstallments ? (
+              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter shrink-0 bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <CreditCard size={8} />
+                <span>Cuota {transaction.installmentNumber}/{transaction.totalInstallments}</span>
+                {transaction.cardName && <span className="font-bold hidden sm:inline">• {transaction.cardName}</span>}
+              </div>
+            ) : transaction.cardName ? (
+              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter shrink-0 bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <CreditCard size={8} />
+                <span>{transaction.cardName}</span>
+              </div>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-1.5 mt-0.5 min-w-0">
             <p className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-widest truncate max-w-[100px] sm:max-w-none">
               {category?.name || transaction.categoryName || (transaction.categoryId ? 'Cargando...' : 'Otros')}
             </p>
-            <span className="w-1 h-1 rounded-full bg-on-surface/10 shrink-0" />
-            <p className="text-[10px] font-black text-primary uppercase tracking-widest shrink-0">{userName}</p>
             {project && (
               <>
                 <span className="w-1 h-1 rounded-full bg-on-surface/10 shrink-0" />
                 <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest leading-none shrink-0">{project.name}</p>
               </>
             )}
+            <span className="w-1 h-1 rounded-full bg-on-surface/10 shrink-0" />
+            <p className={cn(
+              "text-[9px] font-black uppercase tracking-widest shrink-0 px-1.5 py-0.5 rounded-md",
+              transaction.authorId === user?.uid 
+                ? "bg-primary/10 text-primary" 
+                : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+            )}>
+              {transaction.authorId === user?.uid ? 'Tú' : userName}
+            </p>
           </div>
         </div>
       </div>

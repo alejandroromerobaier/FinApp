@@ -1127,6 +1127,12 @@ export const updateTransaction = async (transactionId: string, transaction: any)
 
 export const deleteTransaction = async (transactionId: string) => {
   try {
+    if (transactionId.includes('_installment_')) {
+      const parts = transactionId.split('_installment_');
+      const parentId = parts[0];
+      const installmentNum = parseInt(parts[1], 10);
+      return await deleteSingleVirtualInstallment(parentId, installmentNum);
+    }
     await deleteDoc(doc(db, 'transactions', transactionId));
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `transactions/${transactionId}`);

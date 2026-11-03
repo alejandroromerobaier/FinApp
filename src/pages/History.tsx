@@ -33,7 +33,8 @@ import {
   Clock,
   Layers,
   AlertTriangle,
-  CheckCircle2
+  CheckCircle2,
+  User
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/src/lib/utils';
 import { getGlobalTransactions, deleteTransaction, deleteInstallmentPlan, deleteSingleVirtualInstallment } from '../services/firestoreService';
@@ -79,6 +80,7 @@ export const History: React.FC = () => {
   const [filterType, setFilterType] = useState<'all' | 'expense' | 'income'>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterProject, setFilterProject] = useState<string>('all');
+  const [filterAuthor, setFilterAuthor] = useState<string>('all');
   const [filterClassification, setFilterClassification] = useState<'all' | 'fixed' | 'variable'>('all');
   const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'all'>('monthly');
   const [timeScope, setTimeScope] = useState<TimeScope>('real_only');
@@ -152,6 +154,18 @@ export const History: React.FC = () => {
     return [...usedCategories, ...denormalizedCats].sort((a, b) => a.name.localeCompare(b.name));
   }, [transactions, categories]);
 
+  // Dynamically get unique authors for filtering
+  const projectAuthors = useMemo(() => {
+    const authorIds = new Set<string>();
+    transactions.forEach(t => {
+      if (t.authorId) authorIds.add(t.authorId);
+    });
+    return Array.from(authorIds).map(id => ({
+      id,
+      name: id === user?.uid ? 'Tú (Mis registros)' : (userNames[id] || 'Colaborador')
+    }));
+  }, [transactions, user?.uid, userNames]);
+
   const periodLabel = useMemo(() => {
     if (selectedPeriod === 'all') return 'Todo el Tiempo';
     const months = selectedPeriod === 'monthly' ? 1 : selectedPeriod === 'quarterly' ? 3 : selectedPeriod === 'semiannual' ? 6 : 12;
@@ -185,6 +199,7 @@ export const History: React.FC = () => {
         : filterProject === 'personal' 
           ? !t.projectId 
           : t.projectId === filterProject;
+      const matchesAuthor = filterAuthor === 'all' || t.authorId === filterAuthor;
       const matchesClassification = filterClassification === 'all' || t.classification === filterClassification;
       
       const tDate = t.date instanceof Date ? t.date : new Date(t.date);
@@ -210,7 +225,7 @@ export const History: React.FC = () => {
         matchesPeriod = tDate >= start && tDate <= end;
       }
 
-      return matchesSearch && matchesType && matchesCategory && matchesProject && matchesClassification && matchesPeriod && matchesTimeScope;
+      return matchesSearch && matchesType && matchesCategory && matchesProject && matchesAuthor && matchesClassification && matchesPeriod && matchesTimeScope;
     });
 
     if (timeScope === 'future_only') {
@@ -219,7 +234,7 @@ export const History: React.FC = () => {
     }
 
     return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, searchQuery, filterType, filterCategory, filterProject, filterClassification, selectedPeriod, currentDate, timeScope]);
+  }, [transactions, searchQuery, filterType, filterCategory, filterProject, filterAuthor, filterClassification, selectedPeriod, currentDate, timeScope]);
 
   const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -228,7 +243,7 @@ export const History: React.FC = () => {
   // Reset pagination limit when any filter or search changes
   useEffect(() => {
     setVisibleLimit(PAGE_SIZE);
-  }, [searchQuery, filterType, filterCategory, filterProject, filterClassification, selectedPeriod, currentDate, timeScope]);
+  }, [searchQuery, filterType, filterCategory, filterProject, filterAuthor, filterClassification, selectedPeriod, currentDate, timeScope]);
 
   const hasMore = visibleLimit < filteredTransactions.length;
 
@@ -509,6 +524,37 @@ export const History: React.FC = () => {
                 </div>
               </div>
 
+              {/* Member / Author Filter */}
+              {projectAuthors.length > 1 && (
+                <div>
+                  <p className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-[0.2em] mb-3 ml-1">Colaborador / Miembro</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setFilterAuthor('all')}
+                      className={cn(
+                        "px-3.5 py-2 rounded-lg font-bold text-xs transition-all border",
+                        filterAuthor === 'all' ? "bg-primary text-white border-primary" : "bg-surface-container-low text-on-surface-variant/60 border-transparent"
+                      )}
+                    >
+                      Todos
+                    </button>
+                    {projectAuthors.map((author) => (
+                      <button
+                        key={author.id}
+                        onClick={() => setFilterAuthor(author.id)}
+                        className={cn(
+                          "px-3.5 py-2 rounded-lg font-bold text-xs transition-all border flex items-center gap-1.5",
+                          filterAuthor === author.id ? "bg-primary text-white border-primary" : "bg-surface-container-low text-on-surface-variant/60 border-transparent"
+                        )}
+                      >
+                        <User size={12} />
+                        <span>{author.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Category Filter */}
               <div>
                 <p className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-[0.2em] mb-3 ml-1">Categoría</p>
@@ -621,12 +667,10 @@ export const History: React.FC = () => {
                               </div>
                             )}
                           </div>
-                          <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 mt-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1 min-w-0">
                             <span className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-wider leading-none truncate max-w-[100px] sm:max-w-none">
                               {category ? category.name : (t.categoryName || (t.categoryId ? 'Cargando...' : 'Otros'))}
                             </span>
-                            <span className="w-1 h-1 rounded-full bg-on-surface-variant/20 shrink-0" />
-                            <span className="text-[10px] font-black text-primary uppercase tracking-wider leading-none shrink-0">{userNames[t.authorId] || (t.authorId === user?.uid ? 'Tú' : 'Usuario')}</span>
                             {t.projectId && (
                               <>
                                 <span className="w-1 h-1 rounded-full bg-on-surface-variant/20 shrink-0" />
@@ -636,9 +680,18 @@ export const History: React.FC = () => {
                               </>
                             )}
                             <span className="w-1 h-1 rounded-full bg-on-surface-variant/20 shrink-0" />
-                            <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider flex items-center gap-1 leading-none shrink-0">
-                              {(t.paymentMethod === 'Tarjeta' || t.paymentMethod === 'Tarjeta de Crédito') ? <CreditCard size={10} /> : <Wallet size={10} />}
-                              {t.cardName ? t.cardName : (t.paymentMethod || 'Efectivo')}
+                            <span className={cn(
+                              "text-[10px] font-black uppercase tracking-wider leading-none shrink-0 px-1.5 py-0.5 rounded-md",
+                              t.authorId === user?.uid 
+                                ? "bg-primary/10 text-primary" 
+                                : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                            )}>
+                              {t.authorId === user?.uid ? 'Pagado por Ti' : `Por: ${userNames[t.authorId] || 'Miembro'}`}
+                            </span>
+                            <span className="w-1 h-1 rounded-full bg-on-surface-variant/20 shrink-0" />
+                            <span className="text-[10px] font-bold text-on-surface-variant/70 uppercase tracking-wider flex items-center gap-1 leading-none shrink-0">
+                              {(t.paymentMethod === 'Tarjeta' || t.paymentMethod === 'Tarjeta de Crédito') ? <CreditCard size={10} className="text-primary" /> : <Wallet size={10} />}
+                              <span>{t.cardName ? t.cardName : (t.paymentMethod || 'Efectivo')}</span>
                             </span>
                           </div>
                         </div>

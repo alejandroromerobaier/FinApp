@@ -30,7 +30,7 @@ import { formatCurrency, cn } from '../lib/utils';
 import { getLocalToday, getLocalMonth, formatDisplayDate, formatLocalYYYYMMDD, parseLocalMonth } from '../lib/dateUtils';
 import { deleteInstallmentPlan, deleteSingleVirtualInstallment } from '../services/firestoreService';
 
-export type ScopeFilter = 'personal' | 'shared_mine' | 'all';
+export type ScopeFilter = 'personal' | 'shared_mine' | 'shared_all' | 'all';
 
 export const CreditCards: React.FC = () => {
   const navigate = useNavigate();
@@ -53,6 +53,7 @@ export const CreditCards: React.FC = () => {
     const isPersonal = !item.projectId || item.projectId === 'personal' || item.projectId === 'null';
     if (scopeFilter === 'personal') return isPersonal;
     if (scopeFilter === 'shared_mine') return !isPersonal && item.authorId === user?.uid;
+    if (scopeFilter === 'shared_all') return !isPersonal;
     return true; // 'all'
   };
 
@@ -273,7 +274,7 @@ export const CreditCards: React.FC = () => {
 
       {/* Scope Filter Tabs (Personal vs Proyectos vs Todo) */}
       {projects.length > 0 && (
-        <div className="flex bg-surface-container-low p-1 rounded-2xl border border-on-surface/5">
+        <div className="flex bg-surface-container-low p-1 rounded-2xl border border-on-surface/5 overflow-x-auto scrollbar-none gap-1">
           <button
             type="button"
             onClick={() => {
@@ -281,7 +282,7 @@ export const CreditCards: React.FC = () => {
               setSelectedCardFilter('all');
             }}
             className={cn(
-              "flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider",
+              "flex-1 min-w-[110px] sm:min-w-0 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider whitespace-nowrap",
               scopeFilter === 'personal'
                 ? "bg-surface-container-lowest text-primary shadow-sm"
                 : "text-on-surface-variant/60 hover:text-on-surface"
@@ -297,14 +298,30 @@ export const CreditCards: React.FC = () => {
               setSelectedCardFilter('all');
             }}
             className={cn(
-              "flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider",
+              "flex-1 min-w-[130px] sm:min-w-0 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider whitespace-nowrap",
               scopeFilter === 'shared_mine'
                 ? "bg-surface-container-lowest text-primary shadow-sm"
                 : "text-on-surface-variant/60 hover:text-on-surface"
             )}
           >
             <Users size={14} />
-            <span>Mis Cuotas en Proyectos</span>
+            <span>Financiadas por mí</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setScopeFilter('shared_all');
+              setSelectedCardFilter('all');
+            }}
+            className={cn(
+              "flex-1 min-w-[130px] sm:min-w-0 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider whitespace-nowrap",
+              scopeFilter === 'shared_all'
+                ? "bg-surface-container-lowest text-primary shadow-sm"
+                : "text-on-surface-variant/60 hover:text-on-surface"
+            )}
+          >
+            <Users size={14} />
+            <span>Proyectos (Todos)</span>
           </button>
           <button
             type="button"
@@ -313,7 +330,7 @@ export const CreditCards: React.FC = () => {
               setSelectedCardFilter('all');
             }}
             className={cn(
-              "flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider",
+              "flex-1 min-w-[90px] sm:min-w-0 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider whitespace-nowrap",
               scopeFilter === 'all'
                 ? "bg-surface-container-lowest text-primary shadow-sm"
                 : "text-on-surface-variant/60 hover:text-on-surface"
@@ -540,9 +557,24 @@ export const CreditCards: React.FC = () => {
                       <p className="text-xs font-black text-on-surface truncate">
                         {inst.description}
                       </p>
-                      <p className="text-[10px] text-on-surface-variant/70 font-bold truncate">
-                        {inst.cardName || 'Tarjeta'} • {formatDisplayDate(inst.date)}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                        {inst.projectId && (
+                          <span className="px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 font-black uppercase text-[9px]">
+                            {projects.find(p => p.id === inst.projectId)?.name || 'Proyecto'}
+                          </span>
+                        )}
+                        <span className={cn(
+                          "px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider",
+                          inst.authorId === user?.uid 
+                            ? "bg-primary/10 text-primary" 
+                            : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                        )}>
+                          {inst.authorId === user?.uid ? 'Tú' : (userNames[inst.authorId] || 'Miembro')}
+                        </span>
+                        <p className="text-[10px] text-on-surface-variant/70 font-bold truncate">
+                          {inst.cardName || 'Tarjeta'} • {formatDisplayDate(inst.date)}
+                        </p>
+                      </div>
                     </div>
                   </div>
                   <div className="text-right shrink-0">
@@ -624,7 +656,7 @@ export const CreditCards: React.FC = () => {
                       <div className="truncate">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
                           {plan.projectId ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary/10 text-primary text-[10px] font-black uppercase tracking-wider">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-600 text-[10px] font-black uppercase tracking-wider">
                               <Users size={11} />
                               <span>{projects.find(p => p.id === plan.projectId)?.name || 'Proyecto'}</span>
                             </span>
@@ -634,11 +666,17 @@ export const CreditCards: React.FC = () => {
                               <span>Personal</span>
                             </span>
                           )}
-                          {plan.authorId && plan.authorId !== user?.uid && (
-                            <span className="text-[10px] font-bold text-on-surface-variant/70">
-                              Por <strong className="text-on-surface">{userNames[plan.authorId] || plan.authorName || 'Otro miembro'}</strong>
-                            </span>
-                          )}
+                          <span className={cn(
+                            "inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider",
+                            plan.authorId === user?.uid 
+                              ? "bg-primary/10 text-primary" 
+                              : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                          )}>
+                            {plan.authorId === user?.uid 
+                              ? `Financiado por vos (con tu ${plan.cardName || 'tarjeta'})`
+                              : `Financiado por ${userNames[plan.authorId] || plan.authorName || 'Miembro'} (con su ${plan.cardName || 'tarjeta'})`
+                            }
+                          </span>
                         </div>
                         <h3 className="text-sm sm:text-base font-black text-on-surface truncate">
                           {plan.description}

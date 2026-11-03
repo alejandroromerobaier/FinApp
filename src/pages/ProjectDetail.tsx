@@ -31,6 +31,7 @@ export const ProjectDetail: React.FC = () => {
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'transactions' | 'installments'>('transactions');
+  const [planFilter, setPlanFilter] = useState<'all' | 'mine' | 'others'>('all');
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
@@ -82,6 +83,16 @@ export const ProjectDetail: React.FC = () => {
   const totalCommittedFuture = useMemo(() => {
     return projectInstallmentPlans.reduce((sum, p) => sum + p.remainingAmount, 0);
   }, [projectInstallmentPlans]);
+
+  const filteredInstallmentPlans = useMemo(() => {
+    if (planFilter === 'mine') {
+      return projectInstallmentPlans.filter(p => p.authorId === currentUser?.uid);
+    }
+    if (planFilter === 'others') {
+      return projectInstallmentPlans.filter(p => p.authorId !== currentUser?.uid);
+    }
+    return projectInstallmentPlans;
+  }, [projectInstallmentPlans, planFilter, currentUser?.uid]);
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -459,36 +470,85 @@ export const ProjectDetail: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {projectInstallmentPlans.map((plan) => {
-                    const cat = categories.find(c => c.id === plan.categoryId);
-                    return (
-                      <div 
-                        key={plan.id}
-                        className="bg-surface-container-lowest p-6 rounded-[2rem] border border-on-surface/10 shadow-sm space-y-4"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex items-center gap-4 overflow-hidden">
-                            <div className={cn(
-                              "w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-sm",
-                              cat?.color || 'bg-slate-700'
-                            )}>
-                              <IconComponent name={cat?.icon || 'Tag'} size={22} />
-                            </div>
-                            <div className="truncate">
-                              <h3 className="font-extrabold text-on-surface text-base truncate leading-tight">
-                                {plan.description}
-                              </h3>
-                              <div className="flex items-center gap-2 mt-1 text-xs text-on-surface-variant/70 flex-wrap">
-                                <span>Financiado por <strong className="text-on-surface">{plan.authorMember?.name || 'Un miembro'}</strong></span>
-                                {plan.cardName && (
-                                  <>
-                                    <span>•</span>
-                                    <span className="text-primary font-bold">{plan.cardName}</span>
-                                  </>
-                                )}
+                  {/* Sub-filter chips */}
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                    <button
+                      onClick={() => setPlanFilter('all')}
+                      className={cn(
+                        "px-3.5 py-2 rounded-xl text-xs font-bold transition-all border",
+                        planFilter === 'all'
+                          ? "bg-primary text-white border-primary shadow-sm"
+                          : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:bg-surface-container"
+                      )}
+                    >
+                      Todas ({projectInstallmentPlans.length})
+                    </button>
+                    <button
+                      onClick={() => setPlanFilter('mine')}
+                      className={cn(
+                        "px-3.5 py-2 rounded-xl text-xs font-bold transition-all border",
+                        planFilter === 'mine'
+                          ? "bg-primary text-white border-primary shadow-sm"
+                          : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:bg-surface-container"
+                      )}
+                    >
+                      Financiadas por mí ({projectInstallmentPlans.filter(p => p.authorId === currentUser?.uid).length})
+                    </button>
+                    <button
+                      onClick={() => setPlanFilter('others')}
+                      className={cn(
+                        "px-3.5 py-2 rounded-xl text-xs font-bold transition-all border",
+                        planFilter === 'others'
+                          ? "bg-primary text-white border-primary shadow-sm"
+                          : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:bg-surface-container"
+                      )}
+                    >
+                      Financiadas por otros ({projectInstallmentPlans.filter(p => p.authorId !== currentUser?.uid).length})
+                    </button>
+                  </div>
+
+                  {filteredInstallmentPlans.length === 0 ? (
+                    <div className="bg-surface-container-lowest p-8 rounded-[2rem] border border-on-surface/10 text-center text-xs text-on-surface-variant/60 font-medium">
+                      No hay compras en cuotas para el filtro seleccionado.
+                    </div>
+                  ) : (
+                    filteredInstallmentPlans.map((plan) => {
+                      const cat = categories.find(c => c.id === plan.categoryId);
+                      return (
+                        <div 
+                          key={plan.id}
+                          className="bg-surface-container-lowest p-6 rounded-[2rem] border border-on-surface/10 shadow-sm space-y-4"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-center gap-4 overflow-hidden">
+                              <div className={cn(
+                                "w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-sm",
+                                cat?.color || 'bg-slate-700'
+                              )}>
+                                <IconComponent name={cat?.icon || 'Tag'} size={22} />
+                              </div>
+                              <div className="truncate">
+                                <h3 className="font-extrabold text-on-surface text-base truncate leading-tight">
+                                  {plan.description}
+                                </h3>
+                                <div className="flex items-center gap-2 mt-1.5 text-xs text-on-surface-variant/70 flex-wrap">
+                                  <span className={cn(
+                                    "px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider",
+                                    plan.authorId === currentUser?.uid
+                                      ? "bg-primary/10 text-primary"
+                                      : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                                  )}>
+                                    {plan.authorId === currentUser?.uid ? 'Financiado por Ti' : `Financiado por ${plan.authorMember?.name || 'Miembro'}`}
+                                  </span>
+                                  {plan.cardName && (
+                                    <span className="text-[11px] font-bold text-on-surface-variant/70 flex items-center gap-1">
+                                      <CreditCard size={12} className="text-primary" />
+                                      {plan.cardName}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
 
                           <div className="text-right shrink-0">
                             <p className="text-lg font-black text-on-surface font-headline">
@@ -526,7 +586,7 @@ export const ProjectDetail: React.FC = () => {
                         </div>
                       </div>
                     );
-                  })}
+                  }))}
                 </div>
               )}
             </div>

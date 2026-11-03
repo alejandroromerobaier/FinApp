@@ -348,11 +348,15 @@ export const AddExpense: React.FC = () => {
       }
 
       // Regular single transaction (or update)
+      const transactionDate = (!id && paymentMethod === 'Tarjeta de Crédito' && firstDueDate) 
+        ? firstDueDate 
+        : date;
+
       const transactionData = {
         amount: parsedAmount,
         type,
         description,
-        date,
+        date: transactionDate,
         purchaseDate: date,
         paymentMethod,
         classification,
@@ -383,7 +387,10 @@ export const AddExpense: React.FC = () => {
   };
 
   const handleDelete = async () => {
-    if (!id || !window.confirm('¿Estás seguro de que deseas eliminar esta transacción?')) return;
+    const confirmMsg = isExistingInstallment 
+      ? `¿Estás seguro de que deseas eliminar esta cuota individual (${existingInstallmentNumber}/${existingTotalInstallments})?`
+      : '¿Estás seguro de que deseas eliminar esta transacción?';
+    if (!id || !window.confirm(confirmMsg)) return;
     
     setIsDeleting(true);
     try {
@@ -959,6 +966,31 @@ export const AddExpense: React.FC = () => {
                             Se distribuirá 1 cuota por mes a partir de esta fecha en el historial y presupuesto.
                           </p>
                         </div>
+                      </div>
+                    )}
+
+                    {/* If installments === 1: Due date for 1-pago credit card */}
+                    {parsedInstallments === 1 && (
+                      <div className="mt-3 p-3.5 rounded-2xl bg-surface-container-lowest border border-on-surface/10 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">
+                            Fecha Vencimiento del Resumen
+                          </span>
+                          {selectedCard?.closingDay && (
+                            <span className="text-[10px] font-bold text-primary">
+                              Cierre día {selectedCard.closingDay}
+                            </span>
+                          )}
+                        </div>
+                        <input
+                          type="date"
+                          value={firstDueDate}
+                          onChange={(e) => setFirstDueDate(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-on-surface/10 text-xs font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        />
+                        <p className="text-[10px] text-on-surface-variant/60">
+                          El pago impactará en el balance del mes correspondiente a este vencimiento.
+                        </p>
                       </div>
                     )}
                   </div>
