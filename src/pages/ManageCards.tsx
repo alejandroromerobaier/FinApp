@@ -142,17 +142,18 @@ export const ManageCards: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate('/credit-cards')}
-            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-surface-container rounded-2xl text-on-surface font-bold text-xs border border-on-surface/10 hover:bg-surface-container-high transition-all"
+            className="flex items-center gap-1.5 px-3 py-2 bg-surface-container rounded-xl text-on-surface font-bold text-xs border border-on-surface/10 hover:bg-surface-container-high transition-all"
           >
-            <Layers size={15} className="text-primary" />
+            <Layers size={14} className="text-primary dark:text-blue-400" />
             <span className="hidden sm:inline">Ver Cuotas & Previsión</span>
+            <span className="sm:hidden">Cuotas</span>
           </button>
           <button
             onClick={openAddModal}
-            className="flex items-center gap-2 px-4 py-2.5 bg-primary text-on-primary font-bold text-sm rounded-2xl shadow-lg shadow-primary/20 hover:bg-primary/90 active:scale-95 transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-primary text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-primary/20 hover:bg-primary/90 active:scale-95 transition-all"
           >
-            <Plus size={18} />
-            <span className="hidden sm:inline">Nueva Tarjeta</span>
+            <Plus size={16} />
+            <span>Nueva Tarjeta</span>
           </button>
         </div>
       </div>
@@ -171,7 +172,7 @@ export const ManageCards: React.FC = () => {
           </div>
           <button
             onClick={openAddModal}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-on-primary font-bold text-sm rounded-2xl shadow-md hover:bg-primary/90 transition-all"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white font-bold text-sm rounded-2xl shadow-md hover:bg-primary/90 transition-all"
           >
             <Plus size={18} />
             <span>Agregar mi primera tarjeta</span>

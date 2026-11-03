@@ -203,11 +203,13 @@ export const Home: React.FC = () => {
     return transactions
       .filter(t => {
         const tDate = t.date instanceof Date ? t.date : new Date(t.date);
-        return !isNaN(tDate.getTime()) && tDate <= endOfToday;
+        if (isNaN(tDate.getTime())) return false;
+        if (tDate > endOfToday) return false;
+        return getLocalMonth(tDate) === budgetMonth;
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 5);
-  }, [transactions]);
+      .slice(0, 3);
+  }, [transactions, budgetMonth]);
 
   const installmentSummary = useMemo(() => {
     const monthInstallments = transactions.filter(t => t.isInstallment && getLocalMonth(t.date) === budgetMonth);

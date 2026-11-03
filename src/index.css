@@ -6,6 +6,7 @@
   --font-headline: "Manrope", sans-serif;
 
   --color-primary: #000666;
+  --color-on-primary: #ffffff;
   --color-primary-container: #1a237e;
   --color-secondary: #515f74;
   --color-secondary-container: #d5e3fc;
@@ -66,6 +67,7 @@
 
 .dark {
   --color-primary: #3b82f6;
+  --color-on-primary: #ffffff;
   --color-primary-container: #1d4ed8;
   --color-secondary: #94a3b8;
   --color-secondary-container: #1e293b;

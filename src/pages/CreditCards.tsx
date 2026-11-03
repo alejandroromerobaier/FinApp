@@ -264,7 +264,7 @@ export const CreditCards: React.FC = () => {
           </Link>
           <Link
             to="/add"
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-on-primary font-bold text-xs shadow-md shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-white font-bold text-xs shadow-md shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
           >
             <Plus size={15} />
             <span>Nueva Compra</span>
@@ -274,7 +274,7 @@ export const CreditCards: React.FC = () => {
 
       {/* Scope Filter Tabs (Personal vs Proyectos vs Todo) */}
       {projects.length > 0 && (
-        <div className="flex bg-surface-container-low p-1 rounded-2xl border border-on-surface/5 overflow-x-auto scrollbar-none gap-1">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
           <button
             type="button"
             onClick={() => {
@@ -282,10 +282,10 @@ export const CreditCards: React.FC = () => {
               setSelectedCardFilter('all');
             }}
             className={cn(
-              "flex-1 min-w-[110px] sm:min-w-0 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider whitespace-nowrap",
+              "px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0 flex items-center gap-2 border",
               scopeFilter === 'personal'
-                ? "bg-surface-container-lowest text-primary shadow-sm"
-                : "text-on-surface-variant/60 hover:text-on-surface"
+                ? "bg-on-surface text-surface-container-lowest border-on-surface shadow-md"
+                : "bg-surface-container-low text-on-surface-variant border-transparent hover:bg-surface-container"
             )}
           >
             <User size={14} />
@@ -298,10 +298,10 @@ export const CreditCards: React.FC = () => {
               setSelectedCardFilter('all');
             }}
             className={cn(
-              "flex-1 min-w-[130px] sm:min-w-0 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider whitespace-nowrap",
+              "px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0 flex items-center gap-2 border",
               scopeFilter === 'shared_mine'
-                ? "bg-surface-container-lowest text-primary shadow-sm"
-                : "text-on-surface-variant/60 hover:text-on-surface"
+                ? "bg-on-surface text-surface-container-lowest border-on-surface shadow-md"
+                : "bg-surface-container-low text-on-surface-variant border-transparent hover:bg-surface-container"
             )}
           >
             <Users size={14} />
@@ -314,10 +314,10 @@ export const CreditCards: React.FC = () => {
               setSelectedCardFilter('all');
             }}
             className={cn(
-              "flex-1 min-w-[130px] sm:min-w-0 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider whitespace-nowrap",
+              "px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0 flex items-center gap-2 border",
               scopeFilter === 'shared_all'
-                ? "bg-surface-container-lowest text-primary shadow-sm"
-                : "text-on-surface-variant/60 hover:text-on-surface"
+                ? "bg-on-surface text-surface-container-lowest border-on-surface shadow-md"
+                : "bg-surface-container-low text-on-surface-variant border-transparent hover:bg-surface-container"
             )}
           >
             <Users size={14} />
@@ -330,10 +330,10 @@ export const CreditCards: React.FC = () => {
               setSelectedCardFilter('all');
             }}
             className={cn(
-              "flex-1 min-w-[90px] sm:min-w-0 py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider whitespace-nowrap",
+              "px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0 flex items-center gap-2 border",
               scopeFilter === 'all'
-                ? "bg-surface-container-lowest text-primary shadow-sm"
-                : "text-on-surface-variant/60 hover:text-on-surface"
+                ? "bg-on-surface text-surface-container-lowest border-on-surface shadow-md"
+                : "bg-surface-container-low text-on-surface-variant border-transparent hover:bg-surface-container"
             )}
           >
             <Globe size={14} />
