@@ -54,6 +54,16 @@ const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => 
   return <Icon size={size} />;
 };
 
+// Helper to identify all credit card expenses (installments and single-payment statement charges)
+const isCreditCardTx = (t: any): boolean => {
+  if (t.type === 'income') return false;
+  if (t.isInstallment) return true;
+  if (t.parentPlanId || t.installmentPlanId) return true;
+  if (t.paymentMethod === 'Tarjeta de Crédito' || t.paymentMethod === 'Tarjeta') return true;
+  if (Boolean(t.cardId || t.cardName)) return true;
+  return false;
+};
+
 export const Home: React.FC = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
@@ -212,21 +222,23 @@ export const Home: React.FC = () => {
   }, [transactions, budgetMonth]);
 
   const installmentSummary = useMemo(() => {
-    const monthInstallments = transactions.filter(t => t.isInstallment && getLocalMonth(t.date) === budgetMonth);
+    const currentMonthKey = getLocalMonth();
+    const monthInstallments = transactions.filter(t => isCreditCardTx(t) && getLocalMonth(t.date) === budgetMonth);
     const totalThisMonth = monthInstallments.reduce((sum, t) => sum + (t.amount || 0), 0);
     
-    const currentMonthKey = getLocalMonth();
-    const futureInstallments = transactions.filter(t => t.isInstallment && getLocalMonth(t.date) >= currentMonthKey);
+    const futureInstallments = transactions.filter(t => isCreditCardTx(t) && getLocalMonth(t.date) >= currentMonthKey);
     const totalRemaining = futureInstallments.reduce((sum, t) => sum + (t.amount || 0), 0);
 
-    const activePlansCount = new Set(futureInstallments.map(t => t.parentPlanId || t.installmentPlanId)).size;
+    const activePlansCount = new Set(
+      transactions.filter(isCreditCardTx).map(t => t.parentPlanId || t.installmentPlanId || t.id)
+    ).size;
 
     return {
       thisMonthCount: monthInstallments.length,
       totalThisMonth,
       totalRemaining,
       activePlansCount,
-      hasInstallments: monthInstallments.length > 0 || futureInstallments.length > 0
+      hasInstallments: monthInstallments.length > 0 || futureInstallments.length > 0 || activePlansCount > 0
     };
   }, [transactions, budgetMonth]);
 
@@ -424,7 +436,7 @@ export const Home: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-on-surface font-headline tracking-tight">
-                    Compromisos en Cuotas
+                    Compromisos & Tarjetas
                   </h3>
                   <p className="text-[11px] font-bold text-on-surface-variant/70">
                     {installmentSummary.activePlansCount} {installmentSummary.activePlansCount === 1 ? 'compra financiada' : 'compras financiadas'}
@@ -441,7 +453,7 @@ export const Home: React.FC = () => {
             <div className="grid grid-cols-2 gap-3 pt-3 border-t border-on-surface/5">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70 block mb-0.5">
-                  Cuotas este mes
+                  Vence este mes
                 </span>
                 <span className="text-base sm:text-lg font-black text-on-surface font-headline block">
                   {showBalances ? formatCurrency(installmentSummary.totalThisMonth, profile?.currency) : '••••••'}
