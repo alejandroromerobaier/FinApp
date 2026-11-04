@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import { execSync } from 'child_process';
 import fs from 'fs';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, Plugin } from 'vite';
 
 // Read version and git commit metadata
 let packageVersion = '2.7.0';
@@ -23,12 +23,40 @@ try {
 
 const buildDate = new Date().toISOString();
 
+const createVersionJsonPlugin = (versionData: Record<string, unknown>): Plugin => ({
+  name: 'generate-version-json',
+  generateBundle() {
+    this.emitFile({
+      type: 'asset',
+      fileName: 'version.json',
+      source: JSON.stringify(versionData, null, 2),
+    });
+  },
+  configureServer(server) {
+    server.middlewares.use((req, res, next) => {
+      if (req.url === '/version.json') {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify(versionData));
+        return;
+      }
+      next();
+    });
+  },
+});
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   const appEnv = mode === 'production' ? 'PROD' : mode.toUpperCase();
 
+  const versionPayload = {
+    version: packageVersion,
+    commit: commitHash,
+    buildDate,
+    env: appEnv,
+  };
+
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), createVersionJsonPlugin(versionPayload)],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
       __APP_VERSION__: JSON.stringify(packageVersion),

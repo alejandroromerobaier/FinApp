@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './lib/AuthContext';
 import { DataProvider } from './lib/DataContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { RouteTracker } from './components/RouteTracker';
+import { UpdatePrompt } from './components/UpdatePrompt';
 
 import { Login } from './pages/Login';
 import { Home } from './pages/Home';
@@ -43,6 +44,7 @@ function AppContent() {
   return (
     <Router>
       <RouteTracker />
+      <UpdatePrompt />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route
