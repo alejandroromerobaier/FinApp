@@ -37,6 +37,7 @@ import { useTheme } from '../lib/ThemeContext';
 import { updateUserProfile, syncUserProfile } from '../services/firestoreService';
 import { updatePassword, updateProfile as updateFirebaseProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { getAppVersionInfo } from '../lib/version';
 
 const CURRENCIES = [
   { code: 'ARS', label: 'ARS (Pesos Argentinos)', symbol: '$' },
@@ -66,6 +67,7 @@ export const Settings: React.FC = () => {
   const { user, profile, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const versionInfo = getAppVersionInfo();
 
   const handleThemeChange = async (newTheme: 'light' | 'dark' | 'system') => {
     setTheme(newTheme);
@@ -485,16 +487,39 @@ export const Settings: React.FC = () => {
         </div>
       </section>
 
-      {/* System Actions */}
-      <section className="pt-2">
+      {/* System Actions & Version Info */}
+      <section className="pt-2 space-y-4">
         <button 
           onClick={handleSignOut}
-          className="w-full flex items-center justify-center gap-2 p-4 bg-error/5 text-error rounded-2xl font-black uppercase tracking-wider text-xs hover:bg-error/10 transition-all active:scale-[0.98] border border-error/10"
+          className="w-full flex items-center justify-center gap-2 p-4 bg-error/5 text-error rounded-2xl font-black uppercase tracking-wider text-xs hover:bg-error/10 transition-all active:scale-[0.98] border border-error/10 cursor-pointer"
         >
           <LogOut size={18} />
           Cerrar Sesión
         </button>
-        <p className="text-center text-[10px] text-on-surface-variant/40 mt-6 uppercase tracking-widest font-bold">FinApp v2.6.0 • 2026</p>
+
+        {/* Dynamic Version Info Card */}
+        <div className="flex flex-col items-center justify-center p-4 bg-surface-container-low/60 border border-on-surface/5 rounded-2xl text-center space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black tracking-tight text-on-surface">
+              FinApp v{versionInfo.version}
+            </span>
+            <span className={cn(
+              "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border",
+              versionInfo.isQA 
+                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20" 
+                : versionInfo.isDev 
+                  ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+                  : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+            )}>
+              {versionInfo.env}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-[10px] font-medium text-on-surface-variant/60">
+            <span>Build <code className="font-mono text-on-surface-variant font-semibold">#{versionInfo.commit}</code></span>
+            <span>•</span>
+            <span>Deploy {versionInfo.formattedDate}</span>
+          </div>
+        </div>
       </section>
 
       {/* --- EDIT PROFILE MODAL --- */}

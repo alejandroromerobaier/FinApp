@@ -1,7 +1,7 @@
 {
-  "name": "react-example",
+  "name": "finapp",
   "private": true,
-  "version": "0.0.0",
+  "version": "2.7.0",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
@@ -9,8 +9,11 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "deploy:qa": "vite build && firebase hosting:channel:deploy qa",
-    "deploy:prod": "vite build && firebase deploy --only hosting"
+    "deploy:qa": "vite build --mode qa && firebase hosting:channel:deploy qa",
+    "deploy:prod": "vite build --mode production && firebase deploy --only hosting",
+    "release:patch": "npm version patch",
+    "release:minor": "npm version minor",
+    "release:major": "npm version major"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",

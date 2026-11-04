@@ -1,4 +1,4 @@
-export const APP_VERSION = '2.6.0';
+export { APP_VERSION } from './version';
 
 export interface ProjectColorOption {
   id: string;
