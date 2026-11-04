@@ -737,6 +737,7 @@ export const getGlobalTransactions = (projectIds: string[], callback: (transacti
     updateAll();
   }, (error) => {
     console.error("Personal transactions fetch error:", error);
+    updateAll();
   });
 
   // Projects transactions
@@ -759,6 +760,7 @@ export const getGlobalTransactions = (projectIds: string[], callback: (transacti
         updateAll();
       }, (error) => {
         console.error(`Project ${projectId} transactions fetch error:`, error);
+        updateAll();
       });
       unsubscribesProjects.push(unsub);
     });

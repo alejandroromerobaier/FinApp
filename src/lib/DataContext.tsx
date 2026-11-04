@@ -130,6 +130,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const fetchedCategoryIds = useRef<Set<string>>(new Set());
 
+  // Failsafe: Never keep app in loading state indefinitely
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, []);
+
   useEffect(() => {
     if (!user) {
       setNotifications([]);

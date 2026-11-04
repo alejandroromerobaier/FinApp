@@ -1,7 +1,6 @@
-const CACHE_NAME = 'finapp-cache-v1';
+const CACHE_NAME = 'finapp-cache-v3';
 const STATIC_ASSETS = [
   '/',
-  '/index.html',
   '/manifest.json',
   '/favicon.png',
   '/apple-touch-icon.png',
@@ -9,7 +8,7 @@ const STATIC_ASSETS = [
   '/pwa-512x512.png'
 ];
 
-// Install Event
+// Install Event - cache core shell and skip waiting immediately
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -18,7 +17,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate Event
+// Activate Event - aggressively wipe out any older caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -33,26 +32,58 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch Event - Stale-While-Revalidate for static assets, Network-First for API/Firestore
+// Fetch Event
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Skip non-GET requests and Firestore / Firebase APIs
-  if (event.request.method !== 'GET' || url.hostname.includes('firestore.googleapis.com') || url.hostname.includes('identitytoolkit')) {
+  // Skip non-GET requests and external APIs (Firebase, Google, etc.)
+  if (
+    event.request.method !== 'GET' ||
+    url.hostname.includes('firestore.googleapis.com') ||
+    url.hostname.includes('identitytoolkit') ||
+    url.hostname.includes('googleapis.com')
+  ) {
     return;
   }
 
+  // version.json MUST NEVER be served from cache
+  if (url.pathname === '/version.json') {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  // HTML & Navigation Requests: NETWORK-FIRST to ensure latest version is always loaded
+  if (event.request.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('.html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(event.request).then((cached) => cached || caches.match('/'));
+        })
+    );
+    return;
+  }
+
+  // Static Assets (/assets/**, images): Cache-first with network fallback
   event.respondWith(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.match(event.request).then((cachedResponse) => {
-        const fetchPromise = fetch(event.request).then((networkResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+
+        return fetch(event.request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             cache.put(event.request, networkResponse.clone());
           }
           return networkResponse;
-        }).catch(() => cachedResponse);
-
-        return cachedResponse || fetchPromise;
+        });
       });
     })
   );

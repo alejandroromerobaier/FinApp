@@ -39,19 +39,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Failsafe: Never stay in loading state indefinitely
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 4000);
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       setAnalyticsUser(user?.uid || null);
       
       if (user) {
         // Sync profile to Firestore
-        await syncUserProfile(user);
+        await syncUserProfile(user).catch(() => {});
         
         // Listen to profile changes
         const profileUnsubscribe = onSnapshot(doc(db, 'users', user.uid), (docSnapshot) => {
           if (docSnapshot.exists()) {
             setProfile(docSnapshot.data() as UserProfile);
           }
+          setLoading(false);
+        }, (error) => {
+          console.error("Profile snapshot error:", error);
           setLoading(false);
         });
         
@@ -62,7 +70,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(safetyTimer);
+      unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
