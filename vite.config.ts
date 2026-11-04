@@ -1,14 +1,40 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { execSync } from 'child_process';
+import fs from 'fs';
 import { defineConfig, loadEnv } from 'vite';
+
+// Read version and git commit metadata
+let packageVersion = '2.7.0';
+try {
+  const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
+  if (pkg.version) packageVersion = pkg.version;
+} catch {
+  // fallback if read fails
+}
+
+let commitHash = 'unknown';
+try {
+  commitHash = execSync('git rev-parse --short HEAD').toString().trim();
+} catch {
+  // fallback if git is unavailable
+}
+
+const buildDate = new Date().toISOString();
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
+  const appEnv = mode === 'production' ? 'PROD' : mode.toUpperCase();
+
   return {
     plugins: [react(), tailwindcss()],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      __APP_VERSION__: JSON.stringify(packageVersion),
+      __COMMIT_HASH__: JSON.stringify(commitHash),
+      __BUILD_DATE__: JSON.stringify(buildDate),
+      __APP_ENV__: JSON.stringify(appEnv),
     },
     resolve: {
       alias: {

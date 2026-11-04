@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import logo from '../assets/logo.png';
 import { useData } from '../lib/DataContext';
+import { getAppVersionInfo } from '../lib/version';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
@@ -23,6 +24,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const { notifications, markAsRead, markAllAsRead, deleteNotification, clearAllNotifications } = useData();
   const [showNotifs, setShowNotifs] = React.useState(false);
   const [filterNotifs, setFilterNotifs] = React.useState<'all' | 'unread'>('all');
+  const versionInfo = getAppVersionInfo();
   
   const isAuthPage = location.pathname === '/login';
   const isAddPage = location.pathname === '/add';
@@ -300,6 +302,12 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
            <NavLink to="/settings" className={({ isActive }) => cn("p-4 rounded-2xl transition-all", isActive ? "bg-primary text-white" : "text-on-surface-variant hover:bg-on-surface/5")}>
              <Settings size={24} />
            </NavLink>
+           <span 
+             className="mt-2 text-[9px] font-mono font-bold text-on-surface-variant/40 tracking-tight select-none cursor-default" 
+             title={`FinApp v${versionInfo.version} (${versionInfo.commit}) • ${versionInfo.env}`}
+           >
+             v{versionInfo.version}
+           </span>
         </aside>
       )}
     </div>
