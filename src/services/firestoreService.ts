@@ -268,6 +268,7 @@ export const ensureSystemCategories = async () => {
     { name: 'Salario', icon: 'Landmark', color: 'bg-emerald-600', type: 'income', scope: 'system' },
     { name: 'Inversiones', icon: 'Zap', color: 'bg-amber-600', type: 'income', scope: 'system' },
     { name: 'Regalo', icon: 'Gift', color: 'bg-rose-600', type: 'income', scope: 'system' },
+    { name: 'Transferencia', icon: 'ArrowLeftRight', color: 'bg-cyan-600', type: 'expense', scope: 'system' },
   ];
 
   // We check for these specifically to ensure they exist once globally without overwriting user-edited names

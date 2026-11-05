@@ -222,7 +222,6 @@ export const AddExpense: React.FC = () => {
           const t: any = await getTransaction(id);
           if (t) {
             setAmount(formatAmountForDisplay(t.amount));
-            setType(t.type);
             setDescription(t.description || '');
             // Use original time from Firestore but normalize date string for the input
             const localDateStr = formatLocalYYYYMMDD(t.date);
@@ -258,12 +257,31 @@ export const AddExpense: React.FC = () => {
             }
 
             if (t.isTransfer) {
+              setType('transfer');
               setIsExistingTransfer(true);
               setExistingTransferDirection(t.transferDirection || (t.type === 'expense' ? 'out' : 'in'));
               setExistingRelatedProjectName(t.relatedProjectName || '');
               setExistingRelatedAmount(t.relatedAmount || null);
               setExistingRelatedCurrency(t.relatedCurrency || '');
               setExistingExchangeRate(t.exchangeRate || null);
+
+              // Set accounts & amounts for transfer view
+              if (t.transferDirection === 'in') {
+                setFromProjectId(t.relatedProjectId || 'personal');
+                setToProjectId(t.projectId || 'personal');
+                setAmount(formatAmountForDisplay(t.relatedAmount || t.amount));
+                setToAmount(formatAmountForDisplay(t.amount));
+              } else {
+                setFromProjectId(t.projectId || 'personal');
+                setToProjectId(t.relatedProjectId || 'personal');
+                setAmount(formatAmountForDisplay(t.amount));
+                setToAmount(formatAmountForDisplay(t.relatedAmount || t.amount));
+              }
+              if (t.exchangeRate) {
+                setExchangeRateInput(String(t.exchangeRate));
+              }
+            } else {
+              setType(t.type);
             }
 
             setClassification(t.classification || 'variable');
@@ -277,7 +295,17 @@ export const AddExpense: React.FC = () => {
             }
 
             const cat = allCategories.find(c => c.id === t.categoryId);
-            if (cat) setSelectedCategory(cat);
+            if (cat) {
+              setSelectedCategory(cat);
+            } else if (t.isTransfer) {
+              setSelectedCategory({
+                id: 'system_transferencia',
+                name: 'Transferencia',
+                icon: 'ArrowLeftRight',
+                color: 'bg-cyan-600',
+                type: t.type
+              });
+            }
           }
         } catch (error) {
           console.error('Error fetching transaction:', error);

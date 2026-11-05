@@ -148,18 +148,25 @@ export const ProjectDetail: React.FC = () => {
       return !isNaN(tDate.getTime()) && tDate <= endOfCurrentMonth;
     });
 
-    const total = validTransactions.reduce((acc, t) => acc + (t.type === 'expense' ? t.amount : 0), 0);
+    const totalExpenses = validTransactions.reduce((acc, t) => acc + (t.type === 'expense' ? t.amount : 0), 0);
+    const totalIncome = validTransactions.reduce((acc, t) => acc + (t.type === 'income' ? t.amount : 0), 0);
+    const balance = totalIncome - totalExpenses;
     const byMember: Record<string, number> = {};
 
-    let currentMonthTotal = 0;
+    let currentMonthExpenses = 0;
+    let currentMonthIncome = 0;
 
     validTransactions.forEach(t => {
       if (t.type === 'expense') {
         byMember[t.authorId] = (byMember[t.authorId] || 0) + t.amount;
-        
-        const tDate = t.date instanceof Date ? t.date : new Date(t.date);
-        if (tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear) {
-          currentMonthTotal += t.amount;
+      }
+      
+      const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+      if (tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear) {
+        if (t.type === 'expense') {
+          currentMonthExpenses += t.amount;
+        } else if (t.type === 'income') {
+          currentMonthIncome += t.amount;
         }
       }
     });
@@ -167,10 +174,19 @@ export const ProjectDetail: React.FC = () => {
     const contributorStats = members.map(m => ({
       ...m,
       amount: byMember[m.id] || 0,
-      percentage: total > 0 ? Math.round(((byMember[m.id] || 0) / total) * 100) : 0
+      percentage: totalExpenses > 0 ? Math.round(((byMember[m.id] || 0) / totalExpenses) * 100) : 0
     })).sort((a, b) => b.amount - a.amount);
 
-    return { total, currentMonthTotal, contributorStats };
+    return { 
+      total: totalExpenses, 
+      totalExpenses,
+      totalIncome,
+      balance,
+      currentMonthTotal: currentMonthExpenses, 
+      currentMonthExpenses,
+      currentMonthIncome,
+      contributorStats 
+    };
   }, [transactions, members]);
 
   const handleInvite = async (e: React.FormEvent) => {
@@ -261,9 +277,18 @@ export const ProjectDetail: React.FC = () => {
                   </p>
                 </div>
                 <div className="bg-primary text-white p-6 rounded-3xl shadow-xl shadow-primary/20 min-w-[200px]">
-                  <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Gasto del Mes</p>
-                  <div className="text-3xl font-black tracking-tight font-headline">{formatCurrency(stats.currentMonthTotal, project.currency)}</div>
-                  <p className="text-white/40 text-[9px] font-bold uppercase mt-2">Total: {formatCurrency(stats.total, project.currency)}</p>
+                  <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">
+                    {isUsdProject ? 'Saldo Total de Bóveda' : 'Gasto del Mes'}
+                  </p>
+                  <div className="text-3xl font-black tracking-tight font-headline">
+                    {formatCurrency(isUsdProject ? stats.balance : stats.currentMonthTotal, project.currency)}
+                  </div>
+                  <p className="text-white/60 text-[9px] font-bold uppercase mt-2">
+                    {isUsdProject 
+                      ? `Ingreso del Mes: ${formatCurrency(stats.currentMonthIncome, project.currency)}`
+                      : `Total Histórico: ${formatCurrency(stats.total, project.currency)}`
+                    }
+                  </p>
                 </div>
               </div>
               <div className="absolute -right-20 -bottom-20 w-64 h-64 bg-primary/5 blur-3xl rounded-full"></div>

@@ -90,6 +90,8 @@ export const Home: React.FC = () => {
       total: number; 
       currentIncome: number; 
       currentExpenses: number;
+      transfersIn: number;
+      transfersOut: number;
       currency: string;
       name: string;
       cardColor?: string | null;
@@ -100,6 +102,8 @@ export const Home: React.FC = () => {
         total: 0,
         currentIncome: 0,
         currentExpenses: 0,
+        transfersIn: 0,
+        transfersOut: 0,
         currency: profile?.currency || 'ARS',
         name: 'Personal',
         cardColor: profile?.personalCardColor || 'navy'
@@ -113,6 +117,8 @@ export const Home: React.FC = () => {
         total: 0,
         currentIncome: 0,
         currentExpenses: 0,
+        transfersIn: 0,
+        transfersOut: 0,
         currency: p.currency || profile?.currency || 'ARS',
         name: p.name,
         cardColor: p.cardColor || 'slate'
@@ -146,6 +152,8 @@ export const Home: React.FC = () => {
           total: 0, 
           currentIncome: 0, 
           currentExpenses: 0,
+          transfersIn: 0,
+          transfersOut: 0,
           currency,
           name: projectName,
           cardColor: projectId === 'personal' ? (profile?.personalCardColor || 'navy') : (project?.cardColor || 'slate')
@@ -155,19 +163,23 @@ export const Home: React.FC = () => {
       // Total general acumulado hasta el fin del mes activo (el saldo neto 'total' siempre refleja las transferencias)
       if (t.type === 'income') {
         projectTotals[projectId].total += t.amount;
-        if (!t.isTransfer) projectTotals[projectId].income += t.amount;
+        projectTotals[projectId].income += t.amount;
       } else {
         projectTotals[projectId].total -= t.amount;
-        if (!t.isTransfer) projectTotals[projectId].expenses += t.amount;
+        projectTotals[projectId].expenses += t.amount;
       }
 
-      // Actividad del mes seleccionado (excluyendo transferencias/cambios de divisa para no inflar gastos e ingresos operativos)
+      // Actividad del mes seleccionado reflejada en la tarjeta de cada proyecto/bóveda
       if (tDate.getMonth() === activeMonth && tDate.getFullYear() === activeYear) {
-        if (!t.isTransfer) {
-          if (t.type === 'income') {
-            projectTotals[projectId].currentIncome += t.amount;
-          } else {
-            projectTotals[projectId].currentExpenses += t.amount;
+        if (t.type === 'income') {
+          projectTotals[projectId].currentIncome += t.amount;
+          if (t.isTransfer) {
+            projectTotals[projectId].transfersIn += t.amount;
+          }
+        } else {
+          projectTotals[projectId].currentExpenses += t.amount;
+          if (t.isTransfer) {
+            projectTotals[projectId].transfersOut += t.amount;
           }
         }
       }
@@ -401,6 +413,11 @@ export const Home: React.FC = () => {
                       <p className="text-lg sm:text-xl font-black text-white leading-none tracking-tight">
                         {showBalances ? formatCurrency(data.currentIncome, data.currency) : '••••••'}
                       </p>
+                      {showBalances && data.transfersIn > 0 && (
+                        <p className="text-[9px] font-bold text-emerald-300/80 mt-1 leading-none">
+                          inc. {formatCurrency(data.transfersIn, data.currency)} transf.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -414,6 +431,11 @@ export const Home: React.FC = () => {
                       <p className="text-lg sm:text-xl font-black text-white leading-none tracking-tight">
                         {showBalances ? formatCurrency(data.currentExpenses, data.currency) : '••••••'}
                       </p>
+                      {showBalances && data.transfersOut > 0 && (
+                        <p className="text-[9px] font-bold text-rose-300/80 mt-1 leading-none">
+                          inc. {formatCurrency(data.transfersOut, data.currency)} transf.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -629,22 +651,22 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, category
       <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
         <div className={cn(
           "w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-white shadow-sm shrink-0",
-          color || category?.color || transaction.categoryColor || 'bg-slate-400'
+          transaction.isTransfer ? "bg-cyan-600" : (color || category?.color || transaction.categoryColor || 'bg-slate-400')
         )}>
-          <IconComponent name={category?.icon || transaction.categoryIcon || 'MoreHorizontal'} size={20} />
+          <IconComponent name={transaction.isTransfer ? 'ArrowLeftRight' : (category?.icon || transaction.categoryIcon || 'MoreHorizontal')} size={20} />
         </div>
         <div className="flex flex-col min-w-0 flex-1">
           {/* Row 1: Description gets full width, never squeezed */}
           <div className="flex items-center gap-2 min-w-0">
             <p className="font-bold text-on-surface text-sm sm:text-base leading-tight truncate">
-              {transaction.description || category?.name || transaction.categoryName || 'Sin descripción'}
+              {transaction.description || (transaction.isTransfer ? 'Transferencia' : (category?.name || transaction.categoryName || 'Sin descripción'))}
             </p>
           </div>
 
           {/* Row 2: Badges wrap cleanly without squeezing description */}
           <div className="flex flex-wrap items-center gap-1.5 mt-1 min-w-0">
             <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider truncate max-w-[110px] sm:max-w-none">
-              {category?.name || transaction.categoryName || (transaction.categoryId ? 'Cargando...' : 'Otros')}
+              {transaction.isTransfer ? 'Transferencia' : (category?.name || transaction.categoryName || (transaction.categoryId ? 'Cargando...' : 'Otros'))}
             </p>
 
             {project && (

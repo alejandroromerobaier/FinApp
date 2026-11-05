@@ -643,22 +643,22 @@ export const History: React.FC = () => {
                       <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
                         <div className={cn(
                           "w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-white shadow-lg transition-transform group-hover:scale-110 shrink-0",
-                          category?.color || t.categoryColor || 'bg-slate-400'
+                          t.isTransfer ? "bg-cyan-600" : (category?.color || t.categoryColor || 'bg-slate-400')
                         )}>
-                          <IconComponent name={category?.icon || t.categoryIcon || 'MoreHorizontal'} size={20} />
+                          <IconComponent name={t.isTransfer ? 'ArrowLeftRight' : (category?.icon || t.categoryIcon || 'MoreHorizontal')} size={20} />
                         </div>
                         <div className="min-w-0 flex-1">
                           {/* Row 1: Description gets full width, never squeezed */}
                           <div className="flex items-center gap-2 min-w-0">
                             <h4 className="font-bold text-on-surface tracking-tight leading-snug truncate text-sm sm:text-base">
-                              {t.description || category?.name || t.categoryName || 'Gasto'}
+                              {t.description || (t.isTransfer ? 'Transferencia' : (category?.name || t.categoryName || 'Gasto'))}
                             </h4>
                           </div>
 
                           {/* Row 2: Badges wrap cleanly without squeezing description */}
                           <div className="flex flex-wrap items-center gap-1.5 mt-1 min-w-0">
                             <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider leading-none truncate max-w-[110px] sm:max-w-none">
-                              {category ? category.name : (t.categoryName || (t.categoryId ? 'Cargando...' : 'Otros'))}
+                              {t.isTransfer ? 'Transferencia' : (category ? category.name : (t.categoryName || (t.categoryId ? 'Cargando...' : 'Otros')))}
                             </span>
                             {t.projectId && (
                               <>

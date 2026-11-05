@@ -255,6 +255,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Final categories is the combination of incoming categories + any lingering discovered ones
         const combined = [...data];
+        if (!combined.some(c => c.id === 'system_transferencia')) {
+          combined.push({
+            id: 'system_transferencia',
+            name: 'Transferencia',
+            icon: 'ArrowLeftRight',
+            color: 'bg-cyan-600',
+            type: 'expense',
+            scope: 'system'
+          } as any);
+        }
         discovered.forEach(c => {
           if (!incomingIds.has(c.id)) {
             combined.push(c);
