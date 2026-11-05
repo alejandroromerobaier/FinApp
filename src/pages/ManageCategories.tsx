@@ -191,7 +191,7 @@ export const ManageCategories: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {categories.filter(c => c.type === newType).map((cat) => (
+          {categories.filter(c => c.type === newType && c.id !== 'system_transferencia').map((cat) => (
             <div 
               key={cat.id}
               className="bg-surface-container-lowest p-5 rounded-2xl border border-on-surface/5 flex items-center justify-between group hover:bg-on-surface/5 transition-colors shadow-sm"
@@ -233,7 +233,7 @@ export const ManageCategories: React.FC = () => {
             </div>
           ))}
 
-          {categories.filter(c => c.type === newType).length === 0 && (
+          {categories.filter(c => c.type === newType && c.id !== 'system_transferencia').length === 0 && (
             <div className="col-span-full py-20 text-center bg-on-surface/5 rounded-[2.5rem] border-2 border-dashed border-on-surface/10">
               <p className="text-on-surface-variant font-bold">No hay categorías para este tipo.</p>
               <button 
@@ -394,7 +394,7 @@ export const ManageCategories: React.FC = () => {
                     <span className="text-sm font-bold">Eliminar Directamente</span>
                   </button>
                   
-                  {categories.filter(c => c.id !== showDeleteModal && c.type === categories.find(curr => curr.id === showDeleteModal)?.type).map(cat => (
+                  {categories.filter(c => c.id !== showDeleteModal && c.id !== 'system_transferencia' && c.type === categories.find(curr => curr.id === showDeleteModal)?.type).map(cat => (
                     <button 
                       key={cat.id}
                       onClick={() => setReassignTo(cat.id)}

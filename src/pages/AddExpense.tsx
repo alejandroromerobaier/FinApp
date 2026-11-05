@@ -171,7 +171,7 @@ export const AddExpense: React.FC = () => {
 
   const isAuthor = !id || authorId === user?.uid;
 
-  const categories = allCategories.filter(c => c.type === (type === 'transfer' ? 'expense' : type));
+  const categories = allCategories.filter(c => c.type === (type === 'transfer' ? 'expense' : type) && c.id !== 'system_transferencia');
 
   const [hasInitializedDefault, setHasInitializedDefault] = useState(false);
 
@@ -355,7 +355,7 @@ export const AddExpense: React.FC = () => {
   const handleTypeChange = (newType: 'expense' | 'income' | 'transfer') => {
     setType(newType);
     if (newType !== 'transfer') {
-      const firstCat = allCategories.find(c => c.type === newType);
+      const firstCat = allCategories.find(c => c.type === newType && c.id !== 'system_transferencia');
       setSelectedCategory(firstCat || null);
     } else {
       if (!toProjectId) {

@@ -249,7 +249,7 @@ export const ManageShortcuts: React.FC = () => {
 
   // Include expense categories and any custom user categories
   const expenseCategories = useMemo(() => {
-    return categories.filter(c => c.type !== 'income');
+    return categories.filter(c => c.type !== 'income' && c.id !== 'system_transferencia');
   }, [categories]);
 
   const selectedCategory = useMemo(() => {

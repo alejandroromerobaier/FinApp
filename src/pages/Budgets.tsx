@@ -19,7 +19,7 @@ export const Budgets: React.FC = () => {
   const [copying, setCopying] = useState(false);
 
   // Filter only expense categories
-  const expenseCategories = categories.filter(c => c.type === 'expense');
+  const expenseCategories = categories.filter(c => c.type === 'expense' && c.id !== 'system_transferencia');
 
   // Initialize local budgets from store
   React.useEffect(() => {
