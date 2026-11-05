@@ -186,6 +186,7 @@ export const Reports: React.FC = () => {
     const currencyMap: Record<string, { income: number; expenses: number; fixed: number; variable: number; catMap: Record<string, number>; methods: Record<string, number>; projectSplit: { personal: number; shared: number } }> = {};
 
     filteredTransactions.forEach(t => {
+      if (t.isTransfer) return;
       const project = projects.find(p => p.id === t.projectId);
       const currency = project?.currency || profile?.currency || 'ARS';
       const method = t.paymentMethod || 'Efectivo';

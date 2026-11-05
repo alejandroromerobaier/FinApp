@@ -1128,6 +1128,18 @@ export const updateTransaction = async (transactionId: string, transaction: any)
   }
 };
 
+export const deleteTransfer = async (transferId: string) => {
+  try {
+    const q = query(collection(db, 'transactions'), where('transferId', '==', transferId));
+    const snap = await getDocs(q);
+    const batch = writeBatch(db);
+    snap.docs.forEach(docSnap => batch.delete(docSnap.ref));
+    await batch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `transactions/transfer/${transferId}`);
+  }
+};
+
 export const deleteTransaction = async (transactionId: string) => {
   try {
     if (transactionId.includes('_installment_')) {
@@ -1136,9 +1148,122 @@ export const deleteTransaction = async (transactionId: string) => {
       const installmentNum = parseInt(parts[1], 10);
       return await deleteSingleVirtualInstallment(parentId, installmentNum);
     }
-    await deleteDoc(doc(db, 'transactions', transactionId));
+
+    const txRef = doc(db, 'transactions', transactionId);
+    const txSnap = await getDoc(txRef);
+    if (txSnap.exists() && txSnap.data()?.transferId) {
+      return await deleteTransfer(txSnap.data().transferId);
+    }
+
+    await deleteDoc(txRef);
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `transactions/${transactionId}`);
+  }
+};
+
+export interface CreateTransferParams {
+  userId: string;
+  authorName?: string;
+  fromProjectId: string | null;
+  toProjectId: string | null;
+  fromProjectName: string;
+  toProjectName: string;
+  fromAmount: number;
+  toAmount: number;
+  fromCurrency: string;
+  toCurrency: string;
+  exchangeRate?: number;
+  date: string;
+  description?: string;
+}
+
+export const createTransfer = async (params: CreateTransferParams) => {
+  try {
+    const transferId = `transfer_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const finalDate = parseLocalYYYYMMDD(params.date);
+    const now = new Date();
+    finalDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+
+    const rate = params.exchangeRate && params.exchangeRate > 0 
+      ? params.exchangeRate 
+      : (params.toAmount > 0 ? params.fromAmount / params.toAmount : 1);
+
+    const isCurrencyExchange = params.fromCurrency !== params.toCurrency;
+    const defaultDesc = isCurrencyExchange 
+      ? `Cambio: ${params.fromCurrency} ➔ ${params.toCurrency}`
+      : `Transferencia: ${params.fromProjectName} ➔ ${params.toProjectName}`;
+
+    const cleanDesc = params.description?.trim() || defaultDesc;
+
+    const fromPid = (params.fromProjectId && params.fromProjectId !== 'personal' && params.fromProjectId !== 'null') 
+      ? params.fromProjectId 
+      : null;
+
+    const toPid = (params.toProjectId && params.toProjectId !== 'personal' && params.toProjectId !== 'null') 
+      ? params.toProjectId 
+      : null;
+
+    const batch = writeBatch(db);
+
+    // 1. Outgoing Transaction (Salida)
+    const outDocRef = doc(collection(db, 'transactions'));
+    batch.set(outDocRef, {
+      amount: params.fromAmount,
+      type: 'expense',
+      isTransfer: true,
+      transferDirection: 'out',
+      transferId: transferId,
+      description: cleanDesc,
+      projectId: fromPid,
+      authorId: params.userId,
+      authorName: params.authorName || 'Usuario',
+      date: Timestamp.fromDate(finalDate),
+      createdAt: serverTimestamp(),
+      categoryId: 'system_transferencia',
+      categoryName: 'Transferencia',
+      categoryIcon: 'ArrowLeftRight',
+      categoryColor: 'bg-cyan-600',
+      paymentMethod: 'Transferencia',
+      relatedProjectId: toPid,
+      relatedProjectName: params.toProjectName,
+      relatedAmount: params.toAmount,
+      relatedCurrency: params.toCurrency,
+      exchangeRate: rate,
+      isCurrencyExchange
+    });
+
+    // 2. Incoming Transaction (Entrada)
+    const inDocRef = doc(collection(db, 'transactions'));
+    batch.set(inDocRef, {
+      amount: params.toAmount,
+      type: 'income',
+      isTransfer: true,
+      transferDirection: 'in',
+      transferId: transferId,
+      description: cleanDesc,
+      projectId: toPid,
+      authorId: params.userId,
+      authorName: params.authorName || 'Usuario',
+      date: Timestamp.fromDate(finalDate),
+      createdAt: serverTimestamp(),
+      categoryId: 'system_transferencia',
+      categoryName: 'Transferencia',
+      categoryIcon: 'ArrowLeftRight',
+      categoryColor: 'bg-cyan-600',
+      paymentMethod: 'Transferencia',
+      relatedProjectId: fromPid,
+      relatedProjectName: params.fromProjectName,
+      relatedAmount: params.fromAmount,
+      relatedCurrency: params.fromCurrency,
+      exchangeRate: rate,
+      isCurrencyExchange
+    });
+
+    await batch.commit();
+    return transferId;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, 'transactions/transfer');
+    throw error;
   }
 };
 

@@ -73,6 +73,16 @@ export interface Transaction {
   isVirtualInstallment?: boolean;
   parentPlanId?: string;
   firstDueDate?: string;
+  // Transfer / Currency Exchange fields
+  isTransfer?: boolean;
+  transferDirection?: 'out' | 'in';
+  transferId?: string;
+  relatedProjectId?: string | null;
+  relatedProjectName?: string;
+  relatedAmount?: number;
+  relatedCurrency?: string;
+  exchangeRate?: number;
+  isCurrencyExchange?: boolean;
 }
 
 export interface Budget {

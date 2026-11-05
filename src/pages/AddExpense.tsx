@@ -33,7 +33,8 @@ import {
   CalendarCheck,
   AlertCircle,
   Plus,
-  Info
+  Info,
+  ArrowLeftRight
 } from 'lucide-react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { cn, formatCurrencyInput, formatAmountForDisplay, parseFormattedAmount, formatCurrency } from '../lib/utils';
@@ -45,6 +46,7 @@ import {
   deleteTransaction, 
   getTransaction,
   createInstallmentExpense,
+  createTransfer,
   CreditCard as CreditCardType
 } from '../services/firestoreService';
 import { getLocalToday, formatDisplayDate, formatLocalYYYYMMDD, parseLocalYYYYMMDD } from '../lib/dateUtils';
@@ -59,7 +61,7 @@ const formatMonthLabel = (dateStr: string): string => {
 
 const ICON_MAP: Record<string, any> = {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
-  Landmark, Tag, Gift, Briefcase, Home, Plane, Coffee, Zap, Smartphone, ShieldCheck
+  Landmark, Tag, Gift, Briefcase, Home, Plane, Coffee, Zap, Smartphone, ShieldCheck, ArrowLeftRight
 };
 
 const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => {
@@ -120,7 +122,7 @@ export const AddExpense: React.FC = () => {
   const { categories: allCategories, projects, cards, loading: dataLoading } = useData();
   
   const [amount, setAmount] = useState('');
-  const [type, setType] = useState<'expense' | 'income'>('expense');
+  const [type, setType] = useState<'expense' | 'income' | 'transfer'>('expense');
   const [destination, setDestination] = useState<'personal' | 'shared'>('shared');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<any>(null);
@@ -151,9 +153,23 @@ export const AddExpense: React.FC = () => {
   const [existingTotalInstallments, setExistingTotalInstallments] = useState<number | null>(null);
   const [existingPlanId, setExistingPlanId] = useState<string | null>(null);
 
+  // Transfer & Currency Exchange State
+  const [fromProjectId, setFromProjectId] = useState<string>('personal');
+  const [toProjectId, setToProjectId] = useState<string>('');
+  const [toAmount, setToAmount] = useState<string>('');
+  const [exchangeRateInput, setExchangeRateInput] = useState<string>('');
+
+  // Existing Transfer context (when editing)
+  const [isExistingTransfer, setIsExistingTransfer] = useState(false);
+  const [existingTransferDirection, setExistingTransferDirection] = useState<'out' | 'in' | null>(null);
+  const [existingRelatedProjectName, setExistingRelatedProjectName] = useState<string>('');
+  const [existingRelatedAmount, setExistingRelatedAmount] = useState<number | null>(null);
+  const [existingRelatedCurrency, setExistingRelatedCurrency] = useState<string>('');
+  const [existingExchangeRate, setExistingExchangeRate] = useState<number | null>(null);
+
   const isAuthor = !id || authorId === user?.uid;
 
-  const categories = allCategories.filter(c => c.type === type);
+  const categories = allCategories.filter(c => c.type === (type === 'transfer' ? 'expense' : type));
 
   const [hasInitializedDefault, setHasInitializedDefault] = useState(false);
 
@@ -241,6 +257,15 @@ export const AddExpense: React.FC = () => {
               setInstallments(t.totalInstallments || 1);
             }
 
+            if (t.isTransfer) {
+              setIsExistingTransfer(true);
+              setExistingTransferDirection(t.transferDirection || (t.type === 'expense' ? 'out' : 'in'));
+              setExistingRelatedProjectName(t.relatedProjectName || '');
+              setExistingRelatedAmount(t.relatedAmount || null);
+              setExistingRelatedCurrency(t.relatedCurrency || '');
+              setExistingExchangeRate(t.exchangeRate || null);
+            }
+
             setClassification(t.classification || 'variable');
 
             if (t.projectId) {
@@ -288,10 +313,29 @@ export const AddExpense: React.FC = () => {
     }
   }, [date, selectedCard, id]);
 
-  const handleTypeChange = (newType: 'expense' | 'income') => {
+  const fromProject = fromProjectId === 'personal' ? null : projects.find(p => p.id === fromProjectId);
+  const toProject = toProjectId === 'personal' ? null : projects.find(p => p.id === toProjectId);
+
+  const fromCurrency = fromProject?.currency || profile?.currency || 'ARS';
+  const toCurrency = toProject?.currency || profile?.currency || 'ARS';
+  const isCurrencyExchange = fromCurrency !== toCurrency;
+
+  const handleTypeChange = (newType: 'expense' | 'income' | 'transfer') => {
     setType(newType);
-    const firstCat = allCategories.find(c => c.type === newType);
-    setSelectedCategory(firstCat || null);
+    if (newType !== 'transfer') {
+      const firstCat = allCategories.find(c => c.type === newType);
+      setSelectedCategory(firstCat || null);
+    } else {
+      if (!toProjectId) {
+        const usdProj = visibleProjects.find(p => p.currency === 'USD');
+        if (usdProj && fromProjectId !== usdProj.id) {
+          setToProjectId(usdProj.id);
+        } else if (visibleProjects.length > 0) {
+          const firstOther = visibleProjects.find(p => p.id !== fromProjectId);
+          setToProjectId(firstOther ? firstOther.id : 'personal');
+        }
+      }
+    }
   };
 
   const formatDateDisplay = (dateStr: string) => {
@@ -307,6 +351,19 @@ export const AddExpense: React.FC = () => {
     const { display } = formatCurrencyInput(oldVal);
     setAmount(display);
 
+    if (type === 'transfer') {
+      const fromVal = parseFormattedAmount(display);
+      if (!isCurrencyExchange) {
+        setToAmount(display);
+      } else {
+        const rate = parseFloat(exchangeRateInput.replace(',', '.'));
+        if (rate > 0 && fromVal > 0) {
+          const calculatedTo = fromCurrency === 'USD' ? fromVal * rate : fromVal / rate;
+          setToAmount(formatAmountForDisplay(Math.round(calculatedTo * 100) / 100));
+        }
+      }
+    }
+
     requestAnimationFrame(() => {
       if (input && document.activeElement === input) {
         const newCursor = Math.max(0, display.length - charsFromRight);
@@ -315,7 +372,54 @@ export const AddExpense: React.FC = () => {
     });
   };
 
+  const handleToAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const oldVal = input.value;
+    const oldCursor = input.selectionStart || oldVal.length;
+    const charsFromRight = oldVal.length - oldCursor;
+
+    const { display } = formatCurrencyInput(oldVal);
+    setToAmount(display);
+
+    const toVal = parseFormattedAmount(display);
+    const fromVal = parseFormattedAmount(amount);
+    if (fromVal > 0 && toVal > 0 && isCurrencyExchange) {
+      const derivedRate = fromCurrency === 'USD' ? toVal / fromVal : fromVal / toVal;
+      setExchangeRateInput(derivedRate.toFixed(2));
+    }
+
+    requestAnimationFrame(() => {
+      if (input && document.activeElement === input) {
+        const newCursor = Math.max(0, display.length - charsFromRight);
+        input.setSelectionRange(newCursor, newCursor);
+      }
+    });
+  };
+
+  const handleExchangeRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setExchangeRateInput(val);
+    const rate = parseFloat(val.replace(',', '.'));
+    const fromVal = parseFormattedAmount(amount);
+    if (rate > 0 && fromVal > 0) {
+      const calculatedTo = fromCurrency === 'USD' ? fromVal * rate : fromVal / rate;
+      setToAmount(formatAmountForDisplay(Math.round(calculatedTo * 100) / 100));
+    }
+  };
+
+  const handleSwapAccounts = () => {
+    const prevFrom = fromProjectId;
+    const prevTo = toProjectId;
+    setFromProjectId(prevTo || 'personal');
+    setToProjectId(prevFrom || 'personal');
+    const prevAmt = amount;
+    const prevToAmt = toAmount;
+    setAmount(prevToAmt);
+    setToAmount(prevAmt);
+  };
+
   const parsedAmount = parseFormattedAmount(amount);
+  const parsedToAmount = parseFormattedAmount(toAmount);
   const isValidAmount = Boolean(amount && !isNaN(parsedAmount) && parsedAmount > 0);
 
   const activeCurrency = destination === 'shared' 
@@ -332,6 +436,69 @@ export const AddExpense: React.FC = () => {
     : parsedAmount;
 
   const handleSave = async () => {
+    if (type === 'transfer') {
+      if (!parsedAmount || parsedAmount <= 0) {
+        alert('Por favor ingresa un monto válido a transferir');
+        return;
+      }
+      if (!toProjectId) {
+        alert('Por favor selecciona la cuenta o proyecto de destino');
+        return;
+      }
+      if (fromProjectId === toProjectId) {
+        alert('La cuenta de origen y destino deben ser distintas');
+        return;
+      }
+
+      const finalToAmount = isCurrencyExchange 
+        ? (parseFormattedAmount(toAmount) || 0) 
+        : parsedAmount;
+
+      if (!finalToAmount || finalToAmount <= 0) {
+        alert('Por favor ingresa el monto a recibir');
+        return;
+      }
+
+      setIsSaving(true);
+      try {
+        const rate = isCurrencyExchange
+          ? (fromCurrency === 'USD' ? finalToAmount / parsedAmount : parsedAmount / finalToAmount)
+          : 1;
+
+        await createTransfer({
+          userId: user!.uid,
+          authorName: user!.displayName || user!.email?.split('@')[0] || 'Usuario',
+          fromProjectId: fromProjectId === 'personal' ? null : fromProjectId,
+          toProjectId: toProjectId === 'personal' ? null : toProjectId,
+          fromProjectName: fromProject?.name || 'Personal',
+          toProjectName: toProject?.name || 'Personal',
+          fromAmount: parsedAmount,
+          toAmount: finalToAmount,
+          fromCurrency,
+          toCurrency,
+          exchangeRate: rate,
+          date,
+          description: description.trim()
+        });
+
+        trackEvent('add_transfer', {
+          fromCurrency,
+          toCurrency,
+          fromAmount: parsedAmount,
+          toAmount: finalToAmount,
+          isCurrencyExchange
+        });
+
+        navigate(-1);
+      } catch (error) {
+        console.error('Error saving transfer:', error);
+        alert('Error al guardar la transferencia');
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
     if (!isValidAmount || !selectedCategory) return;
     if (destination === 'shared' && !selectedProjectId) {
       alert('Por favor selecciona un proyecto compartido');
@@ -414,9 +581,11 @@ export const AddExpense: React.FC = () => {
   };
 
   const handleDelete = async () => {
-    const confirmMsg = isExistingInstallment 
-      ? `¿Estás seguro de que deseas eliminar esta cuota individual (${existingInstallmentNumber}/${existingTotalInstallments})?`
-      : '¿Estás seguro de que deseas eliminar esta transacción?';
+    const confirmMsg = isExistingTransfer
+      ? '¿Estás seguro de que deseas eliminar esta transferencia? Se eliminarán automáticamente los movimientos de ambas cuentas.'
+      : isExistingInstallment 
+        ? `¿Estás seguro de que deseas eliminar esta cuota individual (${existingInstallmentNumber}/${existingTotalInstallments})?`
+        : '¿Estás seguro de que deseas eliminar esta transacción?';
     if (!id || !window.confirm(confirmMsg)) return;
     
     setIsDeleting(true);
@@ -506,6 +675,26 @@ export const AddExpense: React.FC = () => {
           </div>
         )}
 
+        {isExistingTransfer && (
+          <div className="bg-cyan-500/10 border border-cyan-500/20 p-5 rounded-2xl flex items-start gap-3 text-cyan-900 dark:text-cyan-200">
+            <ArrowLeftRight size={22} className="shrink-0 mt-0.5 text-cyan-600 dark:text-cyan-400" />
+            <div className="text-xs space-y-1">
+              <p className="font-black text-sm">Transferencia Vinculada ({existingTransferDirection === 'out' ? 'Salida' : 'Entrada'})</p>
+              <p className="font-medium text-on-surface-variant">
+                {existingTransferDirection === 'out' ? 'Hacia' : 'Desde'}: <strong className="text-on-surface">{existingRelatedProjectName}</strong> ({existingRelatedCurrency})
+              </p>
+              {existingExchangeRate && (
+                <p className="font-semibold text-cyan-700 dark:text-cyan-300">
+                  Tipo de cambio: 1 USD = ${formatCurrency(existingExchangeRate, 'ARS')}
+                </p>
+              )}
+              <p className="text-[11px] text-on-surface-variant/70 italic pt-1">
+                Para mantener la simetría contable entre cuentas, si deseas modificar los importes por favor elimina la operación y vuelve a registrarla.
+              </p>
+            </div>
+          </div>
+        )}
+
         {isExistingInstallment && (
           <div className="bg-primary/10 border border-primary/20 p-4 rounded-2xl flex items-center gap-3 text-primary">
             <Layers size={22} className="shrink-0" />
@@ -516,29 +705,245 @@ export const AddExpense: React.FC = () => {
           </div>
         )}
 
-        {/* Type Toggle */}
-        <div className={cn("flex bg-surface-container-low p-1.5 rounded-2xl border border-on-surface/5", !isAuthor && "pointer-events-none opacity-60")}>
+        {/* Type Toggle: Gasto | Ingreso | Cambio / Transferencia */}
+        <div className={cn("grid grid-cols-3 bg-surface-container-low p-1.5 rounded-2xl border border-on-surface/5 gap-1", (!isAuthor || !!id) && "pointer-events-none opacity-60")}>
           <button 
+            type="button"
             onClick={() => handleTypeChange('expense')}
             className={cn(
-              "flex-1 py-3.5 px-4 rounded-[14px] text-sm font-black transition-all flex items-center justify-center gap-2 uppercase tracking-wider",
+              "py-3 px-2 rounded-[14px] text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider",
               type === 'expense' ? "bg-surface-container-lowest text-rose-600 shadow-sm" : "text-on-surface-variant/50"
             )}
           >
-            <div className={cn("w-2 h-2 rounded-full", type === 'expense' ? "bg-rose-600" : "bg-on-surface-variant/20")} />
-            Gasto
+            <div className={cn("w-2 h-2 rounded-full shrink-0", type === 'expense' ? "bg-rose-600" : "bg-on-surface-variant/20")} />
+            <span>Gasto</span>
           </button>
           <button 
+            type="button"
             onClick={() => handleTypeChange('income')}
             className={cn(
-              "flex-1 py-3.5 px-4 rounded-[14px] text-sm font-black transition-all flex items-center justify-center gap-2 uppercase tracking-wider",
+              "py-3 px-2 rounded-[14px] text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider",
               type === 'income' ? "bg-surface-container-lowest text-emerald-600 shadow-sm" : "text-on-surface-variant/50"
             )}
           >
-            <div className={cn("w-2 h-2 rounded-full", type === 'income' ? "bg-emerald-600" : "bg-on-surface-variant/20")} />
-            Ingreso
+            <div className={cn("w-2 h-2 rounded-full shrink-0", type === 'income' ? "bg-emerald-600" : "bg-on-surface-variant/20")} />
+            <span>Ingreso</span>
+          </button>
+          <button 
+            type="button"
+            onClick={() => handleTypeChange('transfer')}
+            className={cn(
+              "py-3 px-2 rounded-[14px] text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider",
+              type === 'transfer' ? "bg-surface-container-lowest text-cyan-600 dark:text-cyan-400 shadow-sm" : "text-on-surface-variant/50"
+            )}
+          >
+            <ArrowLeftRight size={14} className={cn("shrink-0", type === 'transfer' ? "text-cyan-600 dark:text-cyan-400" : "text-on-surface-variant/40")} />
+            <span>Cambio</span>
           </button>
         </div>
+
+        {type === 'transfer' ? (
+          <div className="space-y-6">
+            {/* Account Selector (From -> To) */}
+            <div className="bg-surface-container-lowest p-6 rounded-[2rem] border border-on-surface/5 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70">
+                  Cuentas Involucradas
+                </span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-full">
+                  {isCurrencyExchange ? 'Cambio de Divisas' : 'Transferencia Interna'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-[1fr,auto,1fr] gap-3 items-center">
+                {/* Source Account */}
+                <div className="bg-surface-container-low p-4 rounded-2xl border border-on-surface/5">
+                  <label className="block text-[10px] font-bold text-on-surface-variant/70 uppercase tracking-wider mb-2">
+                    Origen (Sale dinero)
+                  </label>
+                  <select
+                    value={fromProjectId}
+                    onChange={(e) => setFromProjectId(e.target.value)}
+                    className="w-full bg-surface-container-lowest font-black text-sm text-on-surface rounded-xl p-3 border border-on-surface/10 focus:ring-2 focus:ring-cyan-500"
+                  >
+                    <option value="personal">Personal ({profile?.currency || 'ARS'})</option>
+                    {visibleProjects.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.currency || 'ARS'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Swap button */}
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    onClick={handleSwapAccounts}
+                    className="p-3 bg-surface-container-low hover:bg-cyan-500/10 hover:text-cyan-600 rounded-2xl transition-all border border-on-surface/5 active:scale-95 text-on-surface-variant"
+                    title="Intercambiar cuentas origen y destino"
+                  >
+                    <ArrowLeftRight size={18} />
+                  </button>
+                </div>
+
+                {/* Destination Account */}
+                <div className="bg-surface-container-low p-4 rounded-2xl border border-on-surface/5">
+                  <label className="block text-[10px] font-bold text-on-surface-variant/70 uppercase tracking-wider mb-2">
+                    Destino (Entra dinero)
+                  </label>
+                  <select
+                    value={toProjectId}
+                    onChange={(e) => setToProjectId(e.target.value)}
+                    className="w-full bg-surface-container-lowest font-black text-sm text-on-surface rounded-xl p-3 border border-on-surface/10 focus:ring-2 focus:ring-cyan-500"
+                  >
+                    <option value="" disabled>Seleccionar destino...</option>
+                    <option value="personal">Personal ({profile?.currency || 'ARS'})</option>
+                    {visibleProjects.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.currency || 'ARS'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Amount Inputs */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Source Amount */}
+              <div className="bg-surface-container-lowest p-6 rounded-[2rem] border border-on-surface/5 shadow-sm text-center">
+                <p className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-[0.2em] mb-2">
+                  Monto a Enviar (Salida)
+                </p>
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-2xl font-black text-rose-600/70">{fromCurrency}</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={amount}
+                    onChange={handleAmountChange}
+                    placeholder="0,00"
+                    className="w-full max-w-[220px] bg-transparent border-none p-0 focus:ring-0 text-4xl sm:text-5xl font-black tracking-tight text-center placeholder:text-on-surface-variant/10 text-on-surface"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              {/* Destination Amount */}
+              <div className="bg-surface-container-lowest p-6 rounded-[2rem] border border-on-surface/5 shadow-sm text-center">
+                <p className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-[0.2em] mb-2">
+                  Monto a Recibir (Entrada)
+                </p>
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-2xl font-black text-emerald-600/70">{toCurrency}</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={toAmount}
+                    onChange={handleToAmountChange}
+                    disabled={!isCurrencyExchange}
+                    placeholder="0,00"
+                    className={cn(
+                      "w-full max-w-[220px] bg-transparent border-none p-0 focus:ring-0 text-4xl sm:text-5xl font-black tracking-tight text-center placeholder:text-on-surface-variant/10 text-emerald-600 dark:text-emerald-400",
+                      !isCurrencyExchange && "opacity-75"
+                    )}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Exchange Rate Box (Only for different currencies) */}
+            {isCurrencyExchange && (
+              <div className="bg-gradient-to-br from-cyan-500/10 via-sky-500/5 to-transparent p-6 rounded-[2rem] border border-cyan-500/20 shadow-sm">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-cyan-800 dark:text-cyan-200 mb-1">
+                      Cotización / Tipo de Cambio
+                    </label>
+                    <p className="text-xs text-on-surface-variant font-medium">
+                      Define o edita la cotización para calcular automáticamente los importes.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 bg-surface-container-lowest px-4 py-2.5 rounded-2xl border border-cyan-500/20 shadow-sm shrink-0">
+                    <span className="text-xs font-black text-on-surface-variant">1 USD = $</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={exchangeRateInput}
+                      onChange={handleExchangeRateChange}
+                      placeholder="1.200"
+                      className="w-24 bg-transparent border-none p-0 text-base font-black text-cyan-600 dark:text-cyan-400 focus:ring-0 text-right"
+                    />
+                    <span className="text-xs font-bold text-on-surface-variant">ARS</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Date & Note Form Sections */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Date */}
+              <div 
+                onClick={(e) => {
+                  const input = e.currentTarget.querySelector('input');
+                  if (input && 'showPicker' in input) {
+                    (input as any).showPicker();
+                  } else if (input) {
+                    input.click();
+                  }
+                }}
+                className="relative bg-surface-container-lowest p-6 rounded-3xl border border-on-surface/5 shadow-sm flex items-center justify-between group cursor-pointer hover:bg-on-surface/5 transition-colors overflow-hidden"
+              >
+                <input 
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70 mb-2">Fecha</label>
+                  <div className="flex items-center gap-3 text-on-surface font-extrabold">
+                    <Calendar size={20} className="text-primary" />
+                    <span>{formatDateDisplay(date)}</span>
+                  </div>
+                </div>
+                <ChevronRight size={20} className="text-on-surface-variant/40" />
+              </div>
+
+              {/* Note / Description */}
+              <div className="bg-surface-container-lowest p-6 rounded-3xl border border-on-surface/5 shadow-sm">
+                <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70 mb-2">Nota / Concepto (Opcional)</label>
+                <input 
+                  className="w-full bg-transparent border-none p-0 focus:ring-0 text-base font-bold placeholder:text-on-surface-variant/30 text-on-surface"
+                  placeholder={isCurrencyExchange ? "Ej: Compra Dólar MEP / Ahorro" : "Ej: Transferencia entre cuentas"}
+                  type="text"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Confirm Transfer Button */}
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={!parsedAmount || parsedAmount <= 0 || isSaving}
+              className={cn(
+                "w-full py-6 rounded-[2rem] font-black text-xl shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-3",
+                (!parsedAmount || parsedAmount <= 0 || isSaving)
+                  ? "bg-on-surface/5 text-on-surface-variant/20 cursor-not-allowed"
+                  : "bg-cyan-600 text-white shadow-cyan-600/20 hover:bg-cyan-700"
+              )}
+            >
+              {isSaving ? 'Registrando transferencia...' : isCurrencyExchange ? 'Confirmar Compra de Divisas' : 'Confirmar Transferencia'}
+              {!isSaving && <ArrowLeftRight size={22} strokeWidth={2.5} />}
+              {isSaving && <Loader2 size={24} className="animate-spin" />}
+            </button>
+          </div>
+        ) : (
+          <>
 
         {/* Amount Input Section */}
         <section className="text-center py-4">
@@ -1125,6 +1530,8 @@ export const AddExpense: React.FC = () => {
             {!isSaving && <Check size={24} strokeWidth={3} />}
             {isSaving && <Loader2 size={24} className="animate-spin" />}
           </button>
+        )}
+        </>
         )}
 
         {/* Delete Button (Only when editing and is Author) */}

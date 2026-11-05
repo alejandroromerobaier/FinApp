@@ -34,7 +34,8 @@ import {
   Layers,
   AlertTriangle,
   CheckCircle2,
-  User
+  User,
+  ArrowLeftRight
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/src/lib/utils';
 import { getGlobalTransactions, deleteTransaction, deleteInstallmentPlan, deleteSingleVirtualInstallment } from '../services/firestoreService';
@@ -45,7 +46,7 @@ import { formatDisplayDate, parseLocalYYYYMMDD } from '../lib/dateUtils';
 
 const ICON_MAP: Record<string, any> = {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
-  Landmark, Tag, Gift, Briefcase, Home, Plane, Coffee, Zap, Smartphone, ShieldCheck
+  Landmark, Tag, Gift, Briefcase, Home, Plane, Coffee, Zap, Smartphone, ShieldCheck, ArrowLeftRight
 };
 
 const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => {
@@ -676,6 +677,19 @@ export const History: React.FC = () => {
                             )}>
                               {t.authorId === user?.uid ? 'Pagado por Ti' : `Por: ${userNames[t.authorId] || 'Miembro'}`}
                             </span>
+
+                            {t.isTransfer && (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
+                                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tight bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 leading-none shrink-0">
+                                  <ArrowLeftRight size={9} />
+                                  <span>{t.transferDirection === 'out' ? 'Salida' : 'Entrada'}</span>
+                                  {t.exchangeRate && t.isCurrencyExchange && (
+                                    <span className="hidden sm:inline font-mono">• TC: ${formatCurrency(t.exchangeRate, 'ARS')}</span>
+                                  )}
+                                </span>
+                              </>
+                            )}
 
                             {t.installmentNumber && t.totalInstallments ? (
                               <>

@@ -178,8 +178,8 @@ export const Stats: React.FC = () => {
         return tCurrency === activeCurrency;
       });
 
-      const expenses = filtered.filter(t => t.type === 'expense');
-      const income = filtered.filter(t => t.type === 'income');
+      const expenses = filtered.filter(t => t.type === 'expense' && !t.isTransfer);
+      const income = filtered.filter(t => t.type === 'income' && !t.isTransfer);
       
       const totalExpenses = expenses.reduce((acc, t) => acc + t.amount, 0);
       const totalIncome = income.reduce((acc, t) => acc + t.amount, 0);

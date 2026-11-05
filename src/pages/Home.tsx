@@ -31,7 +31,8 @@ import {
   Eye,
   EyeOff,
   Plus,
-  CreditCard
+  CreditCard,
+  ArrowLeftRight
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import logo from '../assets/logo.png';
@@ -46,7 +47,7 @@ import { getProjectGradient } from '../lib/constants';
 
 const ICON_MAP: Record<string, any> = {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
-  Landmark, Tag, Gift, Briefcase, Home: HomeIcon, HomeIcon, Plane, Coffee, Zap, Smartphone, ShieldCheck
+  Landmark, Tag, Gift, Briefcase, Home: HomeIcon, HomeIcon, Plane, Coffee, Zap, Smartphone, ShieldCheck, ArrowLeftRight
 };
 
 const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => {
@@ -151,21 +152,23 @@ export const Home: React.FC = () => {
         };
       }
       
-      // Total general acumulado hasta el fin del mes activo
+      // Total general acumulado hasta el fin del mes activo (el saldo neto 'total' siempre refleja las transferencias)
       if (t.type === 'income') {
         projectTotals[projectId].total += t.amount;
-        projectTotals[projectId].income += t.amount;
+        if (!t.isTransfer) projectTotals[projectId].income += t.amount;
       } else {
         projectTotals[projectId].total -= t.amount;
-        projectTotals[projectId].expenses += t.amount;
+        if (!t.isTransfer) projectTotals[projectId].expenses += t.amount;
       }
 
-      // Actividad del mes seleccionado
+      // Actividad del mes seleccionado (excluyendo transferencias/cambios de divisa para no inflar gastos e ingresos operativos)
       if (tDate.getMonth() === activeMonth && tDate.getFullYear() === activeYear) {
-        if (t.type === 'income') {
-          projectTotals[projectId].currentIncome += t.amount;
-        } else {
-          projectTotals[projectId].currentExpenses += t.amount;
+        if (!t.isTransfer) {
+          if (t.type === 'income') {
+            projectTotals[projectId].currentIncome += t.amount;
+          } else {
+            projectTotals[projectId].currentExpenses += t.amount;
+          }
         }
       }
     });
@@ -660,6 +663,20 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, category
             )}>
               {transaction.authorId === user?.uid ? 'Tú' : userName}
             </p>
+
+            {/* Transfer Badge */}
+            {transaction.isTransfer && (
+              <>
+                <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
+                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tight shrink-0 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                  <ArrowLeftRight size={9} />
+                  <span>{transaction.transferDirection === 'out' ? 'Salida' : 'Entrada'}</span>
+                  {transaction.exchangeRate && transaction.isCurrencyExchange && (
+                    <span className="hidden sm:inline font-mono">• TC: ${formatCurrency(transaction.exchangeRate, 'ARS')}</span>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* Installment Badge or Card Badge */}
             {transaction.isInstallment && transaction.installmentNumber && transaction.totalInstallments && transaction.totalInstallments > 1 ? (

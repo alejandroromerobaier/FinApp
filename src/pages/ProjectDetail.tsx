@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Calendar, Users, Utensils, Hotel, Car, ShoppingCart, ArrowLeft, Bell, ExternalLink, Plus, X, UserPlus, Trash2, Loader2, MoreHorizontal, ShoppingBag, Play, Heart, Book, Landmark, Tag, Gift, Briefcase, Home, Plane, Coffee, Zap, Smartphone, ShieldCheck, CreditCard, Layers, TrendingUp, Clock, CheckCircle2 } from 'lucide-react';
+import { Calendar, Users, Utensils, Hotel, Car, ShoppingCart, ArrowLeft, Bell, ExternalLink, Plus, X, UserPlus, Trash2, Loader2, MoreHorizontal, ShoppingBag, Play, Heart, Book, Landmark, Tag, Gift, Briefcase, Home, Plane, Coffee, Zap, Smartphone, ShieldCheck, CreditCard, Layers, TrendingUp, Clock, CheckCircle2, ArrowLeftRight } from 'lucide-react';
 import { formatCurrency, cn } from '@/src/lib/utils';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getTransactions, removeMemberFromProject, inviteUserToProjectByEmail, getUsersByIds } from '../services/firestoreService';
@@ -11,7 +11,7 @@ import { getLocalMonth } from '../lib/dateUtils';
 
 const ICON_MAP: Record<string, any> = {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
-  Landmark, Tag, Gift, Briefcase, Home, Plane, Coffee, Zap, Smartphone, ShieldCheck, Hotel, ShoppingCart
+  Landmark, Tag, Gift, Briefcase, Home, Plane, Coffee, Zap, Smartphone, ShieldCheck, Hotel, ShoppingCart, ArrowLeftRight
 };
 
 const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => {
@@ -30,7 +30,7 @@ export const ProjectDetail: React.FC = () => {
   const [rawTransactions, setRawTransactions] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'transactions' | 'installments'>('transactions');
+  const [activeTab, setActiveTab] = useState<'transactions' | 'installments' | 'savings'>('transactions');
   const [planFilter, setPlanFilter] = useState<'all' | 'mine' | 'others'>('all');
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -93,6 +93,39 @@ export const ProjectDetail: React.FC = () => {
     }
     return projectInstallmentPlans;
   }, [projectInstallmentPlans, planFilter, currentUser?.uid]);
+
+  const transferStats = useMemo(() => {
+    // Only incoming transfers into this project or currency exchange operations
+    const inTransfers = rawTransactions
+      .filter(t => t.isTransfer && t.transferDirection === 'in')
+      .sort((a, b) => {
+        const da = a.date instanceof Date ? a.date : new Date(a.date);
+        const db = b.date instanceof Date ? b.date : new Date(b.date);
+        return db.getTime() - da.getTime();
+      });
+
+    const totalAcquired = inTransfers.reduce((acc, t) => acc + (t.amount || 0), 0);
+    const totalSpent = inTransfers.reduce((acc, t) => {
+      if (t.relatedAmount && t.relatedAmount > 0) return acc + t.relatedAmount;
+      if (t.exchangeRate && t.exchangeRate > 0) return acc + (t.amount * t.exchangeRate);
+      return acc;
+    }, 0);
+
+    const weightedAvgRate = totalAcquired > 0 ? (totalSpent / totalAcquired) : 0;
+    const latestTransfer = inTransfers[0] || null;
+    const latestRate = latestTransfer?.exchangeRate || 0;
+
+    return {
+      inTransfers,
+      totalAcquired,
+      totalSpent,
+      weightedAvgRate,
+      latestRate,
+      hasTransfers: inTransfers.length > 0
+    };
+  }, [rawTransactions]);
+
+  const isUsdProject = (project?.currency || '').toUpperCase() === 'USD' || transferStats.hasTransfers;
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -332,17 +365,42 @@ export const ProjectDetail: React.FC = () => {
                 )}
               >
                 <Layers size={14} />
-                <span>Cuotas & Financiaciones</span>
+                <span>Cuotas</span>
                 {projectInstallmentPlans.length > 0 && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary text-white font-mono font-bold">
                     {projectInstallmentPlans.length}
                   </span>
                 )}
               </button>
+
+              {isUsdProject && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('savings')}
+                  className={cn(
+                    "py-2.5 px-4 rounded-xl text-xs font-black transition-all flex items-center gap-2 uppercase tracking-wider",
+                    activeTab === 'savings'
+                      ? "bg-surface-container-lowest text-cyan-600 dark:text-cyan-400 shadow-sm"
+                      : "text-on-surface-variant/60 hover:text-on-surface"
+                  )}
+                >
+                  <ArrowLeftRight size={14} />
+                  <span>Cotizaciones & Ahorro</span>
+                  {transferStats.inTransfers.length > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-cyan-600 text-white font-mono font-bold">
+                      {transferStats.inTransfers.length}
+                    </span>
+                  )}
+                </button>
+              )}
             </div>
 
             <div className="text-xs font-bold text-on-surface-variant/70">
-              {activeTab === 'transactions' ? `${transactions.length} registros` : `${projectInstallmentPlans.length} planes activos`}
+              {activeTab === 'transactions' 
+                ? `${transactions.length} registros` 
+                : activeTab === 'installments' 
+                  ? `${projectInstallmentPlans.length} planes activos` 
+                  : `${transferStats.inTransfers.length} compras / cambios`}
             </div>
           </div>
 
@@ -371,10 +429,10 @@ export const ProjectDetail: React.FC = () => {
                         <div className="flex items-center gap-3.5 sm:gap-5 min-w-0 flex-1">
                           <div className={cn(
                             "w-11 h-11 sm:w-14 sm:h-14 rounded-2xl sm:rounded-full flex items-center justify-center shadow-sm transition-transform group-hover:scale-110 shrink-0",
-                            cat?.color || 'bg-slate-500'
+                            t.isTransfer ? "bg-cyan-600" : (cat?.color || 'bg-slate-500')
                           )}>
                             <div className="text-white">
-                              <IconComponent name={cat?.icon || 'Tag'} size={20} />
+                              <IconComponent name={t.isTransfer ? 'ArrowLeftRight' : (cat?.icon || 'Tag')} size={20} />
                             </div>
                           </div>
                           <div className="min-w-0 flex-1">
@@ -383,8 +441,18 @@ export const ProjectDetail: React.FC = () => {
                               <span className="text-xs font-medium text-on-surface-variant">Por <span className="text-primary dark:text-blue-400 font-bold">{member?.name || 'Usuario'}</span></span>
                               <span className="w-1 h-1 rounded-full bg-on-surface-variant/30"></span>
                               <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest truncate max-w-[100px] sm:max-w-none">
-                                {cat?.name || 'Otros'}
+                                {t.isTransfer ? 'Transferencia' : (cat?.name || 'Otros')}
                               </span>
+                              {t.isTransfer && (
+                                <>
+                                  <span className="w-1 h-1 rounded-full bg-on-surface-variant/30"></span>
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 text-[10px] font-black border border-cyan-500/20">
+                                    <ArrowLeftRight size={10} />
+                                    <span>{t.transferDirection === 'out' ? 'Salida' : 'Entrada'}</span>
+                                    {t.exchangeRate && t.isCurrencyExchange && <span>• TC: ${formatCurrency(t.exchangeRate, 'ARS')}</span>}
+                                  </span>
+                                </>
+                              )}
                               {t.isInstallment && (
                                 <>
                                   <span className="w-1 h-1 rounded-full bg-on-surface-variant/30"></span>
@@ -418,6 +486,120 @@ export const ProjectDetail: React.FC = () => {
                   })}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* TAB: Cotizaciones & Ahorro Histórico */}
+          {activeTab === 'savings' && (
+            <div className="space-y-8">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-surface-container-lowest p-5 rounded-3xl border border-on-surface/10 shadow-sm">
+                  <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-widest block mb-2">
+                    Total Adquirido / Ingresado
+                  </span>
+                  <p className="text-2xl font-black font-headline text-emerald-600 dark:text-emerald-400">
+                    {formatCurrency(transferStats.totalAcquired, project.currency)}
+                  </p>
+                  <p className="text-[11px] text-on-surface-variant/70 font-semibold mt-1">
+                    {transferStats.inTransfers.length} operaciones registradas
+                  </p>
+                </div>
+
+                <div className="bg-surface-container-lowest p-5 rounded-3xl border border-on-surface/10 shadow-sm">
+                  <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-widest block mb-2">
+                    Total Invertido
+                  </span>
+                  <p className="text-2xl font-black font-headline text-on-surface">
+                    {formatCurrency(transferStats.totalSpent, 'ARS')}
+                  </p>
+                  <p className="text-[11px] text-on-surface-variant/70 font-semibold mt-1">
+                    Costo total en pesos
+                  </p>
+                </div>
+
+                <div className="bg-gradient-to-br from-cyan-500/10 via-sky-500/5 to-transparent p-5 rounded-3xl border border-cyan-500/20 shadow-sm">
+                  <span className="text-[10px] font-black text-cyan-800 dark:text-cyan-200 uppercase tracking-widest block mb-2">
+                    TC Promedio Ponderado
+                  </span>
+                  <p className="text-2xl font-black font-headline text-cyan-600 dark:text-cyan-400">
+                    ${formatCurrency(transferStats.weightedAvgRate, 'ARS')}
+                  </p>
+                  <p className="text-[11px] text-on-surface-variant/70 font-semibold mt-1">
+                    Costo medio por cada dólar
+                  </p>
+                </div>
+
+                <div className="bg-surface-container-lowest p-5 rounded-3xl border border-on-surface/10 shadow-sm">
+                  <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-widest block mb-2">
+                    Última Cotización
+                  </span>
+                  <p className="text-2xl font-black font-headline text-primary">
+                    {transferStats.latestRate > 0 ? `$${formatCurrency(transferStats.latestRate, 'ARS')}` : 'Sin datos'}
+                  </p>
+                  <p className="text-[11px] text-on-surface-variant/70 font-semibold mt-1">
+                    Último cambio realizado
+                  </p>
+                </div>
+              </div>
+
+              {/* Acquisitions List */}
+              <div className="bg-surface-container-lowest p-6 rounded-3xl border border-on-surface/10 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-lg font-extrabold text-on-surface font-headline">Historial de Compras & Cotizaciones</h3>
+                    <p className="text-xs text-on-surface-variant font-medium">Registro detallado de cada ingreso de divisas y su tasa de cambio aplicada.</p>
+                  </div>
+                </div>
+
+                {transferStats.inTransfers.length === 0 ? (
+                  <div className="text-center py-12 text-on-surface-variant/60">
+                    <ArrowLeftRight size={32} className="mx-auto mb-3 opacity-30 text-cyan-600" />
+                    <p className="text-sm font-bold">Aún no hay compras o transferencias registradas hacia este proyecto.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {transferStats.inTransfers.map((t) => {
+                      const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+                      return (
+                        <div
+                          key={t.id}
+                          onClick={() => navigate(`/edit/${t.id}`)}
+                          className="p-4 rounded-2xl bg-surface-container-low hover:bg-on-surface/5 transition-all border border-on-surface/5 flex items-center justify-between gap-4 cursor-pointer"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-cyan-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                              <ArrowLeftRight size={18} />
+                            </div>
+                            <div>
+                              <p className="font-extrabold text-sm text-on-surface">{t.description || 'Compra de Divisas'}</p>
+                              <div className="flex items-center gap-2 mt-0.5 text-xs text-on-surface-variant">
+                                <span>{tDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                {t.relatedProjectName && (
+                                  <>
+                                    <span>•</span>
+                                    <span>Desde: <strong>{t.relatedProjectName}</strong></span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <p className="text-base font-black font-headline text-emerald-600 dark:text-emerald-400">
+                              +{formatCurrency(t.amount, project.currency)}
+                            </p>
+                            <p className="text-xs font-bold text-on-surface-variant font-mono">
+                              {t.exchangeRate ? `TC: $${formatCurrency(t.exchangeRate, 'ARS')}` : ''}
+                              {t.relatedAmount ? ` (${formatCurrency(t.relatedAmount, 'ARS')})` : ''}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
