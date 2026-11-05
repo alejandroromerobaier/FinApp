@@ -226,11 +226,11 @@ export const Home: React.FC = () => {
     const monthInstallments = transactions.filter(t => isCreditCardTx(t) && getLocalMonth(t.date) === budgetMonth);
     const totalThisMonth = monthInstallments.reduce((sum, t) => sum + (t.amount || 0), 0);
     
-    const futureInstallments = transactions.filter(t => isCreditCardTx(t) && getLocalMonth(t.date) >= currentMonthKey);
+    const futureInstallments = transactions.filter(t => isCreditCardTx(t) && getLocalMonth(t.date) > currentMonthKey);
     const totalRemaining = futureInstallments.reduce((sum, t) => sum + (t.amount || 0), 0);
 
     const activePlansCount = new Set(
-      transactions.filter(isCreditCardTx).map(t => t.parentPlanId || t.installmentPlanId || t.id)
+      transactions.filter(t => isCreditCardTx(t) && ((t.totalInstallments || 1) > 1 || t.parentPlanId || t.installmentPlanId)).map(t => t.parentPlanId || t.installmentPlanId || t.id)
     ).size;
 
     return {
@@ -439,7 +439,9 @@ export const Home: React.FC = () => {
                     Compromisos & Tarjetas
                   </h3>
                   <p className="text-[11px] font-bold text-on-surface-variant/70">
-                    {installmentSummary.activePlansCount} {installmentSummary.activePlansCount === 1 ? 'compra financiada' : 'compras financiadas'}
+                    {installmentSummary.activePlansCount > 0 
+                      ? `${installmentSummary.activePlansCount} ${installmentSummary.activePlansCount === 1 ? 'compra financiada' : 'compras financiadas'}`
+                      : 'Consumos corrientes del mes'}
                   </p>
                 </div>
               </div>
