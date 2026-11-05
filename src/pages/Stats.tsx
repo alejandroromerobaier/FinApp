@@ -178,11 +178,13 @@ export const Stats: React.FC = () => {
         return tCurrency === activeCurrency;
       });
 
-      const expenses = filtered.filter(t => t.type === 'expense' && !t.isTransfer);
-      const income = filtered.filter(t => t.type === 'income' && !t.isTransfer);
+      const expenses = filtered.filter(t => t.type === 'expense');
+      const income = filtered.filter(t => t.type === 'income');
       
       const totalExpenses = expenses.reduce((acc, t) => acc + t.amount, 0);
       const totalIncome = income.reduce((acc, t) => acc + t.amount, 0);
+      const transferExpenses = expenses.filter(t => t.isTransfer).reduce((acc, t) => acc + t.amount, 0);
+      const transferIncome = income.filter(t => t.isTransfer).reduce((acc, t) => acc + t.amount, 0);
       const netBalance = totalIncome - totalExpenses;
       const transactionCount = filtered.length;
       
@@ -204,37 +206,39 @@ export const Stats: React.FC = () => {
       // Expense Distribution
       const catMap: Record<string, number> = {};
       expenses.forEach(t => {
-        catMap[t.categoryId] = (catMap[t.categoryId] || 0) + t.amount;
+        const catId = t.isTransfer ? 'system_transferencia' : (t.categoryId || 'system_transferencia');
+        catMap[catId] = (catMap[catId] || 0) + t.amount;
       });
 
       const distribution = Object.entries(catMap).map(([id, value]) => {
         const cat = categories.find(c => c.id === id);
         // Find a representative transaction for this category to get denormalized fields
-        const sampleTx = expenses.find(t => t.categoryId === id);
+        const sampleTx = expenses.find(t => (t.isTransfer ? 'system_transferencia' : t.categoryId) === id);
         
         return {
-          name: cat?.name || sampleTx?.categoryName || (id ? 'Cargando...' : 'Otros'),
+          name: id === 'system_transferencia' ? 'Transferencia' : (cat?.name || sampleTx?.categoryName || (id ? 'Cargando...' : 'Otros')),
           value: (value / (totalExpenses || 1)) * 100,
           amount: value,
-          color: getHexFromClass(cat?.color || sampleTx?.categoryColor || '')
+          color: id === 'system_transferencia' ? '#0891b2' : getHexFromClass(cat?.color || sampleTx?.categoryColor || '')
         };
       }).sort((a, b) => b.amount - a.amount);
 
       // Income Distribution
       const incomeCatMap: Record<string, number> = {};
       income.forEach(t => {
-        incomeCatMap[t.categoryId] = (incomeCatMap[t.categoryId] || 0) + t.amount;
+        const catId = t.isTransfer ? 'system_transferencia' : (t.categoryId || 'system_transferencia');
+        incomeCatMap[catId] = (incomeCatMap[catId] || 0) + t.amount;
       });
 
       const incomeDistribution = Object.entries(incomeCatMap).map(([id, value]) => {
         const cat = categories.find(c => c.id === id);
-        const sampleTx = income.find(t => t.categoryId === id);
+        const sampleTx = income.find(t => (t.isTransfer ? 'system_transferencia' : t.categoryId) === id);
         
         return {
-          name: cat?.name || sampleTx?.categoryName || (id ? 'Cargando...' : 'Otros'),
+          name: id === 'system_transferencia' ? 'Transferencia' : (cat?.name || sampleTx?.categoryName || (id ? 'Cargando...' : 'Otros')),
           value: (value / (totalIncome || 1)) * 100,
           amount: value,
-          color: getHexFromClass(cat?.color || sampleTx?.categoryColor || '')
+          color: id === 'system_transferencia' ? '#0891b2' : getHexFromClass(cat?.color || sampleTx?.categoryColor || '')
         };
       }).sort((a, b) => b.amount - a.amount);
 
@@ -369,6 +373,8 @@ export const Stats: React.FC = () => {
       return {
         totalExpenses,
         totalIncome,
+        transferExpenses,
+        transferIncome,
         netBalance,
         dailyAverage,
         avgPerTransaction,
@@ -585,12 +591,14 @@ export const Stats: React.FC = () => {
                 value={formatCurrency(stats.totalExpenses, stats.activeCurrency)} 
                 icon={<ArrowDownRight size={20} className="text-rose-500" />}
                 color="text-rose-500"
+                subtext={stats.transferExpenses > 0 ? `inc. ${formatCurrency(stats.transferExpenses, stats.activeCurrency)} transf.` : undefined}
               />
               <MainKPICard 
                 title="Ingresos" 
                 value={formatCurrency(stats.totalIncome, stats.activeCurrency)} 
                 icon={<ArrowUpRight size={20} className="text-emerald-500" />}
                 color="text-emerald-500"
+                subtext={stats.transferIncome > 0 ? `inc. ${formatCurrency(stats.transferIncome, stats.activeCurrency)} transf.` : undefined}
               />
               <MainKPICard 
                 title="Balance" 
@@ -987,7 +995,7 @@ export const Stats: React.FC = () => {
   );
 };
 
-const MainKPICard = ({ title, value, icon, color }: any) => (
+const MainKPICard = ({ title, value, icon, color, subtext }: any) => (
   <motion.div 
     whileHover={{ y: -2 }}
     className="bg-surface-container-lowest p-6 rounded-[1.5rem] border border-on-surface/10 shadow-sm space-y-4"
@@ -998,7 +1006,14 @@ const MainKPICard = ({ title, value, icon, color }: any) => (
         {icon}
       </div>
     </div>
-    <h2 className={cn("text-2xl font-bold tracking-tight font-headline", color)}>{value}</h2>
+    <div>
+      <h2 className={cn("text-2xl font-bold tracking-tight font-headline", color)}>{value}</h2>
+      {subtext && (
+        <p className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 mt-1">
+          {subtext}
+        </p>
+      )}
+    </div>
   </motion.div>
 );
 

@@ -157,7 +157,8 @@ export const ProjectDetail: React.FC = () => {
     let currentMonthIncome = 0;
 
     validTransactions.forEach(t => {
-      if (t.type === 'expense') {
+      const isTargetMovement = isUsdProject ? t.type === 'income' : t.type === 'expense';
+      if (isTargetMovement) {
         byMember[t.authorId] = (byMember[t.authorId] || 0) + t.amount;
       }
       
@@ -171,10 +172,11 @@ export const ProjectDetail: React.FC = () => {
       }
     });
 
+    const totalBase = isUsdProject ? totalIncome : totalExpenses;
     const contributorStats = members.map(m => ({
       ...m,
       amount: byMember[m.id] || 0,
-      percentage: totalExpenses > 0 ? Math.round(((byMember[m.id] || 0) / totalExpenses) * 100) : 0
+      percentage: totalBase > 0 ? Math.round(((byMember[m.id] || 0) / totalBase) * 100) : 0
     })).sort((a, b) => b.amount - a.amount);
 
     return { 
@@ -187,7 +189,7 @@ export const ProjectDetail: React.FC = () => {
       currentMonthIncome,
       contributorStats 
     };
-  }, [transactions, members]);
+  }, [transactions, members, isUsdProject]);
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -327,7 +329,7 @@ export const ProjectDetail: React.FC = () => {
         <aside className="lg:col-span-4 space-y-8">
           <div className="bg-surface-container-lowest p-8 rounded-[2.5rem] border border-on-surface/10 shadow-sm">
             <h2 className="text-lg font-extrabold text-on-surface mb-8 flex items-center gap-2 font-headline">
-              Contribuciones
+              {isUsdProject ? 'Aportes a la Bóveda' : 'Contribuciones'}
             </h2>
             <div className="space-y-6">
               {stats.contributorStats.map((m) => (
@@ -338,7 +340,9 @@ export const ProjectDetail: React.FC = () => {
                     </div>
                     <div>
                       <p className="font-bold text-on-surface group-hover:text-primary transition-colors">{m.name}</p>
-                      <p className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">{m.percentage}% del total</p>
+                      <p className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">
+                        {m.percentage}% {isUsdProject ? 'del ahorro' : 'del total'}
+                      </p>
                     </div>
                   </div>
                   <div className="text-right">

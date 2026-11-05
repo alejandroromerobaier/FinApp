@@ -186,19 +186,26 @@ export const Reports: React.FC = () => {
     const currencyMap: Record<string, { income: number; expenses: number; fixed: number; variable: number; catMap: Record<string, number>; methods: Record<string, number>; projectSplit: { personal: number; shared: number } }> = {};
 
     filteredTransactions.forEach(t => {
-      if (t.isTransfer) return;
       const project = projects.find(p => p.id === t.projectId);
       const currency = project?.currency || profile?.currency || 'ARS';
-      const method = t.paymentMethod || 'Efectivo';
+      const method = t.paymentMethod || (t.isTransfer ? 'Transferencia' : 'Efectivo');
 
       if (!currencyMap[currency]) {
         currencyMap[currency] = { income: 0, expenses: 0, fixed: 0, variable: 0, catMap: {}, methods: {}, projectSplit: { personal: 0, shared: 0 } };
       }
 
+      const cat = categories.find(c => c.id === t.categoryId);
+      const name = t.isTransfer 
+        ? 'Transferencia' 
+        : (cat?.name || t.categoryName || 'Varios');
+
       if (t.type === 'income') {
         currencyMap[currency].income += t.amount;
         if (t.projectId) currencyMap[currency].projectSplit.shared += t.amount;
         else currencyMap[currency].projectSplit.personal += t.amount;
+
+        // Categories
+        currencyMap[currency].catMap[name] = (currencyMap[currency].catMap[name] || 0) + t.amount;
       } else {
         currencyMap[currency].expenses += t.amount;
         
@@ -213,8 +220,6 @@ export const Reports: React.FC = () => {
         else currencyMap[currency].projectSplit.personal -= t.amount;
 
         // Categories
-        const cat = categories.find(c => c.id === t.categoryId);
-        const name = cat?.name || t.categoryName || 'Varios';
         currencyMap[currency].catMap[name] = (currencyMap[currency].catMap[name] || 0) + t.amount;
 
         // Methods
