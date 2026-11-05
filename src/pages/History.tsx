@@ -764,8 +764,13 @@ export const History: React.FC = () => {
                                 isVirtual: Boolean(t.isVirtualInstallment || t.parentPlanId)
                               });
                             } else {
-                              if (window.confirm('¿Estás seguro de que deseas eliminar esta transacción?')) {
-                                deleteTransaction(t.id);
+                              const isTr = t.isTransfer || !!t.transferId;
+                              const confirmMsg = isTr
+                                ? '¿Estás seguro de que deseas eliminar esta transferencia? Se eliminarán automáticamente los movimientos de ambas cuentas.'
+                                : '¿Estás seguro de que deseas eliminar esta transacción?';
+                              if (window.confirm(confirmMsg)) {
+                                const peerTx = isTr && t.transferId ? transactions.find(item => item.id !== t.id && item.transferId === t.transferId) : null;
+                                deleteTransaction(t.id, t.peerTransactionId || peerTx?.id);
                               }
                             }
                           }}

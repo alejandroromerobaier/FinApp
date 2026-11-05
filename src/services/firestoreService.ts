@@ -1129,19 +1129,62 @@ export const updateTransaction = async (transactionId: string, transaction: any)
   }
 };
 
-export const deleteTransfer = async (transferId: string) => {
+export const deleteTransfer = async (
+  transferId: string, 
+  peerTransactionId?: string | null, 
+  currentTransactionId?: string | null
+) => {
   try {
-    const q = query(collection(db, 'transactions'), where('transferId', '==', transferId));
-    const snap = await getDocs(q);
     const batch = writeBatch(db);
-    snap.docs.forEach(docSnap => batch.delete(docSnap.ref));
-    await batch.commit();
+    let didAdd = false;
+
+    if (currentTransactionId) {
+      batch.delete(doc(db, 'transactions', currentTransactionId));
+      didAdd = true;
+    }
+    if (peerTransactionId && peerTransactionId !== currentTransactionId) {
+      batch.delete(doc(db, 'transactions', peerTransactionId));
+      didAdd = true;
+    }
+
+    if (didAdd) {
+      await batch.commit();
+      return;
+    }
+
+    // Fallback if document IDs weren't provided:
+    // We MUST include authorId filter so Firestore security rules allow the query
+    const currentUserId = auth.currentUser?.uid;
+    if (currentUserId && transferId) {
+      const q = query(
+        collection(db, 'transactions'),
+        where('authorId', '==', currentUserId),
+        where('transferId', '==', transferId)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const queryBatch = writeBatch(db);
+        snap.docs.forEach(docSnap => queryBatch.delete(docSnap.ref));
+        await queryBatch.commit();
+        return;
+      }
+    }
   } catch (error) {
+    console.error('Error in deleteTransfer:', error);
+    // Ultimate failsafe: if batch failed or query failed, at least try deleting current doc directly
+    if (currentTransactionId) {
+      try {
+        await deleteDoc(doc(db, 'transactions', currentTransactionId));
+        return;
+      } catch (innerErr) {
+        console.error('Error in fallback single doc deletion:', innerErr);
+      }
+    }
     handleFirestoreError(error, OperationType.DELETE, `transactions/transfer/${transferId}`);
   }
 };
 
-export const deleteTransaction = async (transactionId: string) => {
+export const deleteTransaction = async (transactionId: string, peerTransactionId?: string | null) => {
   try {
     if (transactionId.includes('_installment_')) {
       const parts = transactionId.split('_installment_');
@@ -1152,12 +1195,23 @@ export const deleteTransaction = async (transactionId: string) => {
 
     const txRef = doc(db, 'transactions', transactionId);
     const txSnap = await getDoc(txRef);
-    if (txSnap.exists() && txSnap.data()?.transferId) {
-      return await deleteTransfer(txSnap.data().transferId);
+    if (txSnap.exists()) {
+      const data = txSnap.data();
+      if (data?.isTransfer || data?.transferId) {
+        const resolvedPeerId = peerTransactionId || data.peerTransactionId || null;
+        return await deleteTransfer(data.transferId, resolvedPeerId, transactionId);
+      }
     }
 
     await deleteDoc(txRef);
   } catch (error) {
+    // If an error occurred (e.g. permission on getDoc or batch), attempt direct deletion of txRef as failsafe
+    try {
+      await deleteDoc(doc(db, 'transactions', transactionId));
+      return;
+    } catch {
+      // ignore inner error and proceed to handle original error
+    }
     handleFirestoreError(error, OperationType.DELETE, `transactions/${transactionId}`);
   }
 };
@@ -1208,12 +1262,16 @@ export const createTransfer = async (params: CreateTransferParams) => {
 
     // 1. Outgoing Transaction (Salida)
     const outDocRef = doc(collection(db, 'transactions'));
+    // 2. Incoming Transaction (Entrada)
+    const inDocRef = doc(collection(db, 'transactions'));
+
     batch.set(outDocRef, {
       amount: params.fromAmount,
       type: 'expense',
       isTransfer: true,
       transferDirection: 'out',
       transferId: transferId,
+      peerTransactionId: inDocRef.id,
       description: cleanDesc,
       projectId: fromPid,
       authorId: params.userId,
@@ -1233,14 +1291,13 @@ export const createTransfer = async (params: CreateTransferParams) => {
       isCurrencyExchange
     });
 
-    // 2. Incoming Transaction (Entrada)
-    const inDocRef = doc(collection(db, 'transactions'));
     batch.set(inDocRef, {
       amount: params.toAmount,
       type: 'income',
       isTransfer: true,
       transferDirection: 'in',
       transferId: transferId,
+      peerTransactionId: outDocRef.id,
       description: cleanDesc,
       projectId: toPid,
       authorId: params.userId,

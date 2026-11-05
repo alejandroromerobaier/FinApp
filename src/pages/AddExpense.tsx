@@ -119,7 +119,7 @@ export const AddExpense: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { user, profile } = useAuth();
-  const { categories: allCategories, projects, cards, loading: dataLoading } = useData();
+  const { categories: allCategories, projects, cards, transactions, loading: dataLoading } = useData();
   
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<'expense' | 'income' | 'transfer'>('expense');
@@ -161,6 +161,8 @@ export const AddExpense: React.FC = () => {
 
   // Existing Transfer context (when editing)
   const [isExistingTransfer, setIsExistingTransfer] = useState(false);
+  const [existingTransferId, setExistingTransferId] = useState<string | null>(null);
+  const [existingPeerTransactionId, setExistingPeerTransactionId] = useState<string | null>(null);
   const [existingTransferDirection, setExistingTransferDirection] = useState<'out' | 'in' | null>(null);
   const [existingRelatedProjectName, setExistingRelatedProjectName] = useState<string>('');
   const [existingRelatedAmount, setExistingRelatedAmount] = useState<number | null>(null);
@@ -259,6 +261,8 @@ export const AddExpense: React.FC = () => {
             if (t.isTransfer) {
               setType('transfer');
               setIsExistingTransfer(true);
+              setExistingTransferId(t.transferId || null);
+              setExistingPeerTransactionId(t.peerTransactionId || null);
               setExistingTransferDirection(t.transferDirection || (t.type === 'expense' ? 'out' : 'in'));
               setExistingRelatedProjectName(t.relatedProjectName || '');
               setExistingRelatedAmount(t.relatedAmount || null);
@@ -618,7 +622,13 @@ export const AddExpense: React.FC = () => {
     
     setIsDeleting(true);
     try {
-      await deleteTransaction(id);
+      // Find peer transaction from DataContext if not already recorded on the doc
+      let peerId = existingPeerTransactionId;
+      if (!peerId && existingTransferId) {
+        const peerTx = transactions.find(tx => tx.id !== id && tx.transferId === existingTransferId);
+        if (peerTx) peerId = peerTx.id;
+      }
+      await deleteTransaction(id, peerId);
       navigate(-1);
     } catch (error) {
       console.error('Error deleting transaction:', error);
