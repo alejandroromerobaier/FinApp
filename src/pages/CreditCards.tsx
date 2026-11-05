@@ -91,6 +91,10 @@ export const CreditCards: React.FC = () => {
     transactions.forEach(t => {
       if (!isCreditCardTx(t)) return;
 
+      // Only include purchases financed in more than 1 installment in the active plans section
+      const totInst = t.totalInstallments || 1;
+      if (totInst <= 1 && !t.parentPlanId && !t.installmentPlanId) return;
+
       const planId = t.parentPlanId || t.installmentPlanId || t.id;
       if (planId) {
         if (!map[planId]) {
@@ -218,7 +222,7 @@ export const CreditCards: React.FC = () => {
           if (t.cardId !== selectedCardFilter && t.cardName !== selectedCardFilter) return;
         }
         const tDate = new Date(t.date);
-        if (getLocalMonth(tDate) >= currentMonthKey) {
+        if (getLocalMonth(tDate) > currentMonthKey) {
           remainingDebt += (t.amount || 0);
           if (!lastMaturityDate || tDate > lastMaturityDate) {
             lastMaturityDate = tDate;
