@@ -37,6 +37,8 @@ import {
 } from 'lucide-react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { cn, formatCurrencyInput, formatAmountForDisplay, parseFormattedAmount, formatCurrency } from '../lib/utils';
+import { haptic } from '../lib/haptics';
+import { useToast } from '../context/ToastContext';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { 
@@ -118,6 +120,8 @@ export const AddExpense: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user, profile } = useAuth();
   const { categories: allCategories, projects, cards, loading: dataLoading } = useData();
+  const { toast } = useToast();
+  const amountInputRef = React.useRef<HTMLInputElement>(null);
   
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<'expense' | 'income'>('expense');
@@ -156,6 +160,18 @@ export const AddExpense: React.FC = () => {
   const categories = allCategories.filter(c => c.type === type);
 
   const [hasInitializedDefault, setHasInitializedDefault] = useState(false);
+
+  // Auto-focus on amount input when entering new transaction (with slight delay for mobile transitions)
+  useEffect(() => {
+    if (!id) {
+      const timer = setTimeout(() => {
+        if (amountInputRef.current) {
+          amountInputRef.current.focus();
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [id]);
 
   const visibleProjects = useMemo(() => {
     return projects.filter(p => {
@@ -289,6 +305,7 @@ export const AddExpense: React.FC = () => {
   }, [date, selectedCard, id]);
 
   const handleTypeChange = (newType: 'expense' | 'income') => {
+    haptic.light();
     setType(newType);
     const firstCat = allCategories.find(c => c.type === newType);
     setSelectedCategory(firstCat || null);
@@ -334,7 +351,7 @@ export const AddExpense: React.FC = () => {
   const handleSave = async () => {
     if (!isValidAmount || !selectedCategory) return;
     if (destination === 'shared' && !selectedProjectId) {
-      alert('Por favor selecciona un proyecto compartido');
+      toast.warning('Por favor selecciona un proyecto compartido');
       return;
     }
     
@@ -365,6 +382,8 @@ export const AddExpense: React.FC = () => {
           purchaseDate: date
         });
         trackEvent('add_installment_expense', { installments: parsedInstallments, totalAmount: currentTotalAmount });
+        haptic.success();
+        toast.success(`Compra en ${parsedInstallments} cuotas registrada`);
         navigate(-1);
         return;
       }
@@ -400,14 +419,18 @@ export const AddExpense: React.FC = () => {
       if (id) {
         await updateTransaction(id, transactionData);
         trackEvent('edit_expense', { type, amount: parsedAmount, category: selectedCategory.name });
+        haptic.success();
+        toast.success('Transacción actualizada');
       } else {
         await addTransaction(transactionData);
         trackEvent('add_expense', { type, amount: parsedAmount, category: selectedCategory.name });
+        haptic.success();
+        toast.success(type === 'income' ? 'Ingreso registrado con éxito' : 'Gasto registrado con éxito');
       }
       navigate(-1);
     } catch (error) {
       console.error('Error saving transaction:', error);
-      alert('Error al guardar la transacción');
+      toast.error('Error al guardar la transacción');
     } finally {
       setIsSaving(false);
     }
@@ -422,10 +445,12 @@ export const AddExpense: React.FC = () => {
     setIsDeleting(true);
     try {
       await deleteTransaction(id);
+      haptic.medium();
+      toast.info('Transacción eliminada con éxito');
       navigate(-1);
     } catch (error) {
       console.error('Error deleting transaction:', error);
-      alert('Error al eliminar la transacción');
+      toast.error('Error al eliminar la transacción');
     } finally {
       setIsDeleting(false);
     }
@@ -551,6 +576,7 @@ export const AddExpense: React.FC = () => {
               type === 'expense' ? "text-rose-600" : "text-emerald-600"
             )}>{destination === 'shared' ? projects.find(p => p.id === selectedProjectId)?.currency || 'ARS' : (profile?.currency || 'ARS')}</span>
             <input 
+              ref={amountInputRef}
               type="text"
               inputMode="decimal"
               readOnly={!isAuthor}
@@ -1177,6 +1203,7 @@ export const AddExpense: React.FC = () => {
                   <button
                     key={cat.id}
                     onClick={() => {
+                      haptic.light();
                       setSelectedCategory(cat);
                       setShowCategorySheet(false);
                     }}
