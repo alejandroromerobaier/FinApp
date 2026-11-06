@@ -32,8 +32,8 @@ export const ManageCards: React.FC = () => {
   const [bank, setBank] = useState('');
   const [last4Digits, setLast4Digits] = useState('');
   const [currency, setCurrency] = useState('ARS');
-  const [closingDay, setClosingDay] = useState(25);
-  const [dueDay, setDueDay] = useState(5);
+  const [closingDay, setClosingDay] = useState<string>('25');
+  const [dueDay, setDueDay] = useState<string>('5');
   const [selectedColor, setSelectedColor] = useState(PROJECT_COLOR_OPTIONS[0].gradient);
 
   const openAddModal = () => {
@@ -42,8 +42,8 @@ export const ManageCards: React.FC = () => {
     setBank('');
     setLast4Digits('');
     setCurrency('ARS');
-    setClosingDay(25);
-    setDueDay(5);
+    setClosingDay('25');
+    setDueDay('5');
     setSelectedColor(PROJECT_COLOR_OPTIONS[0].gradient);
     setError(null);
     setShowModal(true);
@@ -55,8 +55,8 @@ export const ManageCards: React.FC = () => {
     setBank(card.bank || '');
     setLast4Digits(card.last4Digits || '');
     setCurrency(card.currency || 'ARS');
-    setClosingDay(card.closingDay || 25);
-    setDueDay(card.dueDay || 5);
+    setClosingDay(card.closingDay ? String(card.closingDay) : '25');
+    setDueDay(card.dueDay ? String(card.dueDay) : '5');
     setSelectedColor(card.color || PROJECT_COLOR_OPTIONS[0].gradient);
     setError(null);
     setShowModal(true);
@@ -68,11 +68,14 @@ export const ManageCards: React.FC = () => {
       setError('Ingresá un nombre para la tarjeta.');
       return;
     }
-    if (closingDay < 1 || closingDay > 31) {
+    const parsedClosing = parseInt(closingDay, 10);
+    const parsedDue = parseInt(dueDay, 10);
+
+    if (isNaN(parsedClosing) || parsedClosing < 1 || parsedClosing > 31) {
       setError('El día de cierre debe estar entre 1 y 31.');
       return;
     }
-    if (dueDay < 1 || dueDay > 31) {
+    if (isNaN(parsedDue) || parsedDue < 1 || parsedDue > 31) {
       setError('El día de vencimiento debe estar entre 1 y 31.');
       return;
     }
@@ -86,8 +89,8 @@ export const ManageCards: React.FC = () => {
         bank: bank.trim() || undefined,
         last4Digits: last4Digits.replace(/\D/g, '').slice(-4) || undefined,
         currency,
-        closingDay: Number(closingDay),
-        dueDay: Number(dueDay),
+        closingDay: parsedClosing,
+        dueDay: parsedDue,
         color: selectedColor
       };
 
@@ -315,8 +318,8 @@ export const ManageCards: React.FC = () => {
                     •••• •••• •••• {last4Digits || '••••'}
                   </div>
                   <div className="flex justify-between text-[11px]">
-                    <span>Cierre: Día {closingDay}</span>
-                    <span>Vence: Día {dueDay}</span>
+                    <span>Cierre: Día {closingDay || '--'}</span>
+                    <span>Vence: Día {dueDay || '--'}</span>
                     <span className="font-bold">{currency}</span>
                   </div>
                 </div>
@@ -379,12 +382,31 @@ export const ManageCards: React.FC = () => {
                       Día Cierre
                     </label>
                     <input
-                      type="number"
-                      min={1}
-                      max={31}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={2}
+                      placeholder="25"
                       required
                       value={closingDay}
-                      onChange={(e) => setClosingDay(Number(e.target.value))}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/\D/g, '');
+                        if (raw === '') {
+                          setClosingDay('');
+                          return;
+                        }
+                        const num = parseInt(raw, 10);
+                        if (num > 31) {
+                          setClosingDay('31');
+                        } else {
+                          setClosingDay(String(num));
+                        }
+                      }}
+                      onBlur={() => {
+                        if (!closingDay || Number(closingDay) < 1) {
+                          setClosingDay('25');
+                        }
+                      }}
                       className="w-full px-3 py-2.5 rounded-2xl bg-surface-container-low border border-on-surface/10 text-on-surface text-sm font-bold text-center focus:outline-none focus:ring-2 focus:ring-primary/40"
                     />
                   </div>
@@ -394,12 +416,31 @@ export const ManageCards: React.FC = () => {
                       Día Vence
                     </label>
                     <input
-                      type="number"
-                      min={1}
-                      max={31}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={2}
+                      placeholder="5"
                       required
                       value={dueDay}
-                      onChange={(e) => setDueDay(Number(e.target.value))}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/\D/g, '');
+                        if (raw === '') {
+                          setDueDay('');
+                          return;
+                        }
+                        const num = parseInt(raw, 10);
+                        if (num > 31) {
+                          setDueDay('31');
+                        } else {
+                          setDueDay(String(num));
+                        }
+                      }}
+                      onBlur={() => {
+                        if (!dueDay || Number(dueDay) < 1) {
+                          setDueDay('5');
+                        }
+                      }}
                       className="w-full px-3 py-2.5 rounded-2xl bg-surface-container-low border border-on-surface/10 text-on-surface text-sm font-bold text-center focus:outline-none focus:ring-2 focus:ring-primary/40"
                     />
                   </div>
