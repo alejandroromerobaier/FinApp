@@ -324,24 +324,33 @@ export const Stats: React.FC = () => {
       const classMap = {
         fixed: 0,
         variable: 0,
+        transfer: 0,
         unclassified: 0
       };
 
       expenses.forEach(t => {
-        if (t.classification === 'fixed') classMap.fixed += t.amount;
-        else if (t.classification === 'variable') classMap.variable += t.amount;
-        else classMap.unclassified += t.amount;
+        if (t.isTransfer || t.categoryId === 'system_transferencia') {
+          classMap.transfer += t.amount;
+        } else if (t.classification === 'fixed') {
+          classMap.fixed += t.amount;
+        } else if (t.classification === 'variable') {
+          classMap.variable += t.amount;
+        } else {
+          classMap.unclassified += t.amount;
+        }
       });
 
       const classificationData = [
         { name: 'Fijos', value: classMap.fixed, color: '#6366f1' },
         { name: 'Variables', value: classMap.variable, color: '#f59e0b' },
+        { name: 'Ahorro / Divisas', value: classMap.transfer, color: '#0891b2' },
         { name: 'Sin Clasif.', value: classMap.unclassified, color: '#94a3b8' }
       ].filter(d => d.value > 0);
 
       const fixedCoverage = totalIncome > 0 ? (classMap.fixed / totalIncome) * 100 : 0;
       const savingsPotential = totalIncome - classMap.fixed;
       const variableRatio = totalExpenses > 0 ? (classMap.variable / totalExpenses) * 100 : 0;
+      const savingsRate = totalIncome > 0 ? (classMap.transfer / totalIncome) * 100 : 0;
 
       // Category Income Impact
       const categoryIncomeImpact = Object.entries(catMap).map(([id, value]) => {
@@ -391,6 +400,7 @@ export const Stats: React.FC = () => {
         classificationData,
         fixedCoverage,
         savingsPotential,
+        savingsRate,
         variableRatio,
         categoryIncomeImpact,
         insights,
@@ -818,27 +828,27 @@ export const Stats: React.FC = () => {
                       </div>
                       
                       <div className="w-full mt-6 space-y-4">
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                           {stats.classificationData.map((item) => (
                             <div key={item.name} className="flex flex-col p-3 bg-on-surface/[0.02] rounded-2xl border border-on-surface/5">
                               <div className="flex items-center gap-2 mb-1">
-                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></div>
-                                <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-wider">{item.name}</span>
+                                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }}></div>
+                                <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-wider truncate">{item.name}</span>
                               </div>
-                              <span className="text-sm font-black text-on-surface">{formatCurrency(item.value, stats.activeCurrency)}</span>
+                              <span className="text-sm font-black text-on-surface truncate">{formatCurrency(item.value, stats.activeCurrency)}</span>
                               <span className="text-[9px] font-bold text-on-surface-variant/40">
-                                {((item.value / stats.totalExpenses) * 100).toFixed(1)}% del gasto
+                                {((item.value / stats.totalExpenses) * 100).toFixed(1)}% {item.name.includes('Ahorro') ? 'a ahorro / div.' : 'del total'}
                               </span>
                             </div>
                           ))}
                         </div>
 
                         {/* Financial Health Indicators */}
-                        <div className="bg-primary/5 rounded-2xl p-4 border border-primary/10">
-                          <h5 className="text-[10px] font-bold text-primary uppercase tracking-widest mb-3">Salud Financiera</h5>
+                        <div className="bg-primary/5 rounded-2xl p-4 border border-primary/10 space-y-4">
+                          <h5 className="text-[10px] font-bold text-primary uppercase tracking-widest">Salud Financiera</h5>
                           <div className="space-y-3">
                             <div className="flex justify-between items-center">
-                              <span className="text-xs font-semibold text-on-surface/60">Compromiso de Ingresos</span>
+                              <span className="text-xs font-semibold text-on-surface/60">Compromiso de Ingresos (Costos Fijos)</span>
                               <span className={cn(
                                 "text-xs font-black",
                                 stats.fixedCoverage > 50 ? "text-rose-500" : "text-emerald-500"
@@ -856,6 +866,26 @@ export const Stats: React.FC = () => {
                               Representa cuánto de tus ingresos se va en gastos fijos. Mantenerlo debajo del 50% es ideal.
                             </p>
                           </div>
+
+                          {stats.savingsRate > 0 && (
+                            <div className="space-y-3 pt-3 border-t border-primary/10">
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs font-semibold text-on-surface/60">Tasa de Ahorro / Divisas</span>
+                                <span className="text-xs font-black text-cyan-600 dark:text-cyan-400">
+                                  {stats.savingsRate.toFixed(1)}%
+                                </span>
+                              </div>
+                              <div className="w-full h-1.5 bg-on-surface/5 rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-cyan-500 transition-all duration-1000"
+                                  style={{ width: `${Math.min(stats.savingsRate, 100)}%` }}
+                                />
+                              </div>
+                              <p className="text-[9px] text-on-surface-variant/40 leading-tight">
+                                Porcentaje de ingresos acumulados en compra de divisas o ahorro en este período.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
