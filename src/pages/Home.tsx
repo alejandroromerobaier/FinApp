@@ -472,7 +472,7 @@ export const Home: React.FC = () => {
                     <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-emerald-400/20 flex items-center justify-center shadow-inner">
                       <ArrowDownLeft size={16} className="text-emerald-400 sm:w-[18px] sm:h-[18px]" />
                     </div>
-                    <div className="text-left">
+                    <div className="text-left min-w-0 flex-1">
                       <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1 leading-none">Ingresos</p>
                       <p className={cn(
                         "text-lg sm:text-xl font-black text-white leading-none tracking-tight transition-all duration-300 inline-block",
@@ -481,12 +481,14 @@ export const Home: React.FC = () => {
                         {formatCurrency(data.currentIncome, data.currency)}
                       </p>
                       {data.transfersIn > 0 && (
-                        <p className={cn(
-                          "text-[9px] font-bold text-emerald-300/80 mt-1 leading-none transition-all duration-300 inline-block",
+                        <div className={cn(
+                          "mt-1.5 transition-all duration-300 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[9px] sm:text-[10px] font-bold text-white/80 leading-none",
                           isCardBlurred(id) && "filter blur-[3px] select-none opacity-50"
                         )}>
-                          inc. {formatCurrency(data.transfersIn, data.currency)} transf.
-                        </p>
+                          <span>Genuino: <strong className="text-white font-black">{formatCurrency(data.currentIncome - data.transfersIn, data.currency)}</strong></span>
+                          <span className="text-white/30">·</span>
+                          <span className="text-cyan-300">Traspasos: <strong className="font-black">{formatCurrency(data.transfersIn, data.currency)}</strong></span>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -496,7 +498,7 @@ export const Home: React.FC = () => {
                     <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-rose-400/20 flex items-center justify-center shadow-inner">
                       <ArrowUpRight size={16} className="text-rose-400 sm:w-[18px] sm:h-[18px]" />
                     </div>
-                    <div className="text-left">
+                    <div className="text-left min-w-0 flex-1">
                       <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1 leading-none">Gastos</p>
                       <p className={cn(
                         "text-lg sm:text-xl font-black text-white leading-none tracking-tight transition-all duration-300 inline-block",
@@ -505,12 +507,14 @@ export const Home: React.FC = () => {
                         {formatCurrency(data.currentExpenses, data.currency)}
                       </p>
                       {data.transfersOut > 0 && (
-                        <p className={cn(
-                          "text-[9px] font-bold text-rose-300/80 mt-1 leading-none transition-all duration-300 inline-block",
+                        <div className={cn(
+                          "mt-1.5 transition-all duration-300 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[9px] sm:text-[10px] font-bold text-white/80 leading-none",
                           isCardBlurred(id) && "filter blur-[3px] select-none opacity-50"
                         )}>
-                          inc. {formatCurrency(data.transfersOut, data.currency)} transf.
-                        </p>
+                          <span>Consumo: <strong className="text-white font-black">{formatCurrency(data.currentExpenses - data.transfersOut, data.currency)}</strong></span>
+                          <span className="text-white/30">·</span>
+                          <span className="text-cyan-300">Ahorro: <strong className="font-black">{formatCurrency(data.transfersOut, data.currency)}</strong></span>
+                        </div>
                       )}
                     </div>
                   </div>
