@@ -7,6 +7,7 @@ import { useAuth } from '../lib/AuthContext';
 import { ShortcutBadge } from '../pages/ManageShortcuts';
 import { formatCurrency, cn, formatCurrencyInput, formatAmountForDisplay, parseFormattedAmount } from '../lib/utils';
 import { getLocalToday } from '../lib/dateUtils';
+import { haptic } from '../lib/haptics';
 
 interface ShortcutKeypadModalProps {
   shortcut: Shortcut | null;
@@ -81,6 +82,7 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
         classification: shortcut.classification || 'variable',
       });
 
+      haptic.success();
       setShowSuccess(true);
       setTimeout(() => {
         if (onSuccess) onSuccess();

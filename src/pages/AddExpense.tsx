@@ -38,6 +38,8 @@ import {
 } from 'lucide-react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { cn, formatCurrencyInput, formatAmountForDisplay, parseFormattedAmount, formatCurrency } from '../lib/utils';
+import { haptic } from '../lib/haptics';
+import { useToast } from '../context/ToastContext';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { 
@@ -120,6 +122,8 @@ export const AddExpense: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user, profile } = useAuth();
   const { categories: allCategories, projects, cards, transactions, loading: dataLoading } = useData();
+  const { toast } = useToast();
+  const amountInputRef = React.useRef<HTMLInputElement>(null);
   
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<'expense' | 'income' | 'transfer'>('expense');
@@ -174,6 +178,18 @@ export const AddExpense: React.FC = () => {
   const categories = allCategories.filter(c => c.type === (type === 'transfer' ? 'expense' : type) && c.id !== 'system_transferencia');
 
   const [hasInitializedDefault, setHasInitializedDefault] = useState(false);
+
+  // Auto-focus on amount input when entering new transaction (with slight delay for mobile transitions)
+  useEffect(() => {
+    if (!id) {
+      const timer = setTimeout(() => {
+        if (amountInputRef.current) {
+          amountInputRef.current.focus();
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [id]);
 
   const visibleProjects = useMemo(() => {
     return projects.filter(p => {
@@ -353,6 +369,7 @@ export const AddExpense: React.FC = () => {
   const isCurrencyExchange = fromCurrency !== toCurrency;
 
   const handleTypeChange = (newType: 'expense' | 'income' | 'transfer') => {
+    haptic.light();
     setType(newType);
     if (newType !== 'transfer') {
       const firstCat = allCategories.find(c => c.type === newType && c.id !== 'system_transferencia');
@@ -470,15 +487,15 @@ export const AddExpense: React.FC = () => {
   const handleSave = async () => {
     if (type === 'transfer') {
       if (!parsedAmount || parsedAmount <= 0) {
-        alert('Por favor ingresa un monto válido a transferir');
+        toast.warning('Por favor ingresa un monto válido a transferir');
         return;
       }
       if (!toProjectId) {
-        alert('Por favor selecciona la cuenta o proyecto de destino');
+        toast.warning('Por favor selecciona la cuenta o proyecto de destino');
         return;
       }
       if (fromProjectId === toProjectId) {
-        alert('La cuenta de origen y destino deben ser distintas');
+        toast.warning('La cuenta de origen y destino deben ser distintas');
         return;
       }
 
@@ -487,7 +504,7 @@ export const AddExpense: React.FC = () => {
         : parsedAmount;
 
       if (!finalToAmount || finalToAmount <= 0) {
-        alert('Por favor ingresa el monto a recibir');
+        toast.warning('Por favor ingresa el monto a recibir');
         return;
       }
 
@@ -521,10 +538,12 @@ export const AddExpense: React.FC = () => {
           isCurrencyExchange
         });
 
+        haptic.success();
+        toast.success(isCurrencyExchange ? 'Cambio de divisas registrado con éxito' : 'Transferencia registrada con éxito');
         navigate(-1);
       } catch (error) {
         console.error('Error saving transfer:', error);
-        alert('Error al guardar la transferencia');
+        toast.error('Error al guardar la transferencia');
       } finally {
         setIsSaving(false);
       }
@@ -533,7 +552,7 @@ export const AddExpense: React.FC = () => {
 
     if (!isValidAmount || !selectedCategory) return;
     if (destination === 'shared' && !selectedProjectId) {
-      alert('Por favor selecciona un proyecto compartido');
+      toast.warning('Por favor selecciona un proyecto compartido');
       return;
     }
     
@@ -564,6 +583,8 @@ export const AddExpense: React.FC = () => {
           purchaseDate: date
         });
         trackEvent('add_installment_expense', { installments: parsedInstallments, totalAmount: currentTotalAmount });
+        haptic.success();
+        toast.success(`Compra en ${parsedInstallments} cuotas registrada`);
         navigate(-1);
         return;
       }
@@ -599,14 +620,18 @@ export const AddExpense: React.FC = () => {
       if (id) {
         await updateTransaction(id, transactionData);
         trackEvent('edit_expense', { type, amount: parsedAmount, category: selectedCategory.name });
+        haptic.success();
+        toast.success('Transacción actualizada');
       } else {
         await addTransaction(transactionData);
         trackEvent('add_expense', { type, amount: parsedAmount, category: selectedCategory.name });
+        haptic.success();
+        toast.success(type === 'income' ? 'Ingreso registrado con éxito' : 'Gasto registrado con éxito');
       }
       navigate(-1);
     } catch (error) {
       console.error('Error saving transaction:', error);
-      alert('Error al guardar la transacción');
+      toast.error('Error al guardar la transacción');
     } finally {
       setIsSaving(false);
     }
@@ -629,10 +654,12 @@ export const AddExpense: React.FC = () => {
         if (peerTx) peerId = peerTx.id;
       }
       await deleteTransaction(id, peerId);
+      haptic.medium();
+      toast.info('Transacción eliminada con éxito');
       navigate(-1);
     } catch (error) {
       console.error('Error deleting transaction:', error);
-      alert('Error al eliminar la transacción');
+      toast.error('Error al eliminar la transacción');
     } finally {
       setIsDeleting(false);
     }
@@ -994,6 +1021,7 @@ export const AddExpense: React.FC = () => {
               type === 'expense' ? "text-rose-600" : "text-emerald-600"
             )}>{destination === 'shared' ? projects.find(p => p.id === selectedProjectId)?.currency || 'ARS' : (profile?.currency || 'ARS')}</span>
             <input 
+              ref={amountInputRef}
               type="text"
               inputMode="decimal"
               readOnly={!isAuthor}
@@ -1622,6 +1650,7 @@ export const AddExpense: React.FC = () => {
                   <button
                     key={cat.id}
                     onClick={() => {
+                      haptic.light();
                       setSelectedCategory(cat);
                       setShowCategorySheet(false);
                     }}

@@ -44,6 +44,7 @@ import { formatDisplayDate, getLocalMonth, parseLocalMonth } from '../lib/dateUt
 import { ShortcutKeypadModal } from '../components/ShortcutKeypadModal';
 import { ShortcutIconComponent, ShortcutBadge } from './ManageShortcuts';
 import { getProjectGradient } from '../lib/constants';
+import { haptic } from '../lib/haptics';
 
 const ICON_MAP: Record<string, any> = {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
@@ -379,25 +380,32 @@ export const Home: React.FC = () => {
                 </div>
               </div>
               
-              <h1 className="text-5xl sm:text-7xl font-black tracking-tighter mb-2 font-headline drop-shadow-lg break-all leading-tight">
-                {showBalances ? formatCurrency(data.total, data.currency) : '••••••'}
+              <h1 className={cn(
+                "text-5xl sm:text-7xl font-black tracking-tighter mb-2 font-headline drop-shadow-lg break-all leading-tight transition-all duration-300",
+                !showBalances && "filter blur-md select-none opacity-60"
+              )}>
+                {formatCurrency(data.total, data.currency)}
               </h1>
               
               <div className="flex flex-wrap gap-4 sm:gap-8 mb-6 sm:mb-10 mt-2 px-1">
                 <div className="flex flex-col">
                   <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-0.5">Saldo Anterior</span>
-                  <span className="text-sm sm:text-base font-black font-headline opacity-95">
-                    {showBalances ? formatCurrency(data.total - (data.currentIncome - data.currentExpenses), data.currency) : '••••••'}
+                  <span className={cn(
+                    "text-sm sm:text-base font-black font-headline opacity-95 transition-all duration-300 inline-block",
+                    !showBalances && "filter blur-sm select-none opacity-60"
+                  )}>
+                    {formatCurrency(data.total - (data.currentIncome - data.currentExpenses), data.currency)}
                   </span>
                 </div>
                 <div className="flex flex-col border-l border-white/10 pl-4 sm:pl-8">
                   <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-0.5">Resultado Mes</span>
                   <span className={cn(
-                    "text-sm sm:text-base font-black font-headline opacity-95",
-                    (data.currentIncome - data.currentExpenses) >= 0 ? "text-emerald-300" : "text-rose-300"
+                    "text-sm sm:text-base font-black font-headline opacity-95 transition-all duration-300 inline-block",
+                    (data.currentIncome - data.currentExpenses) >= 0 ? "text-emerald-300" : "text-rose-300",
+                    !showBalances && "filter blur-sm select-none opacity-60"
                   )}>
                     {(data.currentIncome - data.currentExpenses) >= 0 ? '+' : ''}
-                    {showBalances ? formatCurrency(data.currentIncome - data.currentExpenses, data.currency) : '••••••'}
+                    {formatCurrency(data.currentIncome - data.currentExpenses, data.currency)}
                   </span>
                 </div>
               </div>
@@ -410,11 +418,17 @@ export const Home: React.FC = () => {
                     </div>
                     <div className="text-left">
                       <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1 leading-none">Ingresos</p>
-                      <p className="text-lg sm:text-xl font-black text-white leading-none tracking-tight">
-                        {showBalances ? formatCurrency(data.currentIncome, data.currency) : '••••••'}
+                      <p className={cn(
+                        "text-lg sm:text-xl font-black text-white leading-none tracking-tight transition-all duration-300 inline-block",
+                        !showBalances && "filter blur-sm select-none opacity-60"
+                      )}>
+                        {formatCurrency(data.currentIncome, data.currency)}
                       </p>
-                      {showBalances && data.transfersIn > 0 && (
-                        <p className="text-[9px] font-bold text-emerald-300/80 mt-1 leading-none">
+                      {data.transfersIn > 0 && (
+                        <p className={cn(
+                          "text-[9px] font-bold text-emerald-300/80 mt-1 leading-none transition-all duration-300 inline-block",
+                          !showBalances && "filter blur-[3px] select-none opacity-50"
+                        )}>
                           inc. {formatCurrency(data.transfersIn, data.currency)} transf.
                         </p>
                       )}
@@ -428,11 +442,17 @@ export const Home: React.FC = () => {
                     </div>
                     <div className="text-left">
                       <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1 leading-none">Gastos</p>
-                      <p className="text-lg sm:text-xl font-black text-white leading-none tracking-tight">
-                        {showBalances ? formatCurrency(data.currentExpenses, data.currency) : '••••••'}
+                      <p className={cn(
+                        "text-lg sm:text-xl font-black text-white leading-none tracking-tight transition-all duration-300 inline-block",
+                        !showBalances && "filter blur-sm select-none opacity-60"
+                      )}>
+                        {formatCurrency(data.currentExpenses, data.currency)}
                       </p>
-                      {showBalances && data.transfersOut > 0 && (
-                        <p className="text-[9px] font-bold text-rose-300/80 mt-1 leading-none">
+                      {data.transfersOut > 0 && (
+                        <p className={cn(
+                          "text-[9px] font-bold text-rose-300/80 mt-1 leading-none transition-all duration-300 inline-block",
+                          !showBalances && "filter blur-[3px] select-none opacity-50"
+                        )}>
                           inc. {formatCurrency(data.transfersOut, data.currency)} transf.
                         </p>
                       )}
@@ -482,8 +502,11 @@ export const Home: React.FC = () => {
                 <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70 block mb-0.5">
                   Vence este mes
                 </span>
-                <span className="text-base sm:text-lg font-black text-on-surface font-headline block">
-                  {showBalances ? formatCurrency(installmentSummary.totalThisMonth, profile?.currency) : '••••••'}
+                <span className={cn(
+                  "text-base sm:text-lg font-black text-on-surface font-headline block transition-all duration-300",
+                  !showBalances && "filter blur-sm select-none opacity-60"
+                )}>
+                  {formatCurrency(installmentSummary.totalThisMonth, profile?.currency)}
                 </span>
                 <span className="text-[10px] font-bold text-on-surface-variant/60 block">
                   {installmentSummary.thisMonthCount} {installmentSummary.thisMonthCount === 1 ? 'vencimiento' : 'vencimientos'}
@@ -494,8 +517,11 @@ export const Home: React.FC = () => {
                 <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70 block mb-0.5">
                   Deuda total pendiente
                 </span>
-                <span className="text-base sm:text-lg font-black text-rose-600 font-headline block">
-                  {showBalances ? formatCurrency(installmentSummary.totalRemaining, profile?.currency) : '••••••'}
+                <span className={cn(
+                  "text-base sm:text-lg font-black text-rose-600 font-headline block transition-all duration-300",
+                  !showBalances && "filter blur-sm select-none opacity-60"
+                )}>
+                  {formatCurrency(installmentSummary.totalRemaining, profile?.currency)}
                 </span>
                 <span className="text-[10px] font-bold text-on-surface-variant/60 block">
                   En cuotas futuras
@@ -741,11 +767,12 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, category
       </div>
       <div className="text-right shrink-0 ml-2">
         <p className={cn(
-          "font-bold font-headline tracking-tighter text-sm sm:text-base whitespace-nowrap",
-          transaction.type === 'expense' ? "text-on-surface" : "text-emerald-600 dark:text-emerald-400"
+          "font-bold font-headline tracking-tighter text-sm sm:text-base whitespace-nowrap transition-all duration-300",
+          transaction.type === 'expense' ? "text-on-surface" : "text-emerald-600 dark:text-emerald-400",
+          !showBalances && "filter blur-sm select-none opacity-60"
         )}>
           {transaction.type === 'expense' ? '-' : '+'}
-          {showBalances ? formatCurrency(transaction.amount, project?.currency || profile?.currency) : '••••'}
+          {formatCurrency(transaction.amount, project?.currency || profile?.currency)}
         </p>
         <p className="text-[10px] text-on-surface-variant/70 font-semibold">
           {formatDisplayDate(transaction.date, false)}

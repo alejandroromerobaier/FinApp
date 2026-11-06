@@ -20,6 +20,7 @@ import {
 import { useAuth } from './AuthContext';
 import { getLocalMonth } from './dateUtils';
 import { expandProjectedTransactions } from './installmentUtils';
+import { haptic } from './haptics';
 
 export interface Category {
   id: string;
@@ -219,6 +220,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const toggleShowBalances = () => {
+    haptic.light();
     setShowBalances(prev => {
       const newValue = !prev;
       localStorage.setItem('showBalances', String(newValue));
