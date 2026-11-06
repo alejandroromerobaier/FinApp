@@ -60,24 +60,26 @@ export const Budgets: React.FC = () => {
   useEffect(() => {
     const initial: Record<string, string> = {};
     budgets.forEach(b => {
-      // Only include budgets for the selected context
+      // Only include budgets for the selected context and month
+      if (b.month && b.month !== budgetMonth) return;
       if ((selectedProjectId === null && (!b.projectId || b.projectId === 'personal' || b.projectId === null)) || 
           (selectedProjectId !== null && b.projectId === selectedProjectId)) {
         initial[b.categoryId] = b.amount ? formatAmountForDisplay(b.amount) : '';
       }
     });
     setLocalBudgets(initial);
-  }, [budgets, selectedProjectId]);
+  }, [budgets, selectedProjectId, budgetMonth]);
 
   // Filter active shared projects
   const activeProjects = useMemo(() => {
-    return projects.filter(p => p.status !== 'inactive');
+    return projects.filter(p => (p.status || 'active') !== 'inactive');
   }, [projects]);
 
   const isPersonalActive = (profile?.personalStatus || 'active') !== 'inactive';
 
-  // Ensure selectedProjectId is an active context
+  // Ensure selectedProjectId is an active context (only after projects load)
   useEffect(() => {
+    if (projects.length === 0) return;
     if (selectedProjectId !== null && !activeProjects.some(p => p.id === selectedProjectId)) {
       if (isPersonalActive) {
         setSelectedProjectId(null);
@@ -85,7 +87,7 @@ export const Budgets: React.FC = () => {
         setSelectedProjectId(activeProjects[0].id);
       }
     }
-  }, [activeProjects, selectedProjectId, isPersonalActive]);
+  }, [projects.length, activeProjects, selectedProjectId, isPersonalActive]);
 
   // Category spending aggregation for the active month and selected project
   const categorySpentMap = useMemo(() => {
@@ -121,6 +123,7 @@ export const Budgets: React.FC = () => {
     expenseCategories.forEach(cat => {
       const budgetObj = budgets.find(b => 
         b.categoryId === cat.id && 
+        (!b.month || b.month === budgetMonth) &&
         ((selectedProjectId === null && (!b.projectId || b.projectId === 'personal' || b.projectId === null)) || 
          (selectedProjectId !== null && b.projectId === selectedProjectId))
       );
@@ -478,6 +481,7 @@ export const Budgets: React.FC = () => {
 
             const isEnabled = budgets.some(b => 
               b.categoryId === category.id && 
+              (!b.month || b.month === budgetMonth) &&
               ((selectedProjectId === null && (!b.projectId || b.projectId === 'personal' || b.projectId === null)) || 
                (selectedProjectId !== null && b.projectId === selectedProjectId))
             );
