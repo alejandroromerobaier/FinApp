@@ -366,12 +366,12 @@ export const ProjectDetail: React.FC = () => {
         <section className="lg:col-span-8 space-y-6">
           {/* Tabs Selector */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
-            <div className="flex bg-surface-container-low p-1.5 rounded-2xl border border-on-surface/5">
+            <div className="flex bg-surface-container-low p-1.5 rounded-2xl border border-on-surface/5 overflow-x-auto no-scrollbar max-w-full">
               <button
                 type="button"
                 onClick={() => setActiveTab('transactions')}
                 className={cn(
-                  "py-2.5 px-4 rounded-xl text-xs font-black transition-all flex items-center gap-2 uppercase tracking-wider",
+                  "py-2.5 px-4 rounded-xl text-xs font-black transition-all flex items-center gap-2 uppercase tracking-wider shrink-0",
                   activeTab === 'transactions'
                     ? "bg-surface-container-lowest text-primary shadow-sm"
                     : "text-on-surface-variant/60 hover:text-on-surface"
@@ -387,7 +387,7 @@ export const ProjectDetail: React.FC = () => {
                 type="button"
                 onClick={() => setActiveTab('installments')}
                 className={cn(
-                  "py-2.5 px-4 rounded-xl text-xs font-black transition-all flex items-center gap-2 uppercase tracking-wider",
+                  "py-2.5 px-4 rounded-xl text-xs font-black transition-all flex items-center gap-2 uppercase tracking-wider shrink-0",
                   activeTab === 'installments'
                     ? "bg-surface-container-lowest text-primary shadow-sm"
                     : "text-on-surface-variant/60 hover:text-on-surface"
@@ -407,14 +407,15 @@ export const ProjectDetail: React.FC = () => {
                   type="button"
                   onClick={() => setActiveTab('savings')}
                   className={cn(
-                    "py-2.5 px-4 rounded-xl text-xs font-black transition-all flex items-center gap-2 uppercase tracking-wider",
+                    "py-2.5 px-4 rounded-xl text-xs font-black transition-all flex items-center gap-2 uppercase tracking-wider shrink-0",
                     activeTab === 'savings'
                       ? "bg-surface-container-lowest text-cyan-600 dark:text-cyan-400 shadow-sm"
                       : "text-on-surface-variant/60 hover:text-on-surface"
                   )}
                 >
                   <ArrowLeftRight size={14} />
-                  <span>Cotizaciones & Ahorro</span>
+                  <span className="hidden sm:inline">Cotizaciones & Ahorro</span>
+                  <span className="sm:hidden">Ahorro</span>
                   {transferStats.inTransfers.length > 0 && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-cyan-600 text-white font-mono font-bold">
                       {transferStats.inTransfers.length}
@@ -523,11 +524,11 @@ export const ProjectDetail: React.FC = () => {
             <div className="space-y-8">
               {/* Summary Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-surface-container-lowest p-5 rounded-3xl border border-on-surface/10 shadow-sm">
-                  <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-widest block mb-2">
+                <div className="bg-surface-container-lowest p-5 rounded-3xl border border-on-surface/10 shadow-sm min-w-0">
+                  <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-widest block mb-2 truncate">
                     Total Adquirido / Ingresado
                   </span>
-                  <p className="text-2xl font-black font-headline text-emerald-600 dark:text-emerald-400">
+                  <p className="text-xl sm:text-2xl font-black font-headline text-emerald-600 dark:text-emerald-400 break-words">
                     {formatCurrency(transferStats.totalAcquired, project.currency)}
                   </p>
                   <p className="text-[11px] text-on-surface-variant/70 font-semibold mt-1">
@@ -535,11 +536,11 @@ export const ProjectDetail: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="bg-surface-container-lowest p-5 rounded-3xl border border-on-surface/10 shadow-sm">
-                  <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-widest block mb-2">
+                <div className="bg-surface-container-lowest p-5 rounded-3xl border border-on-surface/10 shadow-sm min-w-0">
+                  <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-widest block mb-2 truncate">
                     Total Invertido
                   </span>
-                  <p className="text-2xl font-black font-headline text-on-surface">
+                  <p className="text-xl sm:text-2xl font-black font-headline text-on-surface break-words">
                     {formatCurrency(transferStats.totalSpent, 'ARS')}
                   </p>
                   <p className="text-[11px] text-on-surface-variant/70 font-semibold mt-1">
@@ -547,24 +548,24 @@ export const ProjectDetail: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="bg-gradient-to-br from-cyan-500/10 via-sky-500/5 to-transparent p-5 rounded-3xl border border-cyan-500/20 shadow-sm">
-                  <span className="text-[10px] font-black text-cyan-800 dark:text-cyan-200 uppercase tracking-widest block mb-2">
+                <div className="bg-gradient-to-br from-cyan-500/10 via-sky-500/5 to-transparent p-5 rounded-3xl border border-cyan-500/20 shadow-sm min-w-0">
+                  <span className="text-[10px] font-black text-cyan-800 dark:text-cyan-200 uppercase tracking-widest block mb-2 truncate">
                     TC Promedio Ponderado
                   </span>
-                  <p className="text-2xl font-black font-headline text-cyan-600 dark:text-cyan-400">
-                    ${formatCurrency(transferStats.weightedAvgRate, 'ARS')}
+                  <p className="text-xl sm:text-2xl font-black font-headline text-cyan-600 dark:text-cyan-400 break-words">
+                    {formatCurrency(transferStats.weightedAvgRate, 'ARS')}
                   </p>
                   <p className="text-[11px] text-on-surface-variant/70 font-semibold mt-1">
                     Costo medio por cada dólar
                   </p>
                 </div>
 
-                <div className="bg-surface-container-lowest p-5 rounded-3xl border border-on-surface/10 shadow-sm">
-                  <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-widest block mb-2">
+                <div className="bg-surface-container-lowest p-5 rounded-3xl border border-on-surface/10 shadow-sm min-w-0">
+                  <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-widest block mb-2 truncate">
                     Última Cotización
                   </span>
-                  <p className="text-2xl font-black font-headline text-primary">
-                    {transferStats.latestRate > 0 ? `$${formatCurrency(transferStats.latestRate, 'ARS')}` : 'Sin datos'}
+                  <p className="text-xl sm:text-2xl font-black font-headline text-primary break-words">
+                    {transferStats.latestRate > 0 ? formatCurrency(transferStats.latestRate, 'ARS') : 'Sin datos'}
                   </p>
                   <p className="text-[11px] text-on-surface-variant/70 font-semibold mt-1">
                     Último cambio realizado
@@ -573,8 +574,8 @@ export const ProjectDetail: React.FC = () => {
               </div>
 
               {/* Acquisitions List */}
-              <div className="bg-surface-container-lowest p-6 rounded-3xl border border-on-surface/10 shadow-sm">
-                <div className="flex items-center justify-between mb-6">
+              <div className="bg-surface-container-lowest p-5 sm:p-6 rounded-3xl border border-on-surface/10 shadow-sm">
+                <div className="flex items-center justify-between mb-5">
                   <div>
                     <h3 className="text-lg font-extrabold text-on-surface font-headline">Historial de Compras & Cotizaciones</h3>
                     <p className="text-xs text-on-surface-variant font-medium">Registro detallado de cada ingreso de divisas y su tasa de cambio aplicada.</p>
@@ -594,34 +595,42 @@ export const ProjectDetail: React.FC = () => {
                         <div
                           key={t.id}
                           onClick={() => navigate(`/edit/${t.id}`)}
-                          className="p-4 rounded-2xl bg-surface-container-low hover:bg-on-surface/5 transition-all border border-on-surface/5 flex items-center justify-between gap-4 cursor-pointer"
+                          className="p-3.5 sm:p-4 rounded-2xl bg-surface-container-low hover:bg-on-surface/5 transition-all border border-on-surface/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer"
                         >
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-cyan-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-xl bg-cyan-600/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center shrink-0 shadow-sm border border-cyan-500/20">
                               <ArrowLeftRight size={18} />
                             </div>
-                            <div>
-                              <p className="font-extrabold text-sm text-on-surface">{t.description || 'Compra de Divisas'}</p>
-                              <div className="flex items-center gap-2 mt-0.5 text-xs text-on-surface-variant">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-extrabold text-sm text-on-surface truncate">{t.description || 'Compra de Divisas'}</p>
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-xs text-on-surface-variant">
                                 <span>{tDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                                 {t.relatedProjectName && (
                                   <>
                                     <span>•</span>
-                                    <span>Desde: <strong>{t.relatedProjectName}</strong></span>
+                                    <span className="truncate">Desde: <strong>{t.relatedProjectName}</strong></span>
                                   </>
                                 )}
                               </div>
                             </div>
                           </div>
 
-                          <div className="text-right shrink-0">
-                            <p className="text-base font-black font-headline text-emerald-600 dark:text-emerald-400">
+                          <div className="flex sm:flex-col items-baseline sm:items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-on-surface/5 shrink-0 gap-1">
+                            <p className="text-base sm:text-lg font-black font-headline text-emerald-600 dark:text-emerald-400">
                               +{formatCurrency(t.amount, project.currency)}
                             </p>
-                            <p className="text-xs font-bold text-on-surface-variant font-mono">
-                              {t.exchangeRate ? `TC: $${formatCurrency(t.exchangeRate, 'ARS')}` : ''}
-                              {t.relatedAmount ? ` (${formatCurrency(t.relatedAmount, 'ARS')})` : ''}
-                            </p>
+                            <div className="text-right">
+                              {t.exchangeRate ? (
+                                <span className="text-xs font-bold text-cyan-700 dark:text-cyan-400 font-mono">
+                                  TC: {formatCurrency(t.exchangeRate, 'ARS')}
+                                </span>
+                              ) : null}
+                              {t.relatedAmount ? (
+                                <span className="text-[11px] text-on-surface-variant/70 font-mono ml-1.5 sm:ml-0 sm:block">
+                                  ({formatCurrency(t.relatedAmount, 'ARS')})
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
                         </div>
                       );

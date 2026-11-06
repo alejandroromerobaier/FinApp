@@ -216,7 +216,7 @@ export const Stats: React.FC = () => {
         const sampleTx = expenses.find(t => (t.isTransfer ? 'system_transferencia' : t.categoryId) === id);
         
         return {
-          name: id === 'system_transferencia' ? 'Transferencia' : (cat?.name || sampleTx?.categoryName || (id ? 'Cargando...' : 'Otros')),
+          name: id === 'system_transferencia' ? 'Ahorro / Divisas' : (cat?.name || sampleTx?.categoryName || (id ? 'Cargando...' : 'Otros')),
           value: (value / (totalExpenses || 1)) * 100,
           amount: value,
           color: id === 'system_transferencia' ? '#0891b2' : getHexFromClass(cat?.color || sampleTx?.categoryColor || '')
@@ -235,7 +235,7 @@ export const Stats: React.FC = () => {
         const sampleTx = income.find(t => (t.isTransfer ? 'system_transferencia' : t.categoryId) === id);
         
         return {
-          name: id === 'system_transferencia' ? 'Transferencia' : (cat?.name || sampleTx?.categoryName || (id ? 'Cargando...' : 'Otros')),
+          name: id === 'system_transferencia' ? 'Ahorro / Divisas' : (cat?.name || sampleTx?.categoryName || (id ? 'Cargando...' : 'Otros')),
           value: (value / (totalIncome || 1)) * 100,
           amount: value,
           color: id === 'system_transferencia' ? '#0891b2' : getHexFromClass(cat?.color || sampleTx?.categoryColor || '')
@@ -355,12 +355,12 @@ export const Stats: React.FC = () => {
       // Category Income Impact
       const categoryIncomeImpact = Object.entries(catMap).map(([id, value]) => {
         const cat = categories.find(c => c.id === id);
-        const sampleTx = expenses.find(t => t.categoryId === id);
+        const sampleTx = expenses.find(t => (t.isTransfer ? 'system_transferencia' : t.categoryId) === id);
         return {
-          name: cat?.name || sampleTx?.categoryName || (id ? 'Cargando...' : 'Otros'),
+          name: id === 'system_transferencia' ? 'Ahorro / Divisas' : (cat?.name || sampleTx?.categoryName || (id ? 'Cargando...' : 'Otros')),
           amount: value,
           percentage: totalIncome > 0 ? (value / totalIncome) * 100 : 0,
-          color: getHexFromClass(cat?.color || sampleTx?.categoryColor || '')
+          color: id === 'system_transferencia' ? '#0891b2' : getHexFromClass(cat?.color || sampleTx?.categoryColor || '')
         };
       }).sort((a, b) => b.amount - a.amount);
 
@@ -601,14 +601,14 @@ export const Stats: React.FC = () => {
                 value={formatCurrency(stats.totalExpenses, stats.activeCurrency)} 
                 icon={<ArrowDownRight size={20} className="text-rose-500" />}
                 color="text-rose-500"
-                subtext={stats.transferExpenses > 0 ? `inc. ${formatCurrency(stats.transferExpenses, stats.activeCurrency)} transf.` : undefined}
+                subtext={stats.transferExpenses > 0 ? `inc. ${formatCurrency(stats.transferExpenses, stats.activeCurrency)} ahorro/divisas` : undefined}
               />
               <MainKPICard 
                 title="Ingresos" 
                 value={formatCurrency(stats.totalIncome, stats.activeCurrency)} 
                 icon={<ArrowUpRight size={20} className="text-emerald-500" />}
                 color="text-emerald-500"
-                subtext={stats.transferIncome > 0 ? `inc. ${formatCurrency(stats.transferIncome, stats.activeCurrency)} transf.` : undefined}
+                subtext={stats.transferIncome > 0 ? `inc. ${formatCurrency(stats.transferIncome, stats.activeCurrency)} ahorro/divisas` : undefined}
               />
               <MainKPICard 
                 title="Balance" 
