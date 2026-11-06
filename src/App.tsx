@@ -80,6 +80,7 @@ function AppContent() {
 }
 
 import { ThemeProvider } from './lib/ThemeContext';
+import { ToastProvider } from './context/ToastContext';
 
 export default function App() {
   return (
@@ -87,7 +88,9 @@ export default function App() {
       <ThemeProvider>
         <AuthProvider>
           <DataProvider>
-            <AppContent />
+            <ToastProvider>
+              <AppContent />
+            </ToastProvider>
           </DataProvider>
         </AuthProvider>
       </ThemeProvider>

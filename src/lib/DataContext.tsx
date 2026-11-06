@@ -20,6 +20,7 @@ import {
 import { useAuth } from './AuthContext';
 import { getLocalMonth } from './dateUtils';
 import { expandProjectedTransactions } from './installmentUtils';
+import { haptic } from './haptics';
 
 export interface Category {
   id: string;
@@ -101,6 +102,7 @@ export interface DataContextType {
   deleteNotification: (id: string) => Promise<void>;
   clearAllNotifications: () => Promise<void>;
   showBalances: boolean;
+  setShowBalances: (show: boolean) => void;
   toggleShowBalances: () => void;
 }
 
@@ -208,7 +210,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (user) await clearAllNotifications(user.uid);
   };
 
+  const updateShowBalances = (show: boolean) => {
+    setShowBalances(show);
+    localStorage.setItem('showBalances', String(show));
+  };
+
   const toggleShowBalances = () => {
+    haptic.light();
     setShowBalances(prev => {
       const newValue = !prev;
       localStorage.setItem('showBalances', String(newValue));
@@ -370,6 +378,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearAllNotifications: handleClearAllNotifications,
       loading,
       showBalances,
+      setShowBalances: updateShowBalances,
       toggleShowBalances
     }}>
       {children}
