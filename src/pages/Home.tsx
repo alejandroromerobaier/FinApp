@@ -65,6 +65,15 @@ const isCreditCardTx = (t: any): boolean => {
   return false;
 };
 
+// Dynamic responsive font size for project card total balance to guarantee it always stays on a single line
+const getBalanceFontSize = (amount: number): string => {
+  const abs = Math.abs(amount);
+  if (abs >= 100_000_000) return "text-2xl sm:text-4xl md:text-5xl lg:text-6xl";
+  if (abs >= 10_000_000) return "text-3xl sm:text-4xl md:text-5xl lg:text-6xl";
+  if (abs >= 1_000_000) return "text-[2.1rem] sm:text-5xl md:text-6xl lg:text-7xl";
+  return "text-4xl sm:text-5xl md:text-6xl lg:text-7xl";
+};
+
 export const Home: React.FC = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
@@ -422,7 +431,8 @@ export const Home: React.FC = () => {
               </div>
               
               <h1 className={cn(
-                "text-5xl sm:text-7xl font-black tracking-tighter mb-2 font-headline drop-shadow-lg break-all leading-tight transition-all duration-300",
+                "font-black tracking-tight mb-2 font-headline drop-shadow-lg whitespace-nowrap leading-tight transition-all duration-300",
+                getBalanceFontSize(data.total),
                 isCardBlurred(id) && "filter blur-md select-none opacity-60"
               )}>
                 {formatCurrency(data.total, data.currency)}
@@ -432,7 +442,7 @@ export const Home: React.FC = () => {
                 <div className="flex flex-col">
                   <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-0.5">Saldo Anterior</span>
                   <span className={cn(
-                    "text-sm sm:text-base font-black font-headline opacity-95 transition-all duration-300 inline-block",
+                    "text-sm sm:text-base font-black font-headline opacity-95 transition-all duration-300 inline-block whitespace-nowrap",
                     isCardBlurred(id) && "filter blur-sm select-none opacity-60"
                   )}>
                     {formatCurrency(data.total - (data.currentIncome - data.currentExpenses), data.currency)}
@@ -441,7 +451,7 @@ export const Home: React.FC = () => {
                 <div className="flex flex-col border-l border-white/10 pl-4 sm:pl-8">
                   <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-0.5">Resultado Mes</span>
                   <span className={cn(
-                    "text-sm sm:text-base font-black font-headline opacity-95 transition-all duration-300 inline-block",
+                    "text-sm sm:text-base font-black font-headline opacity-95 transition-all duration-300 inline-block whitespace-nowrap",
                     (data.currentIncome - data.currentExpenses) >= 0 ? "text-emerald-300" : "text-rose-300",
                     isCardBlurred(id) && "filter blur-sm select-none opacity-60"
                   )}>
@@ -460,7 +470,7 @@ export const Home: React.FC = () => {
                     <div className="text-left">
                       <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1 leading-none">Ingresos</p>
                       <p className={cn(
-                        "text-lg sm:text-xl font-black text-white leading-none tracking-tight transition-all duration-300 inline-block",
+                        "text-lg sm:text-xl font-black text-white leading-none tracking-tight transition-all duration-300 inline-block whitespace-nowrap",
                         isCardBlurred(id) && "filter blur-sm select-none opacity-60"
                       )}>
                         {formatCurrency(data.currentIncome, data.currency)}
@@ -476,7 +486,7 @@ export const Home: React.FC = () => {
                     <div className="text-left">
                       <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1 leading-none">Gastos</p>
                       <p className={cn(
-                        "text-lg sm:text-xl font-black text-white leading-none tracking-tight transition-all duration-300 inline-block",
+                        "text-lg sm:text-xl font-black text-white leading-none tracking-tight transition-all duration-300 inline-block whitespace-nowrap",
                         isCardBlurred(id) && "filter blur-sm select-none opacity-60"
                       )}>
                         {formatCurrency(data.currentExpenses, data.currency)}
