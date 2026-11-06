@@ -505,49 +505,83 @@ export const Budgets: React.FC = () => {
                   (!isEnabled && !isCurrentMonth) && "hidden" // Hide disabled budgets in history
                 )}
               >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className={cn(
-                      "w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm transition-all shrink-0", 
-                      isEnabled ? category.color : "bg-on-surface/10 text-on-surface/40"
-                    )}>
-                      <IconComponent name={category.icon} size={20} />
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  {/* Category Header: Icon & Full Name */}
+                  <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm transition-all shrink-0", 
+                        isEnabled ? category.color : "bg-on-surface/10 text-on-surface/40"
+                      )}>
+                        <IconComponent name={category.icon} size={20} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-extrabold text-on-surface text-sm uppercase tracking-tight break-words">{category.name}</h4>
+                        <p className="text-[10px] text-on-surface-variant/50 font-black uppercase tracking-wider">
+                          {isEnabled ? (isOver ? 'Límite superado' : 'Objetivo Activo') : 'Sin Objetivo'}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <h4 className="font-extrabold text-on-surface text-sm uppercase tracking-tight truncate">{category.name}</h4>
-                      <p className="text-[10px] text-on-surface-variant/50 font-black uppercase tracking-wider">
-                        {isEnabled ? (isOver ? 'Límite superado' : 'Objetivo Activo') : 'Sin Objetivo'}
-                      </p>
+
+                    {/* Toggle Switch on mobile stays on the top row right */}
+                    <div className="sm:hidden shrink-0">
+                      {isCurrentMonth && (
+                        <button
+                          onClick={async () => {
+                            if (isEnabled) {
+                              await handleSave(category.id, 0, true);
+                            } else {
+                              await handleSave(category.id, 0);
+                            }
+                          }}
+                          className={cn(
+                            "w-12 h-6 rounded-full relative transition-all duration-300 flex items-center px-1",
+                            isEnabled ? "bg-primary" : "bg-on-surface/10"
+                          )}
+                          title={isEnabled ? "Desactivar objetivo" : "Activar objetivo"}
+                        >
+                          <motion.div 
+                            animate={{ x: isEnabled ? 24 : 0 }}
+                            className="w-4 h-4 bg-white rounded-full shadow-sm"
+                          />
+                        </button>
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 shrink-0">
-                    {/* Toggle Switch */}
-                    {isCurrentMonth && (
-                      <button
-                        onClick={async () => {
-                          if (isEnabled) {
-                            await handleSave(category.id, 0, true);
-                          } else {
-                            await handleSave(category.id, 0);
-                          }
-                        }}
-                        className={cn(
-                          "w-12 h-6 rounded-full relative transition-all duration-300 flex items-center px-1",
-                          isEnabled ? "bg-primary" : "bg-on-surface/10"
-                        )}
-                        title={isEnabled ? "Desactivar objetivo" : "Activar objetivo"}
-                      >
-                        <motion.div 
-                          animate={{ x: isEnabled ? 24 : 0 }}
-                          className="w-4 h-4 bg-white rounded-full shadow-sm"
-                        />
-                      </button>
-                    )}
+                  {/* Controls: Desktop Toggle & Input / Save */}
+                  <div className={cn(
+                    "flex items-center gap-3 shrink-0",
+                    isEnabled ? "justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-on-surface/5 w-full sm:w-auto" : "hidden sm:flex"
+                  )}>
+                    {/* Toggle Switch on desktop */}
+                    <div className="hidden sm:block">
+                      {isCurrentMonth && (
+                        <button
+                          onClick={async () => {
+                            if (isEnabled) {
+                              await handleSave(category.id, 0, true);
+                            } else {
+                              await handleSave(category.id, 0);
+                            }
+                          }}
+                          className={cn(
+                            "w-12 h-6 rounded-full relative transition-all duration-300 flex items-center px-1",
+                            isEnabled ? "bg-primary" : "bg-on-surface/10"
+                          )}
+                          title={isEnabled ? "Desactivar objetivo" : "Activar objetivo"}
+                        >
+                          <motion.div 
+                            animate={{ x: isEnabled ? 24 : 0 }}
+                            className="w-4 h-4 bg-white rounded-full shadow-sm"
+                          />
+                        </button>
+                      )}
+                    </div>
 
                     {isEnabled && (
-                      <div className="flex items-center gap-2">
-                        <div className="relative">
+                      <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                        <div className="relative flex-1 sm:flex-initial">
                           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-black text-on-surface-variant/40 uppercase tracking-tighter">{activeCurrency}</span>
                           <input 
                             type="text"
@@ -572,7 +606,7 @@ export const Budgets: React.FC = () => {
                             }}
                             placeholder="0"
                             className={cn(
-                              "w-28 sm:w-32 pl-9 sm:pl-10 pr-2.5 sm:pr-3 py-2 bg-on-surface/5 border-none rounded-xl text-sm font-bold text-on-surface transition-all text-right focus:ring-2 focus:ring-primary/20",
+                              "w-full sm:w-32 pl-9 sm:pl-10 pr-2.5 sm:pr-3 py-2 bg-on-surface/5 border-none rounded-xl text-sm font-bold text-on-surface transition-all text-right focus:ring-2 focus:ring-primary/20",
                               !isCurrentMonth && "opacity-80 bg-transparent text-base pr-0"
                             )}
                           />
@@ -601,23 +635,23 @@ export const Budgets: React.FC = () => {
 
                 {/* Progress Bar & Spending Indicator */}
                 {isEnabled && budgetVal > 0 && (
-                  <div className="mt-3 pt-3 border-t border-on-surface/5 space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px] font-bold">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-on-surface-variant/60 font-medium">Gastado:</span>
+                  <div className="mt-3 pt-3 border-t border-on-surface/5 space-y-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                      <div className="flex items-center gap-1.5 min-w-0 font-mono text-[11px] sm:text-xs">
+                        <span className="text-on-surface-variant/60 font-sans font-medium">Gastado:</span>
                         <span className={cn(
-                          "whitespace-nowrap font-black font-mono",
+                          "whitespace-nowrap font-black",
                           isOver ? "text-rose-600 dark:text-rose-400" : "text-on-surface"
                         )}>
                           {formatCurrency(spent, activeCurrency)}
                         </span>
-                        <span className="text-on-surface-variant/40">/</span>
-                        <span className="text-on-surface-variant/70 whitespace-nowrap font-mono">
+                        <span className="text-on-surface-variant/40 font-sans">de</span>
+                        <span className="text-on-surface-variant/70 whitespace-nowrap font-bold">
                           {formatCurrency(budgetVal, activeCurrency)}
                         </span>
                       </div>
 
-                      <div className="text-right shrink-0">
+                      <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
                         <span className={cn(
                           "text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md inline-block whitespace-nowrap",
                           isOver 
@@ -629,6 +663,9 @@ export const Budgets: React.FC = () => {
                           {isOver 
                             ? `+${formatCurrency(spent - budgetVal, activeCurrency)} excedido` 
                             : `${formatCurrency(remainingCat, activeCurrency)} disponible`}
+                        </span>
+                        <span className="text-[10px] font-bold text-on-surface-variant/50 sm:hidden">
+                          {percent.toFixed(0)}%
                         </span>
                       </div>
                     </div>
