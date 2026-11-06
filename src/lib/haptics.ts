@@ -14,6 +14,17 @@ export const haptic = {
     }
   },
 
+  /** Selection pulse for month and project selectors (12ms) */
+  selection: () => {
+    try {
+      if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate(12);
+      }
+    } catch {
+      // Ignore unsupported browser errors
+    }
+  },
+
   /** Medium pulse for button clicks, actions, shortcuts (25ms) */
   medium: () => {
     try {
