@@ -112,6 +112,7 @@ export interface DataContextType {
   deleteNotification: (id: string) => Promise<void>;
   clearAllNotifications: () => Promise<void>;
   showBalances: boolean;
+  setShowBalances: (show: boolean) => void;
   toggleShowBalances: () => void;
 }
 
@@ -217,6 +218,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleClearAllNotifications = async () => {
     if (user) await clearAllNotifications(user.uid);
+  };
+
+  const updateShowBalances = (show: boolean) => {
+    setShowBalances(show);
+    localStorage.setItem('showBalances', String(show));
   };
 
   const toggleShowBalances = () => {
@@ -392,6 +398,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearAllNotifications: handleClearAllNotifications,
       loading,
       showBalances,
+      setShowBalances: updateShowBalances,
       toggleShowBalances
     }}>
       {children}

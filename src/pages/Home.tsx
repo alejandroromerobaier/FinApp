@@ -71,7 +71,7 @@ export const Home: React.FC = () => {
   const { user, profile } = useAuth();
   const { 
     categories, projects, transactions, userNames, shortcuts, loading: dataLoading, 
-    budgetMonth, setBudgetMonth, showBalances, toggleShowBalances 
+    budgetMonth, setBudgetMonth, showBalances, setShowBalances, toggleShowBalances 
   } = useData();
   const [loading, setLoading] = useState(true);
   const [selectedShortcut, setSelectedShortcut] = useState<Shortcut | null>(null);
@@ -222,6 +222,62 @@ export const Home: React.FC = () => {
     return { balancesByProject: sortedBalances };
   }, [transactions, projects, profile, budgetMonth]);
 
+  const [hiddenProjectIds, setHiddenProjectIds] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('hiddenProjectCards');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const isCardBlurred = (id: string) => {
+    if (!showBalances) return true;
+    return !!hiddenProjectIds[id];
+  };
+
+  const isAnyCardVisible = balancesByProject.some(([id]) => !isCardBlurred(id));
+
+  const handleToggleAllBalances = () => {
+    haptic.light();
+    if (showBalances && isAnyCardVisible) {
+      setShowBalances(false);
+      const nextHidden: Record<string, boolean> = {};
+      balancesByProject.forEach(([id]) => {
+        nextHidden[id] = true;
+      });
+      setHiddenProjectIds(nextHidden);
+      localStorage.setItem('hiddenProjectCards', JSON.stringify(nextHidden));
+    } else {
+      setShowBalances(true);
+      setHiddenProjectIds({});
+      localStorage.setItem('hiddenProjectCards', JSON.stringify({}));
+    }
+  };
+
+  const handleToggleCardBalance = (projectId: string) => {
+    haptic.light();
+    const currentlyBlurred = isCardBlurred(projectId);
+
+    if (!showBalances) {
+      // Global was off: unhide this card, keep other existing project cards hidden
+      const nextHidden: Record<string, boolean> = {};
+      balancesByProject.forEach(([id]) => {
+        nextHidden[id] = id !== projectId;
+      });
+      setShowBalances(true);
+      setHiddenProjectIds(nextHidden);
+      localStorage.setItem('hiddenProjectCards', JSON.stringify(nextHidden));
+    } else {
+      const nextHidden = {
+        ...hiddenProjectIds,
+        [projectId]: !currentlyBlurred
+      };
+      setHiddenProjectIds(nextHidden);
+      localStorage.setItem('hiddenProjectCards', JSON.stringify(nextHidden));
+    }
+  };
+
   const recentTransactions = useMemo(() => {
     const endOfToday = new Date();
     endOfToday.setHours(23, 59, 59, 999);
@@ -326,11 +382,11 @@ export const Home: React.FC = () => {
         </div>
         <div className="flex gap-2 sm:gap-3">
           <button 
-            onClick={toggleShowBalances}
+            onClick={handleToggleAllBalances}
             className="p-2.5 sm:p-3 bg-surface-container-low rounded-2xl text-on-surface-variant hover:bg-on-surface/5 transition-all active:scale-95 border border-on-surface/5"
-            title={showBalances ? "Ocultar saldos" : "Mostrar saldos"}
+            title={showBalances && isAnyCardVisible ? "Ocultar todos los saldos" : "Mostrar todos los saldos"}
           >
-            {showBalances ? <EyeOff size={20} className="sm:w-[22px] sm:h-[22px]" /> : <Eye size={20} className="sm:w-[22px] sm:h-[22px]" />}
+            {showBalances && isAnyCardVisible ? <EyeOff size={20} className="sm:w-[22px] sm:h-[22px]" /> : <Eye size={20} className="sm:w-[22px] sm:h-[22px]" />}
           </button>
           <button className="p-2.5 sm:p-3 bg-surface-container-low rounded-2xl text-on-surface-variant hover:bg-on-surface/5 transition-all active:scale-95 border border-on-surface/5">
             <Search size={20} className="sm:w-[22px] sm:h-[22px]" />
@@ -369,12 +425,12 @@ export const Home: React.FC = () => {
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      toggleShowBalances();
+                      handleToggleCardBalance(id);
                     }}
-                    className="p-2 bg-white/10 hover:bg-white/20 rounded-xl backdrop-blur-md border border-white/10 transition-colors"
-                    title={showBalances ? "Ocultar saldos" : "Mostrar saldos"}
+                    className="p-2 bg-white/10 hover:bg-white/20 rounded-xl backdrop-blur-md border border-white/10 transition-colors active:scale-95"
+                    title={isCardBlurred(id) ? "Mostrar saldo" : "Ocultar saldo"}
                   >
-                    {showBalances ? <EyeOff size={18} /> : <Eye size={18} />}
+                    {isCardBlurred(id) ? <Eye size={18} /> : <EyeOff size={18} />}
                   </button>
                   <TrendingUp size={24} className="text-white/40 sm:w-[28px] sm:h-[28px]" />
                 </div>
@@ -382,7 +438,7 @@ export const Home: React.FC = () => {
               
               <h1 className={cn(
                 "text-5xl sm:text-7xl font-black tracking-tighter mb-2 font-headline drop-shadow-lg break-all leading-tight transition-all duration-300",
-                !showBalances && "filter blur-md select-none opacity-60"
+                isCardBlurred(id) && "filter blur-md select-none opacity-60"
               )}>
                 {formatCurrency(data.total, data.currency)}
               </h1>
@@ -392,7 +448,7 @@ export const Home: React.FC = () => {
                   <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-0.5">Saldo Anterior</span>
                   <span className={cn(
                     "text-sm sm:text-base font-black font-headline opacity-95 transition-all duration-300 inline-block",
-                    !showBalances && "filter blur-sm select-none opacity-60"
+                    isCardBlurred(id) && "filter blur-sm select-none opacity-60"
                   )}>
                     {formatCurrency(data.total - (data.currentIncome - data.currentExpenses), data.currency)}
                   </span>
@@ -402,7 +458,7 @@ export const Home: React.FC = () => {
                   <span className={cn(
                     "text-sm sm:text-base font-black font-headline opacity-95 transition-all duration-300 inline-block",
                     (data.currentIncome - data.currentExpenses) >= 0 ? "text-emerald-300" : "text-rose-300",
-                    !showBalances && "filter blur-sm select-none opacity-60"
+                    isCardBlurred(id) && "filter blur-sm select-none opacity-60"
                   )}>
                     {(data.currentIncome - data.currentExpenses) >= 0 ? '+' : ''}
                     {formatCurrency(data.currentIncome - data.currentExpenses, data.currency)}
@@ -420,14 +476,14 @@ export const Home: React.FC = () => {
                       <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1 leading-none">Ingresos</p>
                       <p className={cn(
                         "text-lg sm:text-xl font-black text-white leading-none tracking-tight transition-all duration-300 inline-block",
-                        !showBalances && "filter blur-sm select-none opacity-60"
+                        isCardBlurred(id) && "filter blur-sm select-none opacity-60"
                       )}>
                         {formatCurrency(data.currentIncome, data.currency)}
                       </p>
                       {data.transfersIn > 0 && (
                         <p className={cn(
                           "text-[9px] font-bold text-emerald-300/80 mt-1 leading-none transition-all duration-300 inline-block",
-                          !showBalances && "filter blur-[3px] select-none opacity-50"
+                          isCardBlurred(id) && "filter blur-[3px] select-none opacity-50"
                         )}>
                           inc. {formatCurrency(data.transfersIn, data.currency)} transf.
                         </p>
@@ -444,14 +500,14 @@ export const Home: React.FC = () => {
                       <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-1 leading-none">Gastos</p>
                       <p className={cn(
                         "text-lg sm:text-xl font-black text-white leading-none tracking-tight transition-all duration-300 inline-block",
-                        !showBalances && "filter blur-sm select-none opacity-60"
+                        isCardBlurred(id) && "filter blur-sm select-none opacity-60"
                       )}>
                         {formatCurrency(data.currentExpenses, data.currency)}
                       </p>
                       {data.transfersOut > 0 && (
                         <p className={cn(
                           "text-[9px] font-bold text-rose-300/80 mt-1 leading-none transition-all duration-300 inline-block",
-                          !showBalances && "filter blur-[3px] select-none opacity-50"
+                          isCardBlurred(id) && "filter blur-[3px] select-none opacity-50"
                         )}>
                           inc. {formatCurrency(data.transfersOut, data.currency)} transf.
                         </p>
