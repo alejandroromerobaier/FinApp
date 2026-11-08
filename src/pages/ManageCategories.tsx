@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Edit2, Trash2, AlertTriangle, PlusCircle,
-  X, Check, Loader2, ArrowLeft, Search, Plus
+  X, Check, Loader2, ArrowLeft, Search, Plus, Lock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/src/lib/utils';
@@ -223,34 +223,46 @@ export const ManageCategories: React.FC = () => {
                     <Icon size={22} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-bold text-on-surface tracking-tight font-headline text-base truncate">{cat.name}</h3>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <h3 className="font-bold text-on-surface tracking-tight font-headline text-base truncate">{cat.name}</h3>
+                      {(cat.scope === 'system' || !cat.ownerId) && (
+                        <span className="text-[9px] font-black text-on-surface-variant/50 uppercase tracking-widest px-2 py-0.5 bg-on-surface/5 border border-on-surface/10 rounded-md shrink-0">
+                          Base
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[10px] text-on-surface-variant font-black uppercase tracking-widest mt-0.5">
                       {cat.type === 'expense' ? 'Gasto' : 'Ingreso'}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button 
                     onClick={() => startEdit(cat)}
-                    className="p-2 sm:p-2.5 rounded-xl text-primary hover:bg-primary/5 transition-colors cursor-pointer"
+                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-surface-container-low hover:bg-surface-container text-primary transition-all flex items-center justify-center cursor-pointer border border-on-surface/5 shadow-2xs active:scale-95"
                     title="Editar categoría"
+                    aria-label={`Editar categoría ${cat.name}`}
                   >
-                    <Edit2 size={18} />
+                    <Edit2 size={16} />
                   </button>
-                  {cat.ownerId === user?.uid && (
+                  {cat.ownerId === user?.uid ? (
                     <button 
                       onClick={() => setShowDeleteModal(cat.id)}
-                      className="p-2 sm:p-2.5 rounded-xl text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors cursor-pointer"
+                      className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-surface-container-low hover:bg-rose-500/10 text-rose-500 transition-all flex items-center justify-center cursor-pointer border border-on-surface/5 shadow-2xs active:scale-95"
                       title="Eliminar categoría"
+                      aria-label={`Eliminar categoría ${cat.name}`}
                     >
-                      <Trash2 size={18} />
+                      <Trash2 size={16} />
                     </button>
-                  )}
-                  {(cat.scope === 'system' || !cat.ownerId) && (
-                    <span className="text-[9px] font-black text-on-surface-variant/40 uppercase tracking-widest px-2.5 py-1 bg-on-surface/5 rounded-full ml-1">
-                      Base
-                    </span>
+                  ) : (
+                    <div 
+                      className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-surface-container-low/50 text-on-surface-variant/30 flex items-center justify-center border border-on-surface/5 cursor-not-allowed select-none"
+                      title="Categoría base del sistema (no eliminable)"
+                      aria-label="Categoría base del sistema (no eliminable)"
+                    >
+                      <Lock size={15} />
+                    </div>
                   )}
                 </div>
               </div>
