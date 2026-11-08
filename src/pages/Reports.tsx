@@ -38,13 +38,10 @@ import { useAuth } from '../lib/AuthContext';
 import { formatCurrency, cn } from '@/src/lib/utils';
 import logo from '../assets/logo.png';
 
-const ICON_MAP: Record<string, any> = {
-  ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
-  Landmark, Tag, Gift, Briefcase, Home: HomeIcon, HomeIcon, Plane, Coffee, Zap, Smartphone, ShieldCheck
-};
+import { getCategoryIcon } from '../lib/categoryIcons';
 
 const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => {
-  const Icon = ICON_MAP[name] || MoreHorizontal;
+  const Icon = getCategoryIcon(name);
   return <Icon size={size} />;
 };
 

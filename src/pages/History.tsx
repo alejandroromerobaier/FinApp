@@ -43,13 +43,10 @@ import { useAuth } from '../lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { formatDisplayDate, parseLocalYYYYMMDD } from '../lib/dateUtils';
 
-const ICON_MAP: Record<string, any> = {
-  ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
-  Landmark, Tag, Gift, Briefcase, Home, Plane, Coffee, Zap, Smartphone, ShieldCheck
-};
+import { getCategoryIcon } from '../lib/categoryIcons';
 
 const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => {
-  const Icon = ICON_MAP[name] || MoreHorizontal;
+  const Icon = getCategoryIcon(name);
   return <Icon size={size} />;
 };
 
