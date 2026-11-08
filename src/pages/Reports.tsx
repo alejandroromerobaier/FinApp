@@ -14,6 +14,12 @@ import {
   ExternalLink,
   FileText,
   TrendingUp,
+  TrendingDown,
+  Wallet,
+  PiggyBank,
+  Layers,
+  FileSpreadsheet,
+  X,
   Tag,
   ShieldCheck,
   ShoppingBag, 
@@ -35,6 +41,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { formatCurrency, cn } from '@/src/lib/utils';
 import logo from '../assets/logo.png';
 
@@ -54,6 +61,7 @@ export const Reports: React.FC = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const { transactions, categories, projects, userEmails, budgets, userNames } = useData();
+  const { toast } = useToast();
   
   const [currentDate, setCurrentDate] = useState(new Date());
   const [periodBudgets, setPeriodBudgets] = useState<any[]>([]);
@@ -61,6 +69,7 @@ export const Reports: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'quarterly' | 'semiannual' | 'annual'>('monthly');
   const [copied, setCopied] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [targetEmails, setTargetEmails] = useState<string[]>([]);
   const [customEmail, setCustomEmail] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -236,6 +245,27 @@ export const Reports: React.FC = () => {
     return stats[activeCurrency] || Object.values(stats)[0] || { income: 0, expenses: 0, fixed: 0, variable: 0, catMap: {}, methods: {}, projectSplit: { personal: 0, shared: 0 } };
   }, [stats, activeCurrency]);
 
+  const netBalance = useMemo(() => {
+    return currentStats.income - currentStats.expenses;
+  }, [currentStats]);
+
+  const savingRate = useMemo(() => {
+    if (currentStats.income <= 0) {
+      return currentStats.expenses > 0 ? -100 : 0;
+    }
+    return Math.round(((currentStats.income - currentStats.expenses) / currentStats.income) * 100);
+  }, [currentStats]);
+
+  const fixedPercentage = useMemo(() => {
+    if (currentStats.expenses <= 0) return 0;
+    return Math.round((currentStats.fixed / currentStats.expenses) * 100);
+  }, [currentStats]);
+
+  const variablePercentage = useMemo(() => {
+    if (currentStats.expenses <= 0) return 0;
+    return Math.max(0, 100 - fixedPercentage);
+  }, [currentStats, fixedPercentage]);
+
   const budgetAnalysis = useMemo(() => {
     const analysis: Record<string, { budgeted: number; actual: number; category: any }> = {};
     
@@ -393,9 +423,10 @@ export const Reports: React.FC = () => {
         logoBase64
       });
       doc.save(`reporte_${activeCurrency}_${periodLabel.replace(' ', '_')}.pdf`);
+      toast.success('Reporte PDF descargado con éxito');
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Error al generar el PDF. El sistema ha registrado el incidente.');
+      toast.error('Error al generar el PDF');
     } finally {
       setIsGenerating(false);
     }
@@ -420,8 +451,10 @@ export const Reports: React.FC = () => {
         userNames: userNames
       });
       downloadCSV(content, `FinApp_Data_${activeCurrency}_${periodLabel.replace(' ', '_')}`);
+      toast.success('Archivo CSV descargado con éxito');
     } catch (err) {
       console.error("CSV export error:", err);
+      toast.error('Error al generar el archivo CSV');
     } finally {
       setIsGenerating(false);
     }
@@ -480,40 +513,46 @@ export const Reports: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-surface pb-32">
+    <div className="min-h-screen bg-surface pb-20">
       {/* Header */}
-      <header className="sticky top-0 w-full z-40 flex items-center justify-between px-6 h-20 glass-header">
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="text-on-surface p-2.5 bg-on-surface/5 hover:bg-on-surface/10 rounded-2xl transition-all active:scale-90">
-            <ArrowLeft size={22} />
+      <header className="sticky top-0 w-full z-40 flex items-center justify-between px-4 sm:px-6 h-16 sm:h-20 glass-header">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <button 
+            onClick={() => navigate(-1)} 
+            className="text-on-surface p-2 sm:p-2.5 bg-on-surface/5 hover:bg-on-surface/10 rounded-2xl transition-all active:scale-90 cursor-pointer"
+            title="Volver"
+          >
+            <ArrowLeft size={20} />
           </button>
           <div className="flex flex-col">
-            <span className="text-xs font-black text-primary uppercase tracking-[0.2em] opacity-60 leading-none mb-1">Análisis Pro</span>
-            <span className="text-xl font-black tracking-tight text-on-surface font-headline">Reporte de Estado</span>
+            <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em] opacity-70 leading-none mb-1">Análisis Financiero</span>
+            <span className="text-lg sm:text-xl font-black tracking-tight text-on-surface font-headline">Reporte de Estado</span>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <button 
              onClick={() => setShowEmailModal(true)}
-             className="p-2.5 bg-emerald-500/10 text-emerald-600 rounded-2xl hover:bg-emerald-500/20 transition-all active:scale-95 flex items-center gap-2"
+             className="px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer font-bold text-xs"
+             title="Compartir reporte"
           >
-            <Mail size={20} />
-            <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest">Enviar</span>
+            <Mail size={16} />
+            <span className="hidden sm:inline">Compartir</span>
           </button>
           <button 
-             onClick={handleDownloadPDF}
+             onClick={() => setShowExportModal(true)}
              disabled={isGenerating}
-             className="p-2.5 bg-primary/10 text-primary rounded-2xl hover:bg-primary/20 transition-all active:scale-95 flex items-center gap-2"
+             className="px-3.5 py-2 bg-primary text-white rounded-xl hover:bg-primary/95 transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer font-bold text-xs shadow-sm shadow-primary/20"
+             title="Exportar reporte"
           >
-            <FileText size={20} />
-            <span className="hidden sm:inline text-[10px] font-black uppercase tracking-widest">{isGenerating ? '...' : 'PDF'}</span>
+            <Download size={16} />
+            <span>Exportar</span>
           </button>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-6 pt-8 space-y-12">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 space-y-8 sm:space-y-10">
         {/* Period & Currency Selectors */}
-        <section className="space-y-6">
+        <section className="space-y-4">
           <div className="flex bg-surface-container-low p-1.5 rounded-2xl border border-on-surface/5 gap-1">
             {[
               { id: 'monthly', label: 'Mensual' },
@@ -525,9 +564,9 @@ export const Reports: React.FC = () => {
                 key={p.id}
                 onClick={() => setSelectedPeriod(p.id as any)}
                 className={cn(
-                  "flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                  "flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer",
                   selectedPeriod === p.id 
-                    ? "bg-primary text-white shadow-lg shadow-primary/25" 
+                    ? "bg-primary text-white shadow-md shadow-primary/25" 
                     : "text-on-surface-variant/70 hover:bg-on-surface/5"
                 )}
               >
@@ -536,32 +575,45 @@ export const Reports: React.FC = () => {
             ))}
           </div>
 
-          <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 to-black p-8 rounded-[2.5rem] border border-white/10 shadow-2xl">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 blur-[50px] rounded-full -mr-16 -mt-16" />
+          {/* Compact Temporal Banner */}
+          <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 py-3.5 px-4 sm:py-4 sm:px-6 rounded-2xl sm:rounded-3xl border border-white/10 shadow-lg">
             <div className="relative z-10 flex items-center justify-between">
-              <button onClick={() => changeMonth(-1)} className="p-3 bg-white/5 rounded-2xl hover:bg-white/10 transition-all text-white active:scale-90 border border-white/5">
-                <ChevronLeft size={24} />
+              <button 
+                onClick={() => changeMonth(-1)} 
+                className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl transition-all text-white active:scale-90 border border-white/10 cursor-pointer"
+                title="Período anterior"
+                aria-label="Período anterior"
+              >
+                <ChevronLeft size={20} />
               </button>
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-2 text-primary/80 mb-2">
-                  <Calendar size={14} className="animate-pulse" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.3em]">Ventana Temporal</span>
+              <div className="text-center min-w-0 px-2">
+                <div className="flex items-center justify-center gap-1.5 text-primary/90 mb-0.5">
+                  <Calendar size={12} />
+                  <span className="text-[9px] font-black uppercase tracking-[0.25em]">Ventana Temporal</span>
                 </div>
-                <h2 className="text-2xl font-black text-white capitalize font-headline tracking-tight">{periodLabel}</h2>
+                <h2 className="text-lg sm:text-xl font-black text-white capitalize font-headline tracking-tight truncate">
+                  {periodLabel}
+                </h2>
               </div>
-              <button onClick={() => changeMonth(1)} className="p-3 bg-white/5 rounded-2xl hover:bg-white/10 transition-all text-white active:scale-90 border border-white/5">
-                <ChevronRight size={24} />
+              <button 
+                onClick={() => changeMonth(1)} 
+                className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-xl transition-all text-white active:scale-90 border border-white/10 cursor-pointer"
+                title="Período siguiente"
+                aria-label="Período siguiente"
+              >
+                <ChevronRight size={20} />
               </button>
             </div>
           </div>
 
-          <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-none px-1">
+          {/* Project Filters Chips */}
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
              <button
                 onClick={() => setSelectedProjectId('all')}
                 className={cn(
-                  "px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap border-2",
+                  "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap border cursor-pointer",
                   selectedProjectId === 'all' 
-                    ? "bg-primary border-primary text-white shadow-lg shadow-primary/20" 
+                    ? "bg-primary border-primary text-white shadow-xs" 
                     : "bg-surface-container-low border-on-surface/5 text-on-surface-variant hover:border-primary/20"
                 )}
               >
@@ -572,9 +624,9 @@ export const Reports: React.FC = () => {
                   key={p.id}
                   onClick={() => setSelectedProjectId(p.id)}
                   className={cn(
-                    "px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap border-2",
+                    "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap border cursor-pointer",
                     selectedProjectId === p.id 
-                      ? "bg-primary border-primary text-white shadow-lg shadow-primary/20" 
+                      ? "bg-primary border-primary text-white shadow-xs" 
                       : "bg-surface-container-low border-on-surface/5 text-on-surface-variant hover:border-primary/20"
                   )}
                 >
@@ -583,15 +635,16 @@ export const Reports: React.FC = () => {
               ))}
           </div>
 
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none px-1">
+          {/* Currency Filter Chips */}
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
              {Object.keys(stats).map(curr => (
                 <button
                   key={curr}
                   onClick={() => setActiveCurrency(curr)}
                   className={cn(
-                    "px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap border-2",
+                    "px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap border cursor-pointer",
                     activeCurrency === curr 
-                      ? "bg-primary border-primary text-white shadow-lg shadow-primary/20" 
+                      ? "bg-primary border-primary text-white shadow-xs" 
                       : "bg-surface-container-low border-on-surface/5 text-on-surface-variant hover:border-primary/20"
                   )}
                 >
@@ -601,48 +654,201 @@ export const Reports: React.FC = () => {
           </div>
         </section>
 
-        {/* Executive Summary Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="bg-surface-container-lowest p-8 rounded-[2.5rem] border border-on-surface/5 shadow-sm group transition-all"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 shadow-inner">
-                <BarChart3 size={20} />
-              </div>
-              <span className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-[0.2em]">Ingresos Totales</span>
-            </div>
-            <p className="text-3xl font-black text-on-surface font-headline tracking-tighter mb-2">{formatCurrency(currentStats.income, activeCurrency)}</p>
-            <div className="w-full h-2 bg-on-surface/5 rounded-full overflow-hidden shadow-inner">
-              <motion.div 
-                initial={{ width: 0 }}
-                animate={{ width: '100%' }}
-                className="h-full bg-emerald-500 rounded-full"
-              />
-            </div>
-          </motion.div>
+        {/* Executive Summary Stats: 4-KPI Grid */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-[10px] font-black text-on-surface-variant uppercase tracking-[0.25em] flex items-center gap-1.5">
+              <BarChart3 size={14} className="text-primary" /> Resumen Ejecutivo
+            </h3>
+            <span className="text-[10px] font-bold text-on-surface-variant/50">
+              {filteredTransactions.length} movimientos
+            </span>
+          </div>
 
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="bg-surface-container-lowest p-8 rounded-[2.5rem] border border-on-surface/5 shadow-sm group transition-all"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-600 shadow-inner">
-                <TrendingUp size={20} />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            {/* 1. Ingresos Totales */}
+            <motion.div 
+              whileHover={{ y: -2 }}
+              className="bg-surface-container-lowest p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-on-surface/10 shadow-xs flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-wider">Ingresos</span>
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600">
+                  <TrendingUp size={16} />
+                </div>
               </div>
-              <span className="text-[10px] font-black text-on-surface-variant/40 uppercase tracking-[0.2em]">Gastos Totales</span>
+              <div>
+                <p className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 font-headline tracking-tight truncate">
+                  +{formatCurrency(currentStats.income, activeCurrency)}
+                </p>
+                <p className="text-[10px] font-bold text-on-surface-variant/50 mt-1">
+                  {filteredTransactions.filter(t => t.type === 'income').length} ingresos
+                </p>
+              </div>
+            </motion.div>
+
+            {/* 2. Gastos Totales */}
+            <motion.div 
+              whileHover={{ y: -2 }}
+              className="bg-surface-container-lowest p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-on-surface/10 shadow-xs flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-wider">Gastos</span>
+                <div className="w-8 h-8 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-600">
+                  <TrendingDown size={16} />
+                </div>
+              </div>
+              <div>
+                <p className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400 font-headline tracking-tight truncate">
+                  -{formatCurrency(currentStats.expenses, activeCurrency)}
+                </p>
+                <p className="text-[10px] font-bold text-on-surface-variant/50 mt-1">
+                  {filteredTransactions.filter(t => t.type === 'expense').length} gastos
+                </p>
+              </div>
+            </motion.div>
+
+            {/* 3. Balance Neto */}
+            <motion.div 
+              whileHover={{ y: -2 }}
+              className="bg-surface-container-lowest p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-on-surface/10 shadow-xs flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-wider">
+                  {netBalance >= 0 ? 'Superávit' : 'Déficit'}
+                </span>
+                <div className={cn(
+                  "w-8 h-8 rounded-xl flex items-center justify-center",
+                  netBalance >= 0 ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"
+                )}>
+                  <Wallet size={16} />
+                </div>
+              </div>
+              <div>
+                <p className={cn(
+                  "text-xl sm:text-2xl font-black font-headline tracking-tight truncate",
+                  netBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                )}>
+                  {formatCurrency(netBalance, activeCurrency)}
+                </p>
+                <p className="text-[10px] font-bold text-on-surface-variant/50 mt-1">
+                  {netBalance >= 0 ? 'Flujo neto positivo' : 'Flujo neto negativo'}
+                </p>
+              </div>
+            </motion.div>
+
+            {/* 4. Tasa de Ahorro */}
+            <motion.div 
+              whileHover={{ y: -2 }}
+              className="bg-surface-container-lowest p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-on-surface/10 shadow-xs flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-wider">Tasa Ahorro</span>
+                <div className={cn(
+                  "w-8 h-8 rounded-xl flex items-center justify-center",
+                  savingRate >= 20 ? "bg-emerald-500/10 text-emerald-600" : savingRate >= 0 ? "bg-amber-500/10 text-amber-600" : "bg-rose-500/10 text-rose-600"
+                )}>
+                  <PiggyBank size={16} />
+                </div>
+              </div>
+              <div>
+                <p className={cn(
+                  "text-xl sm:text-2xl font-black font-headline tracking-tight",
+                  savingRate >= 20 ? "text-emerald-600 dark:text-emerald-400" : savingRate >= 0 ? "text-amber-600 dark:text-amber-400" : "text-rose-600 dark:text-rose-400"
+                )}>
+                  {savingRate}%
+                </p>
+                <div className="mt-1">
+                  <span className={cn(
+                    "text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md inline-block",
+                    savingRate >= 20 
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" 
+                      : savingRate >= 0 
+                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" 
+                        : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                  )}>
+                    {savingRate >= 20 ? 'Excelente' : savingRate >= 0 ? 'Equilibrado' : 'Alerta'}
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* Estructura de Gastos: Fijos vs. Variables */}
+        <section className="bg-surface-container-lowest p-5 sm:p-6 rounded-2xl sm:rounded-3xl border border-on-surface/10 shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                <Layers size={16} />
+              </div>
+              <div>
+                <h4 className="font-bold text-on-surface text-sm sm:text-base font-headline tracking-tight">
+                  Estructura de Gastos: Fijos vs. Variables
+                </h4>
+                <p className="text-[10px] text-on-surface-variant/50 font-bold uppercase tracking-wider">
+                  Clasificación de costos del período
+                </p>
+              </div>
             </div>
-            <p className="text-3xl font-black text-on-surface font-headline tracking-tighter mb-2">{formatCurrency(currentStats.expenses, activeCurrency)}</p>
-            <div className="w-full h-2 bg-on-surface/5 rounded-full overflow-hidden shadow-inner">
-              <motion.div 
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.min((currentStats.expenses / (currentStats.income || 1)) * 100, 100)}%` }}
-                className="h-full bg-rose-500 rounded-full"
-              />
+            <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/60 bg-on-surface/5 px-2.5 py-1 rounded-lg">
+              Total {formatCurrency(currentStats.expenses, activeCurrency)}
+            </span>
+          </div>
+
+          {/* Segmented Bar */}
+          <div className="w-full h-3 bg-on-surface/5 rounded-full overflow-hidden flex shadow-inner">
+            <div 
+              style={{ width: `${fixedPercentage}%` }} 
+              className="bg-indigo-500 transition-all duration-500"
+              title={`Gastos Fijos: ${fixedPercentage}%`}
+            />
+            <div 
+              style={{ width: `${variablePercentage}%` }} 
+              className="bg-amber-500 transition-all duration-500"
+              title={`Gastos Variables: ${variablePercentage}%`}
+            />
+          </div>
+
+          {/* Details */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div className="bg-surface-container-low p-3.5 rounded-xl border border-on-surface/5">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0" />
+                  <span className="text-xs font-bold text-on-surface">Gastos Fijos</span>
+                </div>
+                <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 font-mono">
+                  {fixedPercentage}%
+                </span>
+              </div>
+              <p className="text-base font-black text-on-surface font-headline">
+                {formatCurrency(currentStats.fixed, activeCurrency)}
+              </p>
+              <p className="text-[10px] text-on-surface-variant/50 font-medium mt-0.5">
+                Obligaciones y compromisos recurrentes
+              </p>
             </div>
-          </motion.div>
-        </div>
+
+            <div className="bg-surface-container-low p-3.5 rounded-xl border border-on-surface/5">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
+                  <span className="text-xs font-bold text-on-surface">Gastos Variables</span>
+                </div>
+                <span className="text-xs font-black text-amber-600 dark:text-amber-400 font-mono">
+                  {variablePercentage}%
+                </span>
+              </div>
+              <p className="text-base font-black text-on-surface font-headline">
+                {formatCurrency(currentStats.variable, activeCurrency)}
+              </p>
+              <p className="text-[10px] text-on-surface-variant/50 font-medium mt-0.5">
+                Consumo discrecional y gastos flexibles
+              </p>
+            </div>
+          </div>
+        </section>
 
         {/* Comparative Trend Analysis */}
         <section className="space-y-6">
@@ -735,18 +941,18 @@ export const Reports: React.FC = () => {
             </div>
           </div>
           
-          <div className="bg-surface-container-lowest rounded-[2.5rem] p-10 sm:p-16 shadow-2xl border border-on-surface/10 relative group">
+          <div className="bg-surface-container-lowest rounded-3xl p-6 sm:p-12 shadow-lg border border-on-surface/10 relative group">
             <div className="absolute inset-0 opacity-[0.02] pointer-events-none select-none overflow-hidden" 
                  style={{ backgroundImage: 'radial-gradient(currentColor 1.5px, transparent 1.5px)', backgroundSize: '32px 32px' }} />
             
-            <div className="relative z-10 space-y-10">
-              <div className="flex items-start justify-between border-b-2 border-on-surface/10 pb-10">
+            <div className="relative z-10 space-y-8 sm:space-y-10">
+              <div className="flex items-start justify-between border-b-2 border-on-surface/10 pb-8 sm:pb-10">
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center p-3 shadow-lg group-hover:scale-110 transition-transform duration-500">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 bg-primary/10 rounded-2xl flex items-center justify-center p-2.5 sm:p-3 shadow-md group-hover:scale-110 transition-transform duration-500 shrink-0">
                     <img src={logo} alt="FinApp Logo" className="w-full h-full object-contain" />
                   </div>
                   <div>
-                    <h4 className="text-3xl font-black text-on-surface font-headline tracking-tighter mb-0.5">FINAPP</h4>
+                    <h4 className="text-2xl sm:text-3xl font-black text-on-surface font-headline tracking-tighter mb-0.5">FINAPP</h4>
                     <p className="text-[10px] font-black text-primary uppercase tracking-[0.5em]">Consolidated Intelligence</p>
                   </div>
                 </div>
@@ -756,7 +962,7 @@ export const Reports: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-16 py-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-16 py-4">
                 <div className="space-y-6">
                   <div>
                     <p className="text-[10px] font-black text-on-surface-variant/70 uppercase tracking-widest border-l-3 border-primary pl-4 mb-4">Estado de Resultados</p>
@@ -897,29 +1103,73 @@ export const Reports: React.FC = () => {
         </section>
       </main>
 
-      {/* Floating Action Bar */}
-      <div className="fixed bottom-8 sm:bottom-12 left-1/2 -translate-x-1/2 z-50 px-6 w-full max-w-sm sm:max-w-md">
-        <div className="flex gap-3 items-center">
-          <button 
-            onClick={handleDownloadPDF}
-            disabled={isGenerating}
-            className="flex-1 h-18 bg-slate-900 text-white rounded-[2rem] font-black uppercase tracking-[0.1em] text-[10px] flex items-center justify-center gap-3 shadow-2xl shadow-slate-900/30 hover:scale-[1.02] active:scale-95 transition-all border border-white/10 group group-hover:bg-slate-800"
-          >
-            <Download size={18} />
-            <span>{isGenerating ? '...' : '.PDF de Estado'}</span>
-          </button>
-          
-          <button 
-            onClick={handleDownloadCSV}
-            disabled={isGenerating}
-            className="w-18 h-18 bg-indigo-600 text-white rounded-[2rem] font-black uppercase tracking-widest text-[10px] flex flex-col items-center justify-center gap-1 shadow-2xl shadow-indigo-600/30 hover:scale-[1.02] active:scale-95 transition-all border border-white/10 group"
-            title="Descargar datos en CSV para Excel"
-          >
-            <ArrowRight size={18} className="translate-y-[-2px]" />
-            <span>CSV</span>
-          </button>
-        </div>
-      </div>
+      {/* Export Options Modal */}
+      <AnimatePresence>
+        {showExportModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-surface-container-lowest rounded-3xl p-6 sm:p-7 shadow-2xl max-w-md w-full border border-on-surface/10 space-y-5"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                    <Download size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-on-surface font-headline tracking-tight">Exportar Reporte</h3>
+                    <p className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-wider">Selecciona el formato deseado</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowExportModal(false)}
+                  className="p-2 rounded-full hover:bg-on-surface/5 text-on-surface-variant/60 cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    setShowExportModal(false);
+                    handleDownloadPDF();
+                  }}
+                  disabled={isGenerating}
+                  className="w-full p-4 rounded-2xl bg-surface-container-low hover:bg-surface-container border border-on-surface/5 flex items-center gap-4 transition-all text-left cursor-pointer group active:scale-98"
+                >
+                  <div className="w-11 h-11 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <FileText size={22} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-bold text-on-surface text-sm">Reporte PDF Oficial</h4>
+                    <p className="text-xs text-on-surface-variant/60 font-medium">Documento ejecutivo formateado con gráficos y tablas, listo para imprimir.</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowExportModal(false);
+                    handleDownloadCSV();
+                  }}
+                  disabled={isGenerating}
+                  className="w-full p-4 rounded-2xl bg-surface-container-low hover:bg-surface-container border border-on-surface/5 flex items-center gap-4 transition-all text-left cursor-pointer group active:scale-98"
+                >
+                  <div className="w-11 h-11 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <FileSpreadsheet size={22} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-bold text-on-surface text-sm">Planilla CSV / Excel</h4>
+                    <p className="text-xs text-on-surface-variant/60 font-medium">Base de datos de movimientos detallada para abrir en Microsoft Excel o Google Sheets.</p>
+                  </div>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Email Modal */}
       <AnimatePresence>
