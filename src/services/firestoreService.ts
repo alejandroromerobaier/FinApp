@@ -1149,7 +1149,8 @@ export const syncNotificationsOnExpenseDeleted = async (transactionId: string) =
 export const recalculateBudgetAlertsForCategory = async (
   categoryId: string,
   projectId: string | null,
-  date: any
+  date: any,
+  currentTx?: any
 ) => {
   if (!auth.currentUser || !categoryId) return;
 
@@ -1159,11 +1160,36 @@ export const recalculateBudgetAlertsForCategory = async (
     const month = getLocalMonth(dateObj);
 
     // 1. Obtener presupuesto para esta categoría y mes
+    let budgetAmount = 0;
     const budgetId = projectId 
       ? `budget_${projectId}_${categoryId}_${month}` 
       : `budget_personal_${currentUserId}_${categoryId}_${month}`;
 
     const budgetSnap = await getDoc(doc(db, 'budgets', budgetId));
+    if (budgetSnap.exists()) {
+      budgetAmount = budgetSnap.data()?.amount || 0;
+    }
+
+    // Fallback: Si no se encontró por ID determinista, buscar en colección budgets
+    if (budgetAmount <= 0) {
+      const qBudgets = projectId
+        ? query(collection(db, 'budgets'), where('projectId', '==', projectId))
+        : query(collection(db, 'budgets'), where('userId', '==', currentUserId));
+      
+      const bSnap = await getDocs(qBudgets);
+      const matched = bSnap.docs.find(d => {
+        const b = d.data();
+        if (b.categoryId !== categoryId) return false;
+        const pId = b.projectId;
+        const isPersonal = !pId || pId === 'personal' || pId === 'null';
+        if (projectId && pId !== projectId) return false;
+        if (!projectId && !isPersonal) return false;
+        return !b.month || b.month === month;
+      });
+      if (matched) {
+        budgetAmount = matched.data()?.amount || 0;
+      }
+    }
 
     // Determinar destinatarios y moneda
     let targetUserIds: string[] = [currentUserId];
@@ -1183,25 +1209,25 @@ export const recalculateBudgetAlertsForCategory = async (
       }
     }
 
-    // 2. Buscar alertas existentes para este mes, categoría y contexto
+    // 2. Buscar alertas existentes para este mes, categoría y contexto (solo index simple por userId)
     const existingAlertsByUser: { [uid: string]: any[] } = {};
     for (const uid of targetUserIds) {
       const qNotif = query(
         collection(db, 'notifications'),
-        where('userId', '==', uid),
-        where('type', '==', 'budget_alert')
+        where('userId', '==', uid)
       );
       const notifSnap = await getDocs(qNotif);
       existingAlertsByUser[uid] = notifSnap.docs.filter(docSnap => {
         const d = docSnap.data();
-        return d.data?.month === month && 
+        return d.type === 'budget_alert' &&
+               d.data?.month === month && 
                d.data?.categoryId === categoryId && 
                (projectId ? d.data?.projectId === projectId : !d.data?.projectId);
       });
     }
 
     // Si el presupuesto no existe o es <= 0, eliminar alertas obsoletas
-    if (!budgetSnap.exists() || (budgetSnap.data()?.amount || 0) <= 0) {
+    if (budgetAmount <= 0) {
       for (const uid of targetUserIds) {
         for (const notifDoc of existingAlertsByUser[uid] || []) {
           await deleteDoc(notifDoc.ref);
@@ -1210,34 +1236,30 @@ export const recalculateBudgetAlertsForCategory = async (
       return;
     }
 
-    const budgetData = budgetSnap.data();
-    const budgetAmount = budgetData.amount || 0;
-
-    // 3. Sumar todos los gastos de esta categoría y mes
-    let q;
-    if (projectId) {
-      q = query(
-        collection(db, 'transactions'),
-        where('projectId', '==', projectId),
-        where('categoryId', '==', categoryId),
-        where('type', '==', 'expense')
-      );
-    } else {
-      q = query(
-        collection(db, 'transactions'),
-        where('authorId', '==', currentUserId),
-        where('projectId', '==', null),
-        where('categoryId', '==', categoryId),
-        where('type', '==', 'expense')
-      );
-    }
+    // 3. Sumar todos los gastos de esta categoría y mes (query simple por authorId o projectId)
+    const q = projectId
+      ? query(collection(db, 'transactions'), where('projectId', '==', projectId))
+      : query(collection(db, 'transactions'), where('authorId', '==', currentUserId));
 
     const txSnap = await getDocs(q);
     let totalSpent = 0;
-    let catName = 'Categoría';
+    let catName = currentTx?.categoryName || 'Categoría';
+    let foundCurrentTx = false;
 
     txSnap.docs.forEach(docSnap => {
       const data = docSnap.data() as any;
+      if (data.type !== 'expense') return;
+      if (data.categoryId !== categoryId) return;
+
+      const pId = data.projectId;
+      const isPersonal = !pId || pId === 'personal' || pId === 'null';
+      if (projectId && pId !== projectId) return;
+      if (!projectId && !isPersonal) return;
+
+      if (currentTx && docSnap.id === currentTx.id) {
+        foundCurrentTx = true;
+      }
+
       const txDate = safeToDate(data.date);
       if (getLocalMonth(txDate) === month) {
         totalSpent += (data.amount || 0);
@@ -1247,9 +1269,22 @@ export const recalculateBudgetAlertsForCategory = async (
       }
     });
 
+    // Failsafe: Si la transacción actual fue recién agregada y getDocs no la indexó aún
+    if (currentTx && !foundCurrentTx && currentTx.type === 'expense' && currentTx.categoryId === categoryId) {
+      const currentTxDate = safeToDate(currentTx.date);
+      if (getLocalMonth(currentTxDate) === month) {
+        totalSpent += (currentTx.amount || 0);
+        if (currentTx.categoryName) {
+          catName = currentTx.categoryName;
+        }
+      }
+    }
+
     const percentage = budgetAmount > 0 ? (totalSpent / budgetAmount) * 100 : 0;
     const formattedSpent = formatCurrency(totalSpent, currency);
     const formattedLimit = formatCurrency(budgetAmount, currency);
+
+    console.log(`[BudgetAlert] Category: ${categoryId} (${catName}), Month: ${month}, Spent: ${totalSpent}, Limit: ${budgetAmount}, Pct: ${percentage.toFixed(1)}%`);
 
     // Escenario 1: percentage < 80% (Falsa alarma o gasto reducido por debajo de alerta)
     if (percentage < 80) {
@@ -1361,7 +1396,12 @@ export const recalculateBudgetAlertsForCategory = async (
 export const checkAndNotifyBudgetAlerts = async (transaction: any) => {
   if (!transaction || transaction.type !== 'expense' || !transaction.categoryId) return;
   const date = transaction.date || new Date();
-  await recalculateBudgetAlertsForCategory(transaction.categoryId, transaction.projectId || null, date);
+  await recalculateBudgetAlertsForCategory(
+    transaction.categoryId, 
+    transaction.projectId || null, 
+    date,
+    transaction
+  );
 };
 
 export const addTransaction = async (transaction: any) => {
@@ -1501,7 +1541,7 @@ export const updateTransaction = async (transactionId: string, transaction: any)
 
     // 2. Recálculo reactivo de alertas de presupuesto
     if (transaction.type === 'expense' && transaction.categoryId) {
-      recalculateBudgetAlertsForCategory(transaction.categoryId, finalProjectId, finalDate).catch(err =>
+      recalculateBudgetAlertsForCategory(transaction.categoryId, finalProjectId, finalDate, { id: transactionId, ...transaction }).catch(err =>
         console.error('Budget alert recalculation error on update:', err)
       );
     }
