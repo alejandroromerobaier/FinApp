@@ -996,6 +996,7 @@ export const notifyCollaboratorsOnExpenseAdded = async (transaction: any) => {
         type: 'expense_added',
         content,
         data: {
+          transactionId: transaction.id,
           projectId: transaction.projectId,
           projectName,
           amount: transaction.amount,
@@ -1010,31 +1011,209 @@ export const notifyCollaboratorsOnExpenseAdded = async (transaction: any) => {
   }
 };
 
-export const checkAndNotifyBudgetAlerts = async (transaction: any) => {
-  if (!auth.currentUser || transaction.type !== 'expense') return;
+/**
+ * Enfoque 3: Sincronización inteligente de notificaciones al editar un gasto.
+ * - Si el colaborador no leyó la notificación: se actualiza en silencio con el nuevo monto/descripción.
+ * - Si el colaborador YA la leyó: se actualiza, se le añade la marca 'isModified: true' y se resetea a 'isRead: false'
+ *   para advertirle del cambio.
+ */
+export const syncNotificationsOnExpenseUpdated = async (
+  transactionId: string,
+  updatedTransaction: any,
+  oldTransaction: any
+) => {
+  if (!auth.currentUser) return;
 
   try {
-    const dateObj = transaction.date instanceof Date ? transaction.date : parseLocalYYYYMMDD(transaction.date);
-    const month = getLocalMonth(dateObj);
-    const categoryId = transaction.categoryId;
-    const projectId = transaction.projectId || null;
+    const finalProjectId = updatedTransaction.projectId || null;
+    const oldProjectId = oldTransaction?.projectId || null;
+
+    // Buscar notificaciones vinculadas a esta transacción
+    const qNotifs = query(
+      collection(db, 'notifications'),
+      where('data.transactionId', '==', transactionId)
+    );
+    const notifsSnap = await getDocs(qNotifs);
+
+    // Caso A: No estaba en un proyecto compartido y ahora sí
+    if (!oldProjectId && finalProjectId) {
+      await notifyCollaboratorsOnExpenseAdded({
+        id: transactionId,
+        ...updatedTransaction,
+        projectId: finalProjectId
+      });
+      return;
+    }
+
+    // Caso B: Estaba en un proyecto y se quitó o cambió de proyecto
+    if (oldProjectId && (!finalProjectId || finalProjectId !== oldProjectId)) {
+      for (const docSnap of notifsSnap.docs) {
+        await deleteDoc(docSnap.ref);
+      }
+      if (finalProjectId) {
+        await notifyCollaboratorsOnExpenseAdded({
+          id: transactionId,
+          ...updatedTransaction,
+          projectId: finalProjectId
+        });
+      }
+      return;
+    }
+
+    // Caso C: No tiene proyecto (personal)
+    if (!finalProjectId) return;
+
+    // Si aún no existía la notificación por compatibilidad histórica
+    if (notifsSnap.empty) {
+      await notifyCollaboratorsOnExpenseAdded({
+        id: transactionId,
+        ...updatedTransaction,
+        projectId: finalProjectId
+      });
+      return;
+    }
+
+    // Obtener datos del proyecto
+    const projectRef = doc(db, 'projects', finalProjectId);
+    const projectSnap = await getDoc(projectRef);
+    if (!projectSnap.exists()) return;
+
+    const projectData = projectSnap.data();
+    const projectName = projectData.name || 'Proyecto compartido';
+    const currency = projectData.currency || 'ARS';
+    const authorName = auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || 'Un colaborador';
+    const catName = updatedTransaction.categoryName || updatedTransaction.description || 'General';
+    const formattedAmount = formatCurrency(updatedTransaction.amount, currency);
+
+    let updatedContent = `${authorName} actualizó el ${updatedTransaction.type === 'income' ? 'ingreso' : 'gasto'} a ${formattedAmount} en "${projectName}" (${catName})`;
+    if (updatedTransaction.isInstallmentPlan && updatedTransaction.totalInstallments > 1) {
+      const formattedInstallment = formatCurrency(updatedTransaction.installmentAmount, currency);
+      updatedContent = `${authorName} actualizó la compra financiada a ${formattedAmount} (${updatedTransaction.totalInstallments} cuotas de ${formattedInstallment}) en "${projectName}" (${catName})`;
+    }
+
+    for (const docSnap of notifsSnap.docs) {
+      const notifData = docSnap.data();
+      const wasRead = !!notifData.isRead;
+
+      if (wasRead) {
+        // Enfoque 3: Ya leída -> marcar como modificada y pasar a no leída para notificar el cambio
+        await updateDoc(docSnap.ref, {
+          content: updatedContent,
+          isRead: false,
+          'data.amount': updatedTransaction.amount,
+          'data.categoryName': catName,
+          'data.isModified': true,
+          updatedAt: serverTimestamp()
+        });
+      } else {
+        // Enfoque 3: No leída -> actualización silenciosa en el lugar
+        await updateDoc(docSnap.ref, {
+          content: updatedContent,
+          'data.amount': updatedTransaction.amount,
+          'data.categoryName': catName,
+          'data.isModified': false,
+          updatedAt: serverTimestamp()
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Error syncing notifications on expense updated:', err);
+  }
+};
+
+/**
+ * Elimina las notificaciones vinculadas a una transacción borrada.
+ */
+export const syncNotificationsOnExpenseDeleted = async (transactionId: string) => {
+  try {
+    const qNotifs = query(
+      collection(db, 'notifications'),
+      where('data.transactionId', '==', transactionId)
+    );
+    const notifsSnap = await getDocs(qNotifs);
+    for (const docSnap of notifsSnap.docs) {
+      await deleteDoc(docSnap.ref);
+    }
+  } catch (err) {
+    console.error('Error syncing notifications on expense deleted:', err);
+  }
+};
+
+/**
+ * Recálculo Reactivo de Presupuestos y Manejo Inteligente de Alertas:
+ * - Si el gasto total acumulado cae por debajo del 80% (por corrección o borrado):
+ *   se elimina la notificación de alerta (falsa alarma resuelta) para que el estado quede limpio.
+ * - Si el gasto se ubica entre 80% y 99%: se actualiza la alerta a 80% con el nuevo porcentaje.
+ * - Si el gasto supera el 100%: se promociona/actualiza a 100%.
+ */
+export const recalculateBudgetAlertsForCategory = async (
+  categoryId: string,
+  projectId: string | null,
+  date: any
+) => {
+  if (!auth.currentUser || !categoryId) return;
+
+  try {
     const currentUserId = auth.currentUser.uid;
+    const dateObj = date instanceof Date ? date : safeToDate(date);
+    const month = getLocalMonth(dateObj);
 
-    if (!categoryId) return;
-
-    // 1. Fetch budget for this category & month
+    // 1. Obtener presupuesto para esta categoría y mes
     const budgetId = projectId 
       ? `budget_${projectId}_${categoryId}_${month}` 
       : `budget_personal_${currentUserId}_${categoryId}_${month}`;
 
     const budgetSnap = await getDoc(doc(db, 'budgets', budgetId));
-    if (!budgetSnap.exists()) return;
+
+    // Determinar destinatarios y moneda
+    let targetUserIds: string[] = [currentUserId];
+    let currency = 'ARS';
+
+    if (projectId) {
+      const projectSnap = await getDoc(doc(db, 'projects', projectId));
+      if (projectSnap.exists()) {
+        const pData = projectSnap.data();
+        targetUserIds = pData.memberIds || [currentUserId];
+        currency = pData.currency || 'ARS';
+      }
+    } else {
+      const userSnap = await getDoc(doc(db, 'users', currentUserId));
+      if (userSnap.exists()) {
+        currency = userSnap.data()?.currency || 'ARS';
+      }
+    }
+
+    // 2. Buscar alertas existentes para este mes, categoría y contexto
+    const existingAlertsByUser: { [uid: string]: any[] } = {};
+    for (const uid of targetUserIds) {
+      const qNotif = query(
+        collection(db, 'notifications'),
+        where('userId', '==', uid),
+        where('type', '==', 'budget_alert')
+      );
+      const notifSnap = await getDocs(qNotif);
+      existingAlertsByUser[uid] = notifSnap.docs.filter(docSnap => {
+        const d = docSnap.data();
+        return d.data?.month === month && 
+               d.data?.categoryId === categoryId && 
+               (projectId ? d.data?.projectId === projectId : !d.data?.projectId);
+      });
+    }
+
+    // Si el presupuesto no existe o es <= 0, eliminar alertas obsoletas
+    if (!budgetSnap.exists() || (budgetSnap.data()?.amount || 0) <= 0) {
+      for (const uid of targetUserIds) {
+        for (const notifDoc of existingAlertsByUser[uid] || []) {
+          await deleteDoc(notifDoc.ref);
+        }
+      }
+      return;
+    }
 
     const budgetData = budgetSnap.data();
     const budgetAmount = budgetData.amount || 0;
-    if (budgetAmount <= 0) return;
 
-    // 2. Fetch all expenses for this category, month, and project/personal context
+    // 3. Sumar todos los gastos de esta categoría y mes
     let q;
     if (projectId) {
       q = query(
@@ -1055,80 +1234,134 @@ export const checkAndNotifyBudgetAlerts = async (transaction: any) => {
 
     const txSnap = await getDocs(q);
     let totalSpent = 0;
-    txSnap.docs.forEach(doc => {
-      const data = doc.data() as any;
+    let catName = 'Categoría';
+
+    txSnap.docs.forEach(docSnap => {
+      const data = docSnap.data() as any;
       const txDate = safeToDate(data.date);
       if (getLocalMonth(txDate) === month) {
         totalSpent += (data.amount || 0);
+        if (data.categoryName && catName === 'Categoría') {
+          catName = data.categoryName;
+        }
       }
     });
 
-    const percentage = (totalSpent / budgetAmount) * 100;
-    if (percentage < 80) return;
-
-    // Determine targets
-    let targetUserIds: string[] = [currentUserId];
-    let currency = 'ARS';
-
-    if (projectId) {
-      const projectSnap = await getDoc(doc(db, 'projects', projectId));
-      if (projectSnap.exists()) {
-        const pData = projectSnap.data();
-        targetUserIds = pData.memberIds || [currentUserId];
-        currency = pData.currency || 'ARS';
-      }
-    } else {
-      const userSnap = await getDoc(doc(db, 'users', currentUserId));
-      if (userSnap.exists()) {
-        currency = userSnap.data()?.currency || 'ARS';
-      }
-    }
-
-    const catName = transaction.categoryName || 'Categoría';
+    const percentage = budgetAmount > 0 ? (totalSpent / budgetAmount) * 100 : 0;
     const formattedSpent = formatCurrency(totalSpent, currency);
     const formattedLimit = formatCurrency(budgetAmount, currency);
 
-    const targetThreshold = percentage >= 100 ? 100 : 80;
+    // Escenario 1: percentage < 80% (Falsa alarma o gasto reducido por debajo de alerta)
+    if (percentage < 80) {
+      for (const uid of targetUserIds) {
+        for (const notifDoc of existingAlertsByUser[uid] || []) {
+          await deleteDoc(notifDoc.ref);
+        }
+      }
+      return;
+    }
 
-    for (const userId of targetUserIds) {
-      const qNotif = query(
-        collection(db, 'notifications'),
-        where('userId', '==', userId),
-        where('type', '==', 'budget_alert')
-      );
-      
-      const notifSnap = await getDocs(qNotif);
-      const alreadyNotified = notifSnap.docs.some(doc => {
-        const d = doc.data();
-        return d.data?.month === month && 
-               d.data?.categoryId === categoryId && 
-               d.data?.threshold === targetThreshold &&
-               (projectId ? d.data?.projectId === projectId : !d.data?.projectId);
-      });
+    // Escenario 2: 80% <= percentage < 100%
+    if (percentage >= 80 && percentage < 100) {
+      const title = `Alerta de presupuesto: Has alcanzado el ${Math.round(percentage)}% del límite en ${catName} (${formattedSpent} de ${formattedLimit})`;
 
-      if (!alreadyNotified) {
-        const title = targetThreshold === 100
-          ? `¡Límite superado! Has alcanzado el ${Math.round(percentage)}% del presupuesto en ${catName} (${formattedSpent} de ${formattedLimit})`
-          : `Alerta de presupuesto: Has alcanzado el ${Math.round(percentage)}% del límite en ${catName} (${formattedSpent} de ${formattedLimit})`;
+      for (const uid of targetUserIds) {
+        const userAlerts = existingAlertsByUser[uid] || [];
+        if (userAlerts.length > 0) {
+          const primaryAlert = userAlerts[0];
+          await updateDoc(primaryAlert.ref, {
+            content: title,
+            'data.threshold': 80,
+            'data.percentage': Math.round(percentage),
+            'data.spent': totalSpent,
+            'data.limit': budgetAmount,
+            updatedAt: serverTimestamp()
+          });
 
-        await addNotification({
-          userId,
-          type: 'budget_alert',
-          content: title,
-          data: {
-            budgetAlert: true,
-            threshold: targetThreshold,
-            month,
-            categoryId,
-            projectId,
-            percentage: Math.round(percentage)
+          // Limpiar duplicados si existieran
+          for (let i = 1; i < userAlerts.length; i++) {
+            await deleteDoc(userAlerts[i].ref);
           }
-        });
+        } else {
+          await addNotification({
+            userId: uid,
+            type: 'budget_alert',
+            content: title,
+            data: {
+              budgetAlert: true,
+              threshold: 80,
+              month,
+              categoryId,
+              projectId,
+              percentage: Math.round(percentage),
+              spent: totalSpent,
+              limit: budgetAmount
+            }
+          });
+        }
+      }
+      return;
+    }
+
+    // Escenario 3: percentage >= 100% (Límite superado)
+    if (percentage >= 100) {
+      const title = `¡Límite superado! Has alcanzado el ${Math.round(percentage)}% del presupuesto en ${catName} (${formattedSpent} de ${formattedLimit})`;
+
+      for (const uid of targetUserIds) {
+        const userAlerts = existingAlertsByUser[uid] || [];
+        if (userAlerts.length > 0) {
+          const primaryAlert = userAlerts[0];
+          const prevThreshold = primaryAlert.data()?.data?.threshold;
+          const shouldAlertAgain = prevThreshold === 80;
+
+          const updatePayload: any = {
+            content: title,
+            'data.threshold': 100,
+            'data.percentage': Math.round(percentage),
+            'data.spent': totalSpent,
+            'data.limit': budgetAmount,
+            updatedAt: serverTimestamp()
+          };
+          if (shouldAlertAgain) {
+            updatePayload.isRead = false;
+          }
+
+          await updateDoc(primaryAlert.ref, updatePayload);
+
+          for (let i = 1; i < userAlerts.length; i++) {
+            await deleteDoc(userAlerts[i].ref);
+          }
+        } else {
+          await addNotification({
+            userId: uid,
+            type: 'budget_alert',
+            content: title,
+            data: {
+              budgetAlert: true,
+              threshold: 100,
+              month,
+              categoryId,
+              projectId,
+              percentage: Math.round(percentage),
+              spent: totalSpent,
+              limit: budgetAmount
+            }
+          });
+        }
       }
     }
   } catch (err) {
-    console.error('Error checking budget alerts:', err);
+    console.error('Error recalculating budget alerts for category:', err);
   }
+};
+
+/**
+ * Mantiene compatibilidad con llamadas existentes a checkAndNotifyBudgetAlerts.
+ */
+export const checkAndNotifyBudgetAlerts = async (transaction: any) => {
+  if (!transaction || transaction.type !== 'expense' || !transaction.categoryId) return;
+  const date = transaction.date || new Date();
+  await recalculateBudgetAlertsForCategory(transaction.categoryId, transaction.projectId || null, date);
 };
 
 export const addTransaction = async (transaction: any) => {
@@ -1215,11 +1448,20 @@ export const updateTransaction = async (transactionId: string, transaction: any)
         }
 
         await updateDoc(parentRef, updates);
+
+        const finalCatId = transaction.categoryId || parentData.categoryId;
+        if (finalCatId) {
+          recalculateBudgetAlertsForCategory(finalCatId, finalProjectId, transaction.date || parentData.date).catch(err =>
+            console.error('Budget recalculation error on virtual installment update:', err)
+          );
+        }
         return;
       }
     }
 
     const transactionRef = doc(db, 'transactions', transactionId);
+    const prevSnap = await getDoc(transactionRef);
+    const prevData = prevSnap.exists() ? prevSnap.data() : null;
     
     // Parse the date part based on local time
     const finalDate = parseLocalYYYYMMDD(transaction.date);
@@ -1248,11 +1490,35 @@ export const updateTransaction = async (transactionId: string, transaction: any)
       categoryColor: transaction.categoryColor
     });
 
-    // Check budget thresholds if expense
-    if (transaction.type === 'expense') {
-      checkAndNotifyBudgetAlerts({ id: transactionId, ...transaction, projectId: finalProjectId, date: finalDate }).catch(err =>
-        console.error('Budget alert error:', err)
+    // 1. Sincronizar notificaciones de colaboradores (Enfoque 3)
+    syncNotificationsOnExpenseUpdated(
+      transactionId, 
+      { id: transactionId, ...transaction, projectId: finalProjectId, date: finalDate }, 
+      prevData
+    ).catch(err =>
+      console.error('Error syncing notifications on update:', err)
+    );
+
+    // 2. Recálculo reactivo de alertas de presupuesto
+    if (transaction.type === 'expense' && transaction.categoryId) {
+      recalculateBudgetAlertsForCategory(transaction.categoryId, finalProjectId, finalDate).catch(err =>
+        console.error('Budget alert recalculation error on update:', err)
       );
+    }
+
+    // Si cambió de categoría, proyecto o mes, o si dejó de ser gasto:
+    if (prevData && prevData.type === 'expense' && prevData.categoryId) {
+      const prevDateObj = safeToDate(prevData.date);
+      const isSameCategory = prevData.categoryId === transaction.categoryId;
+      const isSameProject = (prevData.projectId || null) === finalProjectId;
+      const isSameMonth = getLocalMonth(prevDateObj) === getLocalMonth(finalDate);
+      const isStillExpense = transaction.type === 'expense';
+
+      if (!isSameCategory || !isSameProject || !isSameMonth || !isStillExpense) {
+        recalculateBudgetAlertsForCategory(prevData.categoryId, prevData.projectId || null, prevData.date).catch(err =>
+          console.error('Previous budget alert recalculation error:', err)
+        );
+      }
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `transactions/${transactionId}`);
@@ -1267,7 +1533,24 @@ export const deleteTransaction = async (transactionId: string) => {
       const installmentNum = parseInt(parts[1], 10);
       return await deleteSingleVirtualInstallment(parentId, installmentNum);
     }
-    await deleteDoc(doc(db, 'transactions', transactionId));
+
+    const txRef = doc(db, 'transactions', transactionId);
+    const prevSnap = await getDoc(txRef);
+    const prevData = prevSnap.exists() ? prevSnap.data() : null;
+
+    await deleteDoc(txRef);
+
+    // Sincronizar borrado en notificaciones de colaboradores
+    syncNotificationsOnExpenseDeleted(transactionId).catch(err =>
+      console.error('Error syncing notifications on delete:', err)
+    );
+
+    // Recalcular presupuesto reactivamente
+    if (prevData && prevData.type === 'expense' && prevData.categoryId) {
+      recalculateBudgetAlertsForCategory(prevData.categoryId, prevData.projectId || null, prevData.date).catch(err =>
+        console.error('Error recalculating budget alerts on delete:', err)
+      );
+    }
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `transactions/${transactionId}`);
   }
@@ -1723,7 +2006,16 @@ export const deleteInstallmentPlan = async (installmentPlanId: string) => {
     const planRef = doc(db, 'transactions', installmentPlanId);
     const planSnap = await getDoc(planRef);
     if (planSnap.exists()) {
+      const planData = planSnap.data();
       await deleteDoc(planRef);
+      syncNotificationsOnExpenseDeleted(installmentPlanId).catch(err =>
+        console.error('Error syncing notifications on plan delete:', err)
+      );
+      if (planData.type === 'expense' && planData.categoryId) {
+        recalculateBudgetAlertsForCategory(planData.categoryId, planData.projectId || null, planData.date).catch(err =>
+          console.error('Budget recalculation error on plan delete:', err)
+        );
+      }
       return;
     }
 
@@ -1740,6 +2032,9 @@ export const deleteInstallmentPlan = async (installmentPlanId: string) => {
         batch.delete(d.ref);
       });
       await batch.commit();
+      syncNotificationsOnExpenseDeleted(installmentPlanId).catch(err =>
+        console.error('Error syncing notifications on legacy plan delete:', err)
+      );
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `transactions (plan: ${installmentPlanId})`);
@@ -1754,10 +2049,19 @@ export const deleteSingleVirtualInstallment = async (parentPlanId: string, insta
   try {
     if (!auth.currentUser) return;
     const planRef = doc(db, 'transactions', parentPlanId);
+    const planSnap = await getDoc(planRef);
+    const planData = planSnap.exists() ? planSnap.data() : null;
+
     await updateDoc(planRef, {
       [`overrides.${installmentNumber}.status`]: 'deleted',
       updatedAt: serverTimestamp()
     });
+
+    if (planData && planData.type === 'expense' && planData.categoryId) {
+      recalculateBudgetAlertsForCategory(planData.categoryId, planData.projectId || null, planData.date).catch(err =>
+        console.error('Budget recalculation error on installment override delete:', err)
+      );
+    }
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `transactions (installment override: ${parentPlanId})`);
     throw error;

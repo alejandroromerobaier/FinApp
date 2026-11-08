@@ -131,12 +131,12 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ n, onRead, onDelete
     const pct = n.data?.percentage || n.data?.threshold || 100;
     metadataTag = (
       <span className={cn(
-        "text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md border",
+        "text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md border font-mono",
         isOver
-          ? "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20 font-mono"
-          : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 font-mono"
+          ? "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20"
+          : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
       )}>
-        {pct}% superado
+        {pct}% {isOver ? 'superado' : 'alcanzado'}
       </span>
     );
   } else if (n.type === 'project_shared') {
@@ -163,17 +163,31 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ n, onRead, onDelete
 
     if (n.data?.amount !== undefined) {
       metadataTag = (
-        <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-mono">
-          {formatCurrency(n.data.amount)}
-        </span>
+        <div className="flex items-center gap-1">
+          <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-mono">
+            {formatCurrency(n.data.amount)}
+          </span>
+          {n.data?.isModified && (
+            <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/25">
+              Modificado
+            </span>
+          )}
+        </div>
       );
     } else {
       const match = n.content.match(/\$\s*[\d.,]+/);
       if (match) {
         metadataTag = (
-          <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-mono">
-            {match[0]}
-          </span>
+          <div className="flex items-center gap-1">
+            <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-mono">
+              {match[0]}
+            </span>
+            {n.data?.isModified && (
+              <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/25">
+                Modificado
+              </span>
+            )}
+          </div>
         );
       }
     }
