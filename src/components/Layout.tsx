@@ -1,4 +1,5 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Home, 
@@ -20,6 +21,25 @@ import logo from '../assets/logo.png';
 import { useData } from '../lib/DataContext';
 import { getAppVersionInfo } from '../lib/version';
 import { haptic } from '../lib/haptics';
+
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 640;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return isMobile;
+};
 
 const formatRelativeTime = (rawDate: any): string => {
   if (!rawDate) return 'Ahora';
@@ -233,6 +253,172 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ n, onRead, onDelete
   );
 };
 
+interface NotificationPanelContentProps {
+  unreadCount: number;
+  notifications: any[];
+  displayedNotifs: any[];
+  filterNotifs: 'all' | 'unread';
+  setFilterNotifs: (f: 'all' | 'unread') => void;
+  markAllAsRead: () => void;
+  onClearRequest: () => void;
+  onClose: () => void;
+  markAsRead: (id: string) => void;
+  deleteNotification: (id: string) => void;
+  handleNotificationClick: (n: any) => void;
+  isMobile: boolean;
+}
+
+const NotificationPanelContent: React.FC<NotificationPanelContentProps> = ({
+  unreadCount,
+  notifications,
+  displayedNotifs,
+  filterNotifs,
+  setFilterNotifs,
+  markAllAsRead,
+  onClearRequest,
+  onClose,
+  markAsRead,
+  deleteNotification,
+  handleNotificationClick,
+  isMobile
+}) => {
+  return (
+    <>
+      {/* Mobile Drag Bar */}
+      {isMobile && (
+        <div className="w-12 h-1.5 rounded-full bg-on-surface/20 mx-auto mt-3 mb-1 shrink-0" />
+      )}
+
+      {/* Header */}
+      <div className="p-4 sm:p-5 border-b border-on-surface/10 space-y-3 shrink-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h3 className="font-headline font-black text-on-surface text-sm sm:text-base uppercase tracking-wider">
+              Notificaciones
+            </h3>
+            {unreadCount > 0 && (
+              <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-black">
+                {unreadCount} nueva{unreadCount > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {unreadCount > 0 && (
+              <button 
+                onClick={() => {
+                  haptic.light();
+                  markAllAsRead();
+                }}
+                className="px-2 py-1 rounded-lg hover:bg-primary/10 text-[10px] font-black text-primary uppercase tracking-wider transition-colors flex items-center gap-1 cursor-pointer"
+                title="Marcar todas como leídas"
+              >
+                <Check size={13} strokeWidth={3} />
+                <span>Leer todo</span>
+              </button>
+            )}
+            {notifications.length > 0 && (
+              <button 
+                onClick={() => {
+                  haptic.light();
+                  onClearRequest();
+                }}
+                className="px-2 py-1 rounded-lg hover:bg-rose-500/10 text-[10px] font-black text-on-surface-variant/60 hover:text-rose-500 uppercase tracking-wider transition-colors flex items-center gap-1 cursor-pointer"
+                title="Vaciar historial de notificaciones"
+              >
+                <Trash2 size={13} />
+                <span>Vaciar</span>
+              </button>
+            )}
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-full text-on-surface-variant/60 hover:text-on-surface hover:bg-on-surface/5 cursor-pointer ml-1"
+              title="Cerrar"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="flex gap-1.5 p-1 bg-surface-container-low rounded-xl">
+          <button
+            type="button"
+            onClick={() => {
+              haptic.selection();
+              setFilterNotifs('all');
+            }}
+            className={cn(
+              "flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
+              filterNotifs === 'all'
+                ? "bg-surface-container-lowest text-on-surface shadow-xs"
+                : "text-on-surface-variant/60 hover:text-on-surface"
+            )}
+          >
+            Todas ({notifications.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              haptic.selection();
+              setFilterNotifs('unread');
+            }}
+            className={cn(
+              "flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
+              filterNotifs === 'unread'
+                ? "bg-surface-container-lowest text-on-surface shadow-xs"
+                : "text-on-surface-variant/60 hover:text-on-surface"
+            )}
+          >
+            No leídas ({unreadCount})
+          </button>
+        </div>
+      </div>
+
+      {/* Notifications List */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-on-surface/[0.04]">
+        {displayedNotifs.length === 0 ? (
+          <div className="py-12 px-6 text-center flex flex-col items-center justify-center gap-3">
+            <div className="w-14 h-14 rounded-3xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shadow-inner">
+              <CheckCircle2 size={28} strokeWidth={2.5} />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-black text-on-surface">
+                {filterNotifs === 'unread' ? '¡Estás al día!' : 'Bandeja limpia'}
+              </p>
+              <p className="text-xs text-on-surface-variant/60 max-w-[220px]">
+                {filterNotifs === 'unread'
+                  ? 'No tienes notificaciones pendientes de lectura.'
+                  : 'No hay notificaciones en tu historial.'}
+              </p>
+            </div>
+          </div>
+        ) : (
+          displayedNotifs.map((n) => (
+            <NotificationItem
+              key={n.id}
+              n={n}
+              onRead={markAsRead}
+              onDelete={deleteNotification}
+              onClick={handleNotificationClick}
+            />
+          ))
+        )}
+      </div>
+
+      {/* Mobile Swipe Hint in Footer */}
+      {isMobile && displayedNotifs.length > 0 && (
+        <div className="p-2.5 bg-surface-container-low/40 border-t border-on-surface/5 text-center shrink-0">
+          <p className="text-[10px] text-on-surface-variant/50 font-medium">
+            💡 Desliza hacia la izquierda para leer o borrar
+          </p>
+        </div>
+      )}
+    </>
+  );
+};
+
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -240,6 +426,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const [showNotifs, setShowNotifs] = useState(false);
   const [filterNotifs, setFilterNotifs] = useState<'all' | 'unread'>('all');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const isMobile = useIsMobile();
   const versionInfo = getAppVersionInfo();
   
   const isAuthPage = location.pathname === '/login';
@@ -297,7 +484,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2 relative">
+            <div className="flex items-center gap-2">
               <button 
                 onClick={() => {
                   haptic.light();
@@ -316,212 +503,116 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                   </span>
                 )}
               </button>
-
-              {/* Notifications Sheet / Popover */}
-              <AnimatePresence>
-                {showNotifs && (
-                  <>
-                    {/* Backdrop */}
-                    <motion.div 
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      onClick={() => setShowNotifs(false)}
-                      className="fixed inset-0 bg-black/40 backdrop-blur-xs z-[60]"
-                    />
-
-                    <motion.div 
-                      initial={{ opacity: 0, y: 24, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 24, scale: 0.96 }}
-                      transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-                      className="fixed inset-x-0 bottom-0 sm:inset-auto sm:absolute sm:top-full sm:right-0 sm:mt-2 w-full sm:w-[400px] bg-surface-container-lowest rounded-t-[2.2rem] sm:rounded-3xl shadow-2xl border border-on-surface/10 overflow-hidden z-[70] flex flex-col max-h-[85vh] sm:max-h-[620px]"
-                    >
-                      {/* Mobile Drag Bar */}
-                      <div className="w-12 h-1.5 rounded-full bg-on-surface/20 mx-auto mt-3 mb-1 sm:hidden shrink-0" />
-
-                      {/* Header */}
-                      <div className="p-4 sm:p-5 border-b border-on-surface/10 space-y-3 shrink-0">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-headline font-black text-on-surface text-sm sm:text-base uppercase tracking-wider">Notificaciones</h3>
-                            {unreadCount > 0 && (
-                              <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-black">
-                                {unreadCount} nueva{unreadCount > 1 ? 's' : ''}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1.5 sm:gap-2">
-                            {unreadCount > 0 && (
-                              <button 
-                                onClick={() => {
-                                  haptic.light();
-                                  markAllAsRead();
-                                }}
-                                className="px-2 py-1 rounded-lg hover:bg-primary/10 text-[10px] font-black text-primary uppercase tracking-wider transition-colors flex items-center gap-1 cursor-pointer"
-                                title="Marcar todas como leídas"
-                              >
-                                <Check size={13} strokeWidth={3} />
-                                <span>Leer todo</span>
-                              </button>
-                            )}
-                            {notifications.length > 0 && (
-                              <button 
-                                onClick={() => {
-                                  haptic.light();
-                                  setShowClearConfirm(true);
-                                }}
-                                className="px-2 py-1 rounded-lg hover:bg-rose-500/10 text-[10px] font-black text-on-surface-variant/60 hover:text-rose-500 uppercase tracking-wider transition-colors flex items-center gap-1 cursor-pointer"
-                                title="Vaciar historial de notificaciones"
-                              >
-                                <Trash2 size={13} />
-                                <span>Vaciar</span>
-                              </button>
-                            )}
-                            {/* Close Button on Mobile */}
-                            <button
-                              type="button"
-                              onClick={() => setShowNotifs(false)}
-                              className="p-1.5 rounded-full text-on-surface-variant/60 hover:text-on-surface hover:bg-on-surface/5 sm:hidden cursor-pointer ml-1"
-                              title="Cerrar"
-                            >
-                              <X size={18} />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Filter Tabs */}
-                        <div className="flex gap-1.5 p-1 bg-surface-container-low rounded-xl">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              haptic.selection();
-                              setFilterNotifs('all');
-                            }}
-                            className={cn(
-                              "flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
-                              filterNotifs === 'all'
-                                ? "bg-surface-container-lowest text-on-surface shadow-xs"
-                                : "text-on-surface-variant/60 hover:text-on-surface"
-                            )}
-                          >
-                            Todas ({notifications.length})
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              haptic.selection();
-                              setFilterNotifs('unread');
-                            }}
-                            className={cn(
-                              "flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
-                              filterNotifs === 'unread'
-                                ? "bg-surface-container-lowest text-on-surface shadow-xs"
-                                : "text-on-surface-variant/60 hover:text-on-surface"
-                            )}
-                          >
-                            No leídas ({unreadCount})
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Notifications List */}
-                      <div className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-on-surface/[0.04]">
-                        {displayedNotifs.length === 0 ? (
-                          <div className="py-12 px-6 text-center flex flex-col items-center justify-center gap-3">
-                            <div className="w-14 h-14 rounded-3xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shadow-inner">
-                              <CheckCircle2 size={28} strokeWidth={2.5} />
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-sm font-black text-on-surface">
-                                {filterNotifs === 'unread' ? '¡Estás al día!' : 'Bandeja limpia'}
-                              </p>
-                              <p className="text-xs text-on-surface-variant/60 max-w-[220px]">
-                                {filterNotifs === 'unread'
-                                  ? 'No tienes notificaciones pendientes de lectura.'
-                                  : 'No hay notificaciones en tu historial.'}
-                              </p>
-                            </div>
-                          </div>
-                        ) : (
-                          displayedNotifs.map((n) => (
-                            <NotificationItem
-                              key={n.id}
-                              n={n}
-                              onRead={markAsRead}
-                              onDelete={deleteNotification}
-                              onClick={handleNotificationClick}
-                            />
-                          ))
-                        )}
-                      </div>
-
-                      {/* Mobile Swipe Hint in Footer */}
-                      {displayedNotifs.length > 0 && (
-                        <div className="p-2.5 bg-surface-container-low/40 border-t border-on-surface/5 text-center sm:hidden shrink-0">
-                          <p className="text-[10px] text-on-surface-variant/50 font-medium">
-                            💡 Desliza hacia la izquierda para leer o borrar
-                          </p>
-                        </div>
-                      )}
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
-
-              {/* In-app styled confirmation modal for Clear All */}
-              <AnimatePresence>
-                {showClearConfirm && (
-                  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      onClick={() => setShowClearConfirm(false)}
-                      className="fixed inset-0 bg-black/50 backdrop-blur-xs"
-                    />
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.94, y: 10 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.94, y: 10 }}
-                      className="relative z-10 bg-surface-container-lowest rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-on-surface/10 space-y-4 text-center"
-                    >
-                      <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 mx-auto flex items-center justify-center">
-                        <Trash2 size={24} />
-                      </div>
-                      <div>
-                        <h4 className="text-base font-black text-on-surface">¿Vaciar notificaciones?</h4>
-                        <p className="text-xs text-on-surface-variant/70 mt-1 leading-relaxed">
-                          Se eliminarán todas las notificaciones de tu historial de forma permanente.
-                        </p>
-                      </div>
-                      <div className="flex gap-2.5 pt-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowClearConfirm(false)}
-                          className="flex-1 py-2.5 rounded-xl border border-on-surface/10 text-xs font-bold text-on-surface hover:bg-on-surface/5 transition-colors cursor-pointer"
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            haptic.medium();
-                            await clearAllNotifications();
-                            setShowClearConfirm(false);
-                          }}
-                          className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-black shadow-md shadow-rose-600/20 transition-all cursor-pointer"
-                        >
-                          Sí, vaciar
-                        </button>
-                      </div>
-                    </motion.div>
-                  </div>
-                )}
-              </AnimatePresence>
             </div>
           </div>
         </header>
+      )}
+
+      {/* Portaled Notifications Sheet / Popover & Confirmation Modal */}
+      {typeof document !== 'undefined' && createPortal(
+        <>
+          <AnimatePresence>
+            {showNotifs && (
+              <div className={cn(
+                "fixed inset-0 z-[100] pointer-events-none",
+                isMobile ? "flex flex-col justify-end" : ""
+              )}>
+                {/* Fullscreen Backdrop */}
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowNotifs(false)}
+                  className="fixed inset-0 bg-black/40 backdrop-blur-xs pointer-events-auto"
+                />
+
+                {/* Panel */}
+                <motion.div 
+                  initial={isMobile ? { y: '100%' } : { opacity: 0, y: -10, scale: 0.98 }}
+                  animate={isMobile ? { y: 0 } : { opacity: 1, y: 0, scale: 1 }}
+                  exit={isMobile ? { y: '100%' } : { opacity: 0, y: -10, scale: 0.98 }}
+                  transition={isMobile 
+                    ? { type: 'spring', damping: 28, stiffness: 300 }
+                    : { duration: 0.16, ease: 'easeOut' }
+                  }
+                  className={cn(
+                    "relative z-10 w-full bg-surface-container-lowest shadow-2xl border border-on-surface/10 overflow-hidden flex flex-col pointer-events-auto",
+                    isMobile
+                      ? "rounded-t-[2.2rem] max-h-[85vh] pb-safe"
+                      : "fixed top-18 right-6 w-[420px] rounded-3xl max-h-[calc(100vh-100px)]"
+                  )}
+                >
+                  <NotificationPanelContent
+                    unreadCount={unreadCount}
+                    notifications={notifications}
+                    displayedNotifs={displayedNotifs}
+                    filterNotifs={filterNotifs}
+                    setFilterNotifs={setFilterNotifs}
+                    markAllAsRead={markAllAsRead}
+                    onClearRequest={() => setShowClearConfirm(true)}
+                    onClose={() => setShowNotifs(false)}
+                    markAsRead={markAsRead}
+                    deleteNotification={deleteNotification}
+                    handleNotificationClick={handleNotificationClick}
+                    isMobile={isMobile}
+                  />
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* Clear All Confirmation Modal */}
+          <AnimatePresence>
+            {showClearConfirm && (
+              <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowClearConfirm(false)}
+                  className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.94, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.94, y: 10 }}
+                  className="relative z-10 bg-surface-container-lowest rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-on-surface/10 space-y-4 text-center"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 mx-auto flex items-center justify-center">
+                    <Trash2 size={24} />
+                  </div>
+                  <div>
+                    <h4 className="text-base font-black text-on-surface">¿Vaciar notificaciones?</h4>
+                    <p className="text-xs text-on-surface-variant/70 mt-1 leading-relaxed">
+                      Se eliminarán todas las notificaciones de tu historial de forma permanente.
+                    </p>
+                  </div>
+                  <div className="flex gap-2.5 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowClearConfirm(false)}
+                      className="flex-1 py-2.5 rounded-xl border border-on-surface/10 text-xs font-bold text-on-surface hover:bg-on-surface/5 transition-colors cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        haptic.medium();
+                        await clearAllNotifications();
+                        setShowClearConfirm(false);
+                      }}
+                      className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-black shadow-md shadow-rose-600/20 transition-all cursor-pointer"
+                    >
+                      Sí, vaciar
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+        </>,
+        document.body
       )}
 
       <main className={cn("flex-1 w-full max-w-screen-xl mx-auto", !isAddPage && "pt-[calc(3.75rem+env(safe-area-inset-top,0px))] sm:pt-16 pb-28")}>
