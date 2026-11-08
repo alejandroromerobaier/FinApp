@@ -191,6 +191,136 @@ export const cleanOldNotifications = async (userId: string, days: number = 7) =>
   }
 };
 
+/**
+ * Alertas automáticas de vencimiento de tarjetas:
+ * Notificación automática 3 días antes del vencimiento del resumen de la tarjeta para evitar intereses punitorios.
+ */
+export const checkCardDueAlerts = async (userId: string, cards: CreditCard[]) => {
+  if (!userId || !cards || cards.length === 0) return;
+
+  try {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const todayDate = now.getDate();
+
+    // Query recent card_due notifications to prevent duplicate alerts in the same cycle
+    const qNotifs = query(
+      collection(db, 'notifications'),
+      where('userId', '==', userId),
+      where('type', '==', 'card_due')
+    );
+    const existingSnap = await getDocs(qNotifs);
+    const existingCycles = new Set(
+      existingSnap.docs.map(doc => {
+        const d = doc.data();
+        return `${d.data?.cardId}_${d.data?.dueCycle}`;
+      })
+    );
+
+    for (const card of cards) {
+      if (!card.dueDay || card.dueDay < 1 || card.dueDay > 31) continue;
+
+      let dueYear = currentYear;
+      let dueMonth = currentMonth;
+      if (todayDate > card.dueDay) {
+        dueMonth += 1;
+        if (dueMonth > 11) {
+          dueMonth = 0;
+          dueYear += 1;
+        }
+      }
+
+      const lastDayOfDueMonth = new Date(dueYear, dueMonth + 1, 0).getDate();
+      const actualDueDay = Math.min(card.dueDay, lastDayOfDueMonth);
+      const dueDate = new Date(dueYear, dueMonth, actualDueDay, 23, 59, 59);
+
+      const msDiff = dueDate.getTime() - now.getTime();
+      const daysRemaining = Math.max(0, Math.ceil(msDiff / (1000 * 60 * 60 * 24)));
+
+      if (daysRemaining <= 3) {
+        const dueCycle = `${dueYear}-${String(dueMonth + 1).padStart(2, '0')}-${String(actualDueDay).padStart(2, '0')}`;
+        const cycleKey = `${card.id}_${dueCycle}`;
+
+        if (!existingCycles.has(cycleKey)) {
+          const daysText = daysRemaining === 0 
+            ? 'vence hoy' 
+            : daysRemaining === 1 
+              ? 'vence mañana' 
+              : `vence en ${daysRemaining} días`;
+
+          await addNotification({
+            userId,
+            type: 'card_due',
+            content: `El resumen de tu tarjeta ${card.name} ${daysText} (${actualDueDay}/${dueMonth + 1}). Recuerda abonar para evitar intereses punitorios.`,
+            data: {
+              cardId: card.id,
+              cardName: card.name,
+              dueDay: actualDueDay,
+              dueDate: dueCycle,
+              dueCycle,
+              daysRemaining,
+              last4Digits: card.last4Digits || '',
+              bank: card.bank || ''
+            }
+          });
+          existingCycles.add(cycleKey);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error checking card due alerts:', error);
+  }
+};
+
+/**
+ * Hitos de ahorro / Reportes:
+ * Notifica automáticamente cuando el reporte del mes anterior está disponible para consultar.
+ */
+export const checkMonthlyReportAlert = async (userId: string) => {
+  if (!userId) return;
+
+  try {
+    const now = new Date();
+    let prevYear = now.getFullYear();
+    let prevMonth = now.getMonth(); // 0 is January
+    if (prevMonth === 0) {
+      prevMonth = 12;
+      prevYear -= 1;
+    }
+    const prevMonthStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+
+    const monthNames = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    const prevMonthName = monthNames[prevMonth - 1];
+
+    const qNotifs = query(
+      collection(db, 'notifications'),
+      where('userId', '==', userId),
+      where('type', '==', 'monthly_report')
+    );
+    const existingSnap = await getDocs(qNotifs);
+    const alreadyNotified = existingSnap.docs.some(doc => doc.data().data?.month === prevMonthStr);
+
+    if (!alreadyNotified) {
+      await addNotification({
+        userId,
+        type: 'monthly_report',
+        content: `Tu reporte mensual de ${prevMonthName} ya está disponible para consultar. Revisa el balance de tus finanzas.`,
+        data: {
+          month: prevMonthStr,
+          monthName: prevMonthName,
+          year: prevYear
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error checking monthly report alert:', error);
+  }
+};
+
 // --- User Profile ---
 
 export const syncUserProfile = async (user: any, displayName?: string) => {
@@ -568,7 +698,7 @@ export const inviteUserToProjectByEmail = async (projectId: string, email: strin
         userId: user.id,
         type: 'project_shared',
         content: `Te han compartido el proyecto: ${projectName}`,
-        data: { projectId, ownerName: auth.currentUser?.displayName }
+        data: { projectId, projectName, ownerName: auth.currentUser?.displayName }
       });
 
       return { success: true, type: 'member' };
@@ -867,6 +997,7 @@ export const notifyCollaboratorsOnExpenseAdded = async (transaction: any) => {
         content,
         data: {
           projectId: transaction.projectId,
+          projectName,
           amount: transaction.amount,
           categoryName: catName,
           isInstallmentPlan: !!transaction.isInstallmentPlan,

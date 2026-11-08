@@ -8,7 +8,11 @@ import {
   Settings, 
   Bell, 
   UserPlus,
+  Users,
+  CreditCard,
   Receipt,
+  Wallet,
+  Target,
   AlertTriangle, 
   Check, 
   Trash2,
@@ -16,7 +20,7 @@ import {
   X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '@/src/lib/utils';
+import { cn, formatCurrency } from '@/src/lib/utils';
 import logo from '../assets/logo.png';
 import { useData } from '../lib/DataContext';
 import { getAppVersionInfo } from '../lib/version';
@@ -82,29 +86,109 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ n, onRead, onDelete
   const isDragging = useRef(false);
   const dragDistance = useRef(0);
 
-  let typeLabel = 'Aviso';
+  // Default configuration
+  let typeLabel = 'AVISO';
   let pillClass = 'bg-on-surface/5 text-on-surface-variant border-on-surface/10';
   let iconContainerClass = 'bg-on-surface/5 text-on-surface-variant';
-  let TypeIcon = Bell;
+  let TypeIcon: any = Bell;
+  let metadataTag: React.ReactNode = null;
 
-  if (n.type === 'project_shared') {
-    typeLabel = 'Proyecto';
-    pillClass = 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-500/20';
-    iconContainerClass = 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400';
-    TypeIcon = UserPlus;
-  } else if (n.type === 'expense_added') {
-    typeLabel = 'Gasto';
-    pillClass = 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20';
-    iconContainerClass = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
-    TypeIcon = Receipt;
+  if (n.type === 'card_due') {
+    // 💳 Tarjetas de Crédito: Ícono violeta/azul con fecha límite
+    typeLabel = 'TARJETA';
+    pillClass = 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20';
+    iconContainerClass = 'bg-purple-500/10 text-purple-600 dark:text-purple-400 dark:bg-purple-500/20 shadow-purple-500/10';
+    TypeIcon = CreditCard;
+
+    const days = n.data?.daysRemaining;
+    const dueDay = n.data?.dueDay;
+    const isUrgent = days === 0 || days === 1;
+
+    metadataTag = (
+      <span className={cn(
+        "text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md border",
+        isUrgent
+          ? "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20"
+          : "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20"
+      )}>
+        {days !== undefined 
+          ? (days === 0 ? '¡Vence hoy!' : days === 1 ? 'Vence mañana' : `Vence en ${days} d`)
+          : (dueDay ? `Límite: día ${dueDay}` : 'Fecha límite')}
+      </span>
+    );
   } else if (n.type === 'budget_alert') {
-    typeLabel = 'Presupuesto';
-    const isOver = n.data?.threshold === 100;
+    // ⚠️ Presupuestos: Amarillo/Naranja con porcentaje superado (80% o 100%)
+    typeLabel = 'PRESUPUESTO';
+    const isOver = (n.data?.threshold === 100) || (n.data?.percentage >= 100);
     pillClass = isOver 
       ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20'
       : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20';
-    iconContainerClass = isOver ? 'bg-rose-500/10 text-rose-600' : 'bg-amber-500/10 text-amber-600';
+    iconContainerClass = isOver 
+      ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 dark:bg-rose-500/20 shadow-rose-500/10' 
+      : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 dark:bg-amber-500/20 shadow-amber-500/10';
     TypeIcon = AlertTriangle;
+
+    const pct = n.data?.percentage || n.data?.threshold || 100;
+    metadataTag = (
+      <span className={cn(
+        "text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md border",
+        isOver
+          ? "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20 font-mono"
+          : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 font-mono"
+      )}>
+        {pct}% superado
+      </span>
+    );
+  } else if (n.type === 'project_shared') {
+    // 👥 Proyectos Compartidos: Ícono índigo con nombre del proyecto
+    typeLabel = 'PROYECTO';
+    pillClass = 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20';
+    iconContainerClass = 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 dark:bg-indigo-500/20 shadow-indigo-500/10';
+    TypeIcon = Users;
+
+    const pName = n.data?.projectName || n.content.match(/proyecto:\s*([^.]+)/i)?.[1]?.trim() || '';
+    if (pName) {
+      metadataTag = (
+        <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 max-w-[130px] truncate" title={pName}>
+          {pName}
+        </span>
+      );
+    }
+  } else if (n.type === 'expense_added') {
+    // 💰 Gastos en Bóvedas: Ícono esmeralda con el monto involucrado
+    typeLabel = 'GASTO';
+    pillClass = 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20';
+    iconContainerClass = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 dark:bg-emerald-500/20 shadow-emerald-500/10';
+    TypeIcon = Wallet;
+
+    if (n.data?.amount !== undefined) {
+      metadataTag = (
+        <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-mono">
+          {formatCurrency(n.data.amount)}
+        </span>
+      );
+    } else {
+      const match = n.content.match(/\$\s*[\d.,]+/);
+      if (match) {
+        metadataTag = (
+          <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 font-mono">
+            {match[0]}
+          </span>
+        );
+      }
+    }
+  } else if (n.type === 'monthly_report') {
+    // 🎯 Hitos de Ahorro / Reportes: Ícono cyan con mes
+    typeLabel = 'REPORTE';
+    pillClass = 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20';
+    iconContainerClass = 'bg-sky-500/10 text-sky-600 dark:text-sky-400 dark:bg-sky-500/20 shadow-sky-500/10';
+    TypeIcon = Target;
+
+    metadataTag = (
+      <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20">
+        {n.data?.monthName ? `${n.data.monthName}` : 'Disponible'}
+      </span>
+    );
   }
 
   const actionWidth = n.isRead ? 72 : 144;
@@ -181,10 +265,11 @@ const NotificationItem: React.FC<NotificationItemProps> = ({ n, onRead, onDelete
         </div>
 
         <div className="flex-1 space-y-1.5 min-w-0 pr-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <span className={cn("text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border", pillClass)}>
               {typeLabel}
             </span>
+            {metadataTag}
             {!n.isRead && (
               <span className="w-2 h-2 bg-primary rounded-full shrink-0 shadow-xs ring-2 ring-primary/20" />
             )}
@@ -256,7 +341,9 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     }
     setShowNotifs(false);
 
-    if (n.type === 'project_shared') {
+    if (n.type === 'card_due') {
+      navigate('/cards');
+    } else if (n.type === 'project_shared') {
       if (n.data?.projectId) {
         navigate(`/project/${n.data.projectId}`);
       } else {
@@ -270,6 +357,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       }
     } else if (n.type === 'budget_alert') {
       navigate('/budgets');
+    } else if (n.type === 'monthly_report') {
+      navigate('/reports');
     } else {
       if (n.data?.projectId) {
         navigate(`/project/${n.data.projectId}`);
