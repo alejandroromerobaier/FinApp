@@ -15,14 +15,10 @@ import { updateBudget, deleteBudget, getBudgetsOnce } from '../services/firestor
 import { getLocalMonth, parseLocalMonth } from '../lib/dateUtils';
 import { formatCurrency, cn, formatCurrencyInput, formatAmountForDisplay, parseFormattedAmount } from '../lib/utils';
 
-const ICON_MAP: Record<string, any> = {
-  ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
-  Landmark, Tag, Gift, Briefcase, Home: HomeIcon, Plane, Coffee, Zap, Smartphone, ShieldCheck,
-  ShoppingCart, Hotel, Target
-};
+import { getCategoryIcon } from '../lib/categoryIcons';
 
 const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => {
-  const Icon = ICON_MAP[name] || Target;
+  const Icon = getCategoryIcon(name);
   return <Icon size={size} />;
 };
 

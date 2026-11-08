@@ -61,13 +61,10 @@ const formatMonthLabel = (dateStr: string): string => {
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 };
 
-const ICON_MAP: Record<string, any> = {
-  ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
-  Landmark, Tag, Gift, Briefcase, Home, Plane, Coffee, Zap, Smartphone, ShieldCheck, ArrowLeftRight
-};
+import { getCategoryIcon } from '../lib/categoryIcons';
 
 const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => {
-  const Icon = ICON_MAP[name] || MoreHorizontal;
+  const Icon = getCategoryIcon(name);
   return <Icon size={size} />;
 };
 
