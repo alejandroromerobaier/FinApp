@@ -34,7 +34,6 @@ export const ProjectDetail: React.FC = () => {
   const [planFilter, setPlanFilter] = useState<'all' | 'mine' | 'others'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterAuthor, setFilterAuthor] = useState<string>('all');
-  const [filterCategory, setFilterCategory] = useState<string>('all');
   const [visibleLimit, setVisibleLimit] = useState(10);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -170,22 +169,15 @@ export const ProjectDetail: React.FC = () => {
       .sort((a, b) => b.total - a.total);
   }, [transactions, categories]);
 
-  // Unique categories used in this project
-  const availableCategories = useMemo(() => {
-    const catIds = new Set(transactions.map(t => t.categoryId).filter(Boolean));
-    return categories.filter(c => catIds.has(c.id));
-  }, [transactions, categories]);
-
   // Reset pagination when search or filters change
   useEffect(() => {
     setVisibleLimit(10);
-  }, [searchQuery, filterAuthor, filterCategory, activeTab]);
+  }, [searchQuery, filterAuthor, activeTab]);
 
   // Filtered transactions for the History tab
   const filteredTransactions = useMemo(() => {
     return transactions.filter(t => {
       if (filterAuthor !== 'all' && t.authorId !== filterAuthor) return false;
-      if (filterCategory !== 'all' && t.categoryId !== filterCategory) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const desc = (t.description || '').toLowerCase();
@@ -195,7 +187,7 @@ export const ProjectDetail: React.FC = () => {
       }
       return true;
     });
-  }, [transactions, filterAuthor, filterCategory, searchQuery, categories, members]);
+  }, [transactions, filterAuthor, searchQuery, categories, members]);
 
   const paginatedTransactions = useMemo(() => {
     return filteredTransactions.slice(0, visibleLimit);
@@ -505,7 +497,7 @@ export const ProjectDetail: React.FC = () => {
                   </div>
 
                   {/* Filter Chips: Authors & Categories */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1 border-t border-on-surface/5">
+                  <div className="pt-1 border-t border-on-surface/5">
                     {/* Authors Filter */}
                     <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
                       <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/50 mr-1 shrink-0">Por:</span>
@@ -535,22 +527,6 @@ export const ProjectDetail: React.FC = () => {
                         </button>
                       ))}
                     </div>
-
-                    {/* Category Selector */}
-                    {availableCategories.length > 0 && (
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <select
-                          value={filterCategory}
-                          onChange={(e) => setFilterCategory(e.target.value)}
-                          className="bg-surface-container-low border border-on-surface/10 rounded-xl px-2.5 py-1 text-xs font-bold text-on-surface outline-none cursor-pointer"
-                        >
-                          <option value="all">Todas las categorías</option>
-                          {availableCategories.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
@@ -569,7 +545,7 @@ export const ProjectDetail: React.FC = () => {
                   <p className="text-sm font-bold text-on-surface">No se encontraron movimientos con los filtros aplicados</p>
                   <p className="text-xs text-on-surface-variant/60">Prueba cambiando el término de búsqueda o el colaborador seleccionado.</p>
                   <button
-                    onClick={() => { setSearchQuery(''); setFilterAuthor('all'); setFilterCategory('all'); }}
+                    onClick={() => { setSearchQuery(''); setFilterAuthor('all'); }}
                     className="mt-2 px-4 py-1.5 rounded-xl bg-primary text-white text-xs font-bold hover:opacity-90 transition-opacity"
                   >
                     Restablecer filtros
