@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Edit2, Trash2, AlertTriangle, PlusCircle,
@@ -39,6 +39,21 @@ export const ManageCategories: React.FC = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [reassignTo, setReassignTo] = useState<string | null>(null);
+
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus and select name input when opening modal
+  useEffect(() => {
+    if (showAddModal) {
+      const timer = setTimeout(() => {
+        if (nameInputRef.current) {
+          nameInputRef.current.focus();
+          nameInputRef.current.select();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [showAddModal]);
 
   const handleDelete = async (id: string) => {
     setIsDeleting(true);
@@ -363,6 +378,7 @@ export const ManageCategories: React.FC = () => {
                     Nombre de la Categoría
                   </label>
                   <input 
+                    ref={nameInputRef}
                     type="text"
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
