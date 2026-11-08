@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Calendar, Users, Utensils, Hotel, Car, ShoppingCart, ArrowLeft, Bell, ExternalLink, Plus, X, UserPlus, Trash2, Loader2, MoreHorizontal, ShoppingBag, Play, Heart, Book, Landmark, Tag, Gift, Briefcase, Home, Plane, Coffee, Zap, Smartphone, ShieldCheck, CreditCard, Layers, TrendingUp, Clock, CheckCircle2, ArrowLeftRight } from 'lucide-react';
+import { Calendar, Users, Utensils, Hotel, Car, ShoppingCart, ArrowLeft, Bell, ExternalLink, Plus, X, UserPlus, Trash2, Loader2, MoreHorizontal, ShoppingBag, Play, Heart, Book, Landmark, Tag, Gift, Briefcase, Home, Plane, Coffee, Zap, Smartphone, ShieldCheck, CreditCard, Layers, TrendingUp, Clock, CheckCircle2, ArrowLeftRight, Search, Filter, PieChart } from 'lucide-react';
 import { formatCurrency, cn } from '@/src/lib/utils';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getTransactions, removeMemberFromProject, inviteUserToProjectByEmail, getUsersByIds } from '../services/firestoreService';
@@ -32,6 +32,11 @@ export const ProjectDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'transactions' | 'installments' | 'savings'>('transactions');
   const [planFilter, setPlanFilter] = useState<'all' | 'mine' | 'others'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterAuthor, setFilterAuthor] = useState<string>('all');
+  const [visibleLimit, setVisibleLimit] = useState(10);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
@@ -190,6 +195,77 @@ export const ProjectDetail: React.FC = () => {
       contributorStats 
     };
   }, [transactions, members, isUsdProject]);
+
+  // Category Breakdown for the project
+  const categoryBreakdown = useMemo(() => {
+    const byCat: Record<string, { total: number; count: number; category: any }> = {};
+    const expenseTransactions = transactions.filter(t => t.type === 'expense');
+    const totalExp = expenseTransactions.reduce((acc, t) => acc + (t.amount || 0), 0);
+
+    expenseTransactions.forEach(t => {
+      const cId = t.categoryId || 'unknown';
+      if (!byCat[cId]) {
+        const foundCat = categories.find(c => c.id === cId) || { id: cId, name: t.categoryName || 'Otros', icon: t.categoryIcon || 'Tag', color: t.categoryColor || 'bg-slate-500' };
+        byCat[cId] = { total: 0, count: 0, category: foundCat };
+      }
+      byCat[cId].total += (t.amount || 0);
+      byCat[cId].count += 1;
+    });
+
+    return Object.values(byCat)
+      .map(item => ({
+        ...item,
+        percentage: totalExp > 0 ? Math.round((item.total / totalExp) * 100) : 0
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [transactions, categories]);
+
+  // Reset pagination when search or filters change
+  useEffect(() => {
+    setVisibleLimit(10);
+  }, [searchQuery, filterAuthor, activeTab]);
+
+  // Filtered transactions for the History tab
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(t => {
+      if (filterAuthor !== 'all' && t.authorId !== filterAuthor) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const desc = (t.description || '').toLowerCase();
+        const catName = (categories.find(c => c.id === t.categoryId)?.name || t.categoryName || '').toLowerCase();
+        const authorName = (members.find(m => m.id === t.authorId)?.name || '').toLowerCase();
+        if (!desc.includes(q) && !catName.includes(q) && !authorName.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [transactions, filterAuthor, searchQuery, categories, members]);
+
+  const paginatedTransactions = useMemo(() => {
+    return filteredTransactions.slice(0, visibleLimit);
+  }, [filteredTransactions, visibleLimit]);
+
+  const hasMore = visibleLimit < filteredTransactions.length;
+
+  // Infinite scroll observer
+  useEffect(() => {
+    if (activeTab !== 'transactions' || !hasMore) return;
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setVisibleLimit(prev => Math.min(prev + 10, filteredTransactions.length));
+      }
+    }, {
+      rootMargin: '200px',
+      threshold: 0.1
+    });
+
+    observer.observe(sentinel);
+    return () => {
+      if (sentinel) observer.unobserve(sentinel);
+    };
+  }, [activeTab, hasMore, filteredTransactions.length]);
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -360,6 +436,48 @@ export const ProjectDetail: React.FC = () => {
               ))}
             </div>
           </div>
+
+          {/* Sidebar: Categories Breakdown */}
+          <div className="bg-surface-container-lowest p-6 sm:p-8 rounded-[2.5rem] border border-on-surface/10 shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-extrabold text-on-surface font-headline flex items-center gap-2">
+                <Tag size={18} className="text-primary" />
+                Por Categorías
+              </h2>
+              <span className="text-[10px] font-black uppercase text-on-surface-variant/60">
+                {categoryBreakdown.length} rubros
+              </span>
+            </div>
+
+            {categoryBreakdown.length === 0 ? (
+              <p className="text-xs text-on-surface-variant/60 font-medium text-center py-4">Sin gastos categorizados</p>
+            ) : (
+              <div className="space-y-4">
+                {categoryBreakdown.map(item => (
+                  <div key={item.category.id} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className={cn("w-6 h-6 rounded-lg flex items-center justify-center text-white shrink-0 text-[10px]", item.category.color || 'bg-slate-500')}>
+                          <IconComponent name={item.category.icon || 'Tag'} size={12} />
+                        </div>
+                        <span className="font-bold text-on-surface truncate">{item.category.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-mono font-bold text-on-surface">{formatCurrency(item.total, project.currency)}</span>
+                        <span className="text-[10px] font-black text-primary font-mono w-8 text-right">{item.percentage}%</span>
+                      </div>
+                    </div>
+                    <div className="w-full h-1.5 bg-surface-container-low rounded-full overflow-hidden">
+                      <div 
+                        className="h-full rounded-full bg-primary transition-all duration-500"
+                        style={{ width: `${item.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </aside>
 
         {/* Expense History & Installments Tabs */}
@@ -427,7 +545,11 @@ export const ProjectDetail: React.FC = () => {
 
             <div className="text-xs font-bold text-on-surface-variant/70">
               {activeTab === 'transactions' 
-                ? `${transactions.length} registros` 
+                ? (filteredTransactions.length === 0 
+                    ? '0 movimientos' 
+                    : (hasMore 
+                        ? `Mostrando ${paginatedTransactions.length} de ${filteredTransactions.length} movimientos` 
+                        : `${filteredTransactions.length} movimiento${filteredTransactions.length > 1 ? 's' : ''}`))
                 : activeTab === 'installments' 
                   ? `${projectInstallmentPlans.length} planes activos` 
                   : `${transferStats.inTransfers.length} compras / cambios`}
@@ -436,7 +558,66 @@ export const ProjectDetail: React.FC = () => {
 
           {/* TAB 1: Transactions History */}
           {activeTab === 'transactions' && (
-            <div>
+            <div className="space-y-4">
+              {/* Search & Filters Bar */}
+              {transactions.length > 0 && (
+                <div className="bg-surface-container-lowest p-4 rounded-2xl border border-on-surface/10 space-y-3 shadow-xs">
+                  {/* Search Input */}
+                  <div className="relative">
+                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40" />
+                    <input 
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Buscar por descripción, concepto o categoría..."
+                      className="w-full bg-surface-container-low border border-on-surface/10 rounded-xl pl-9 pr-8 py-2 text-xs font-bold text-on-surface placeholder:text-on-surface-variant/40 outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                    />
+                    {searchQuery && (
+                      <button 
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 hover:text-on-surface p-0.5"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Filter Chips: Authors & Categories */}
+                  <div className="pt-1 border-t border-on-surface/5">
+                    {/* Authors Filter */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/50 mr-1 shrink-0">Por:</span>
+                      <button
+                        onClick={() => setFilterAuthor('all')}
+                        className={cn(
+                          "px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all shrink-0",
+                          filterAuthor === 'all'
+                            ? "bg-primary text-white shadow-xs"
+                            : "bg-surface-container-low text-on-surface-variant/70 hover:bg-surface-container"
+                        )}
+                      >
+                        Todos
+                      </button>
+                      {members.map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => setFilterAuthor(m.id)}
+                          className={cn(
+                            "px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all shrink-0 truncate max-w-[120px]",
+                            filterAuthor === m.id
+                              ? "bg-primary text-white shadow-xs"
+                              : "bg-surface-container-low text-on-surface-variant/70 hover:bg-surface-container"
+                          )}
+                        >
+                          {m.name || 'Usuario'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Transaction List or Empty State */}
               {transactions.length === 0 ? (
                 <div className="bg-surface-container-low/50 border-2 border-dashed border-on-surface/10 rounded-[2.5rem] p-16 text-center">
                   <div className="w-20 h-20 bg-on-surface/5 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -445,9 +626,20 @@ export const ProjectDetail: React.FC = () => {
                   <h3 className="text-xl font-bold text-on-surface mb-2">Sin gastos registrados</h3>
                   <p className="text-on-surface-variant/70 max-w-xs mx-auto">Comienza a registrar los gastos compartidos de este proyecto.</p>
                 </div>
+              ) : filteredTransactions.length === 0 ? (
+                <div className="bg-surface-container-low/50 border-2 border-dashed border-on-surface/10 rounded-3xl p-12 text-center space-y-2">
+                  <p className="text-sm font-bold text-on-surface">No se encontraron movimientos con los filtros aplicados</p>
+                  <p className="text-xs text-on-surface-variant/60">Prueba cambiando el término de búsqueda o el colaborador seleccionado.</p>
+                  <button
+                    onClick={() => { setSearchQuery(''); setFilterAuthor('all'); }}
+                    className="mt-2 px-4 py-1.5 rounded-xl bg-primary text-white text-xs font-bold hover:opacity-90 transition-opacity"
+                  >
+                    Restablecer filtros
+                  </button>
+                </div>
               ) : (
                 <div className="space-y-4">
-                  {transactions.map((t) => {
+                  {paginatedTransactions.map((t) => {
                     const cat = categories.find(c => c.id === t.categoryId);
                     const member = members.find(m => m.id === t.authorId);
                     return (
@@ -514,6 +706,19 @@ export const ProjectDetail: React.FC = () => {
                       </div>
                     );
                   })}
+
+                  {/* Infinite scroll sentinel and load more fallback button */}
+                  {hasMore && (
+                    <div className="pt-3 pb-1 flex flex-col items-center gap-2">
+                      <div ref={sentinelRef} className="h-4 w-full" />
+                      <button
+                        onClick={() => setVisibleLimit(prev => Math.min(prev + 10, filteredTransactions.length))}
+                        className="px-6 py-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container border border-on-surface/10 text-xs font-bold text-on-surface transition-all active:scale-95 cursor-pointer shadow-xs"
+                      >
+                        Cargar 10 movimientos más ({filteredTransactions.length - visibleLimit} restantes)...
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

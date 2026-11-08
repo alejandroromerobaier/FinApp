@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plane, Home, PlusCircle, Share2, Edit3, Trash2, Eye, MoreVertical, Hourglass, Users, X, Wallet, Briefcase, Heart, ShoppingBag, Landmark, Star, Archive, CheckCircle2, Power, ArrowLeft, Check } from 'lucide-react';
 import { formatCurrency, cn, formatCurrencyInput, formatAmountForDisplay, parseFormattedAmount } from '@/src/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
-import { createProject, updateProject, deleteProject, removeMemberFromProject, inviteUserToProjectByEmail, updateUserProfile } from '../services/firestoreService';
+import { createProject, updateProject, deleteProject, removeMemberFromProject, inviteUserToProjectByEmail, updateUserProfile, getUsersByIds } from '../services/firestoreService';
 import { PROJECT_COLOR_OPTIONS } from '../lib/constants';
 
 const PROJECT_ICONS = [
@@ -31,13 +31,14 @@ export const isProjectOwner = (project: any, userId?: string): boolean => {
 
 export const SharedProjects: React.FC = () => {
   const navigate = useNavigate();
-  const { projects, loading } = useData();
+  const { projects, loading, transactions } = useData();
   const { user, profile } = useAuth();
   const [activeTab, setActiveTab] = useState<'active' | 'inactive'>('active');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<any>(null);
   const [selectedProject, setSelectedProject] = useState<any>(null);
+  const [membersMap, setMembersMap] = useState<Record<string, any>>({});
   const [formData, setFormData] = useState({ 
     name: '', 
     icon: 'plane', 
@@ -54,6 +55,48 @@ export const SharedProjects: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [inviteError, setInviteError] = useState('');
   const [saveError, setSaveError] = useState('');
+
+  // Fetch real user metadata for all project members
+  useEffect(() => {
+    const allMemberIds = new Set<string>();
+    projects.forEach(p => {
+      p.memberIds?.forEach((mid: string) => allMemberIds.add(mid));
+      if (p.ownerId) allMemberIds.add(p.ownerId);
+    });
+    if (user?.uid) allMemberIds.add(user.uid);
+
+    const ids = Array.from(allMemberIds);
+    if (ids.length > 0) {
+      getUsersByIds(ids).then(users => {
+        if (users) {
+          const map: Record<string, any> = {};
+          users.forEach((u: any) => {
+            map[u.id] = u;
+          });
+          setMembersMap(map);
+        }
+      });
+    }
+  }, [projects, user?.uid]);
+
+  // Compute current month expenses per project
+  const projectMonthlyTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    transactions.forEach(t => {
+      const pId = t.projectId || 'personal';
+      if (t.type === 'expense') {
+        const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+        if (!isNaN(tDate.getTime()) && tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear) {
+          totals[pId] = (totals[pId] || 0) + (t.amount || 0);
+        }
+      }
+    });
+    return totals;
+  }, [transactions]);
 
   const myProjects = useMemo(() => projects.filter(p => isProjectOwner(p, user?.uid)).map(p => ({
     ...p,
@@ -323,6 +366,8 @@ export const SharedProjects: React.FC = () => {
                 project={project} 
                 isOwner={true}
                 isDefault={(profile?.defaultProjectId || 'personal') === project.id}
+                monthlyTotal={projectMonthlyTotals[project.id] || 0}
+                membersMap={membersMap}
                 onEdit={() => handleOpenModal(project)}
                 onToggleStatus={() => handleToggleStatus(project)}
                 onDelete={project.isPersonal ? undefined : () => handleDelete(project.id)}
@@ -350,6 +395,8 @@ export const SharedProjects: React.FC = () => {
                 project={project} 
                 isOwner={isProjectOwner(project, user?.uid)}
                 isDefault={(profile?.defaultProjectId || 'personal') === project.id}
+                monthlyTotal={projectMonthlyTotals[project.id] || 0}
+                membersMap={membersMap}
                 onEdit={() => handleOpenModal(project)}
                 onInvite={() => handleOpenInvite(project)}
                 onToggleStatus={() => handleToggleStatus(project)}
@@ -721,6 +768,8 @@ interface ProjectCardProps {
   project: any;
   isOwner: boolean;
   isDefault?: boolean;
+  monthlyTotal?: number;
+  membersMap?: Record<string, any>;
   onEdit?: () => void;
   onDelete?: () => void;
   onInvite?: () => void;
@@ -729,30 +778,68 @@ interface ProjectCardProps {
   onView: () => void;
 }
 
-const ProjectCard: React.FC<ProjectCardProps> = ({ project, isOwner, isDefault, onEdit, onDelete, onInvite, onLeave, onToggleStatus, onView }) => {
+const ProjectCard: React.FC<ProjectCardProps> = ({ 
+  project, 
+  isOwner, 
+  isDefault, 
+  monthlyTotal = 0,
+  membersMap = {},
+  onEdit, 
+  onDelete, 
+  onInvite, 
+  onLeave, 
+  onToggleStatus, 
+  onView 
+}) => {
   const Icon = PROJECT_ICONS.find(i => i.id === project.icon)?.icon || Plane;
   const isInactive = project.status === 'inactive';
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+
+  // Collect real member objects
+  const projectMemberIds: string[] = useMemo(() => {
+    const list: string[] = [];
+    if (project.ownerId) list.push(project.ownerId);
+    if (Array.isArray(project.memberIds)) {
+      project.memberIds.forEach((id: string) => {
+        if (!list.includes(id)) list.push(id);
+      });
+    }
+    return list;
+  }, [project.ownerId, project.memberIds]);
+
+  const membersList = useMemo(() => {
+    return projectMemberIds.map(id => {
+      if (membersMap[id]) return membersMap[id];
+      if (id === 'personal' || project.isPersonal) return { id, name: 'Personal' };
+      return { id, name: 'Usuario' };
+    });
+  }, [projectMemberIds, membersMap, project.isPersonal]);
+
+  const displayMembers = membersList.slice(0, 3);
+  const extraMembersCount = Math.max(0, membersList.length - 3);
 
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className={cn(
-        "bg-surface-container-lowest rounded-[2rem] p-5 sm:p-8 border border-on-surface/10 shadow-sm hover:shadow-md transition-all group",
+        "bg-surface-container-lowest rounded-[2rem] p-5 sm:p-7 border border-on-surface/10 shadow-sm hover:shadow-md transition-all group relative",
         isInactive && "opacity-75 bg-surface-container-low/50"
       )}
     >
-      <div className="flex justify-between items-start gap-3 mb-6">
-        <div className="flex items-center gap-3 sm:gap-5 min-w-0 flex-1">
+      <div className="flex justify-between items-start gap-3 mb-5">
+        <div className="flex items-start gap-3.5 sm:gap-5 min-w-0 flex-1">
           <div className={cn(
-            "w-12 h-12 sm:w-16 sm:h-16 rounded-[18px] sm:rounded-[22px] flex items-center justify-center shrink-0",
+            "w-12 h-12 sm:w-16 sm:h-16 rounded-[18px] sm:rounded-[22px] flex items-center justify-center shrink-0 mt-0.5",
             isInactive ? "bg-on-surface/10 text-on-surface-variant" : isOwner ? "bg-primary/5 text-primary" : "bg-secondary/5 text-secondary"
           )}>
             <Icon className="w-6 h-6 sm:w-8 sm:h-8" strokeWidth={2.5} />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-xl sm:text-2xl font-extrabold text-on-surface tracking-tight font-headline group-hover:text-primary transition-colors truncate">{project.name}</h3>
-            <div className="flex items-center gap-1.5 sm:gap-2 mt-1.5 flex-wrap">
+            <h3 className="text-lg sm:text-2xl font-extrabold text-on-surface tracking-tight font-headline group-hover:text-primary transition-colors break-words leading-tight">
+              {project.name}
+            </h3>
+            <div className="flex items-center gap-1.5 sm:gap-2 mt-2 flex-wrap">
               <span className={cn(
                 "text-[10px] font-extrabold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg uppercase tracking-wider shrink-0",
                 isOwner ? "bg-primary/10 text-primary" : "bg-secondary/10 text-secondary"
@@ -771,14 +858,99 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, isOwner, isDefault, 
                   PREDETERMINADO
                 </span>
               )}
-              <span className="text-on-surface-variant/70 text-xs sm:text-sm font-medium flex items-center gap-1 shrink-0">
-                <Users size={14} />
-                {project.memberIds?.length || 1}
+              <span className="bg-surface-container-high/60 text-on-surface-variant text-[10px] font-black uppercase px-2 py-0.5 rounded-md shrink-0">
+                {project.currency || 'ARS'}
+              </span>
+              <span className="text-on-surface-variant/70 text-xs font-medium flex items-center gap-1 shrink-0">
+                <Users size={13} />
+                {membersList.length}
               </span>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+
+        {/* Mobile Actions Button with Dropdown (prevents squishing title on mobile) */}
+        <div className="sm:hidden relative shrink-0">
+          <button 
+            type="button"
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
+            className="p-2 text-on-surface-variant/60 hover:text-on-surface hover:bg-on-surface/5 rounded-xl transition-all"
+            title="Opciones de la bóveda"
+          >
+            <MoreVertical size={20} />
+          </button>
+
+          <AnimatePresence>
+            {showMobileMenu && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setShowMobileMenu(false)}
+                />
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95, y: -5 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                  className="absolute right-0 top-full mt-1 w-52 bg-surface-container-lowest border border-on-surface/10 rounded-2xl shadow-xl z-50 py-1.5 overflow-hidden"
+                >
+                  {onEdit && (
+                    <button 
+                      type="button"
+                      onClick={() => { setShowMobileMenu(false); onEdit(); }}
+                      className="w-full px-4 py-2.5 text-left text-xs font-bold text-on-surface hover:bg-on-surface/5 flex items-center gap-2.5 transition-colors"
+                    >
+                      <Edit3 size={15} className="text-primary" />
+                      Editar Bóveda
+                    </button>
+                  )}
+                  {onInvite && (
+                    <button 
+                      type="button"
+                      onClick={() => { setShowMobileMenu(false); onInvite(); }}
+                      className="w-full px-4 py-2.5 text-left text-xs font-bold text-on-surface hover:bg-on-surface/5 flex items-center gap-2.5 transition-colors"
+                    >
+                      <Share2 size={15} className="text-secondary" />
+                      Invitar Colaborador
+                    </button>
+                  )}
+                  {onToggleStatus && (
+                    <button 
+                      type="button"
+                      onClick={() => { setShowMobileMenu(false); onToggleStatus(); }}
+                      className="w-full px-4 py-2.5 text-left text-xs font-bold text-on-surface hover:bg-on-surface/5 flex items-center gap-2.5 transition-colors"
+                    >
+                      <Power size={15} className={isInactive ? "text-emerald-600" : "text-amber-600"} />
+                      {isInactive ? "Reactivar Bóveda" : "Inactivar / Archivar"}
+                    </button>
+                  )}
+                  {isOwner && onDelete && (
+                    <button 
+                      type="button"
+                      onClick={() => { setShowMobileMenu(false); onDelete(); }}
+                      className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-600 hover:bg-rose-500/10 flex items-center gap-2.5 border-t border-on-surface/5 transition-colors"
+                    >
+                      <Trash2 size={15} />
+                      Eliminar Bóveda
+                    </button>
+                  )}
+                  {!isOwner && onLeave && (
+                    <button 
+                      type="button"
+                      onClick={() => { setShowMobileMenu(false); onLeave(); }}
+                      className="w-full px-4 py-2.5 text-left text-xs font-bold text-rose-600 hover:bg-rose-500/10 flex items-center gap-2.5 border-t border-on-surface/5 transition-colors"
+                    >
+                      <X size={15} />
+                      Salir del Proyecto
+                    </button>
+                  )}
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Desktop Actions Bar */}
+        <div className="hidden sm:flex items-center gap-1 sm:gap-1.5 shrink-0">
           {onToggleStatus && (
             <button 
               onClick={onToggleStatus}
@@ -830,19 +1002,48 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, isOwner, isDefault, 
         </div>
       </div>
 
-      <div className="flex items-center justify-between pt-4 border-t border-on-surface/10">
-        <div className="flex -space-x-3">
-          {/* Mock avatars for now, in a real app these would be member profile pics */}
-          <div className="w-10 h-10 rounded-full border-4 border-surface-container-lowest bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">U1</div>
-          {project.memberIds?.length > 1 && (
-            <div className="w-10 h-10 rounded-full border-4 border-surface-container-lowest bg-secondary/10 flex items-center justify-center text-[10px] font-bold text-secondary">U2</div>
-          )}
+      {/* Footer with Real Member Avatars, Monthly Expense KPI & View Details Button */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-on-surface/10">
+        <div className="flex items-center justify-between sm:justify-start gap-3 sm:gap-4 flex-wrap">
+          {/* Real Avatars Stack */}
+          <div className="flex -space-x-2.5 overflow-hidden py-0.5">
+            {displayMembers.map((m, idx) => (
+              <div 
+                key={m.id || idx} 
+                title={m.name || 'Colaborador'}
+                className="w-9 h-9 rounded-full border-2 border-surface-container-lowest bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary shadow-xs overflow-hidden shrink-0"
+              >
+                {m.photoURL ? (
+                  <img src={m.photoURL} alt={m.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <span>{(m.name || 'U').substring(0, 2).toUpperCase()}</span>
+                )}
+              </div>
+            ))}
+            {extraMembersCount > 0 && (
+              <div 
+                title={`+${extraMembersCount} colaboradores más`}
+                className="w-9 h-9 rounded-full border-2 border-surface-container-lowest bg-surface-container-high flex items-center justify-center text-[10px] font-black text-on-surface-variant shadow-xs shrink-0"
+              >
+                +{extraMembersCount}
+              </div>
+            )}
+          </div>
+
+          {/* Current Month Spending Pill */}
+          <div className="bg-surface-container-low px-3 py-1.5 rounded-xl border border-on-surface/5 flex items-center gap-1.5 text-xs">
+            <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/60">Mes:</span>
+            <span className="font-bold font-mono text-on-surface">
+              {formatCurrency(monthlyTotal, project.currency || 'ARS')}
+            </span>
+          </div>
         </div>
+
         <button 
           onClick={onView}
-          className="bg-primary text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:opacity-90 transition-all active:scale-95 shadow-md shadow-primary/20"
+          className="w-full sm:w-auto bg-primary text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-all active:scale-95 shadow-md shadow-primary/20 cursor-pointer"
         >
-          <Eye size={18} />
+          <Eye size={16} />
           Ver Detalles
         </button>
       </div>
