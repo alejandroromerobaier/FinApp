@@ -40,17 +40,24 @@ export const ManageCategories: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [reassignTo, setReassignTo] = useState<string | null>(null);
 
+  const modalContainerRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-focus and select name input when opening modal
+  // Auto-focus and select name input when opening modal without scrolling past the top
   useEffect(() => {
     if (showAddModal) {
+      if (modalContainerRef.current) {
+        modalContainerRef.current.scrollTop = 0;
+      }
       const timer = setTimeout(() => {
         if (nameInputRef.current) {
-          nameInputRef.current.focus();
+          nameInputRef.current.focus({ preventScroll: true });
           nameInputRef.current.select();
         }
-      }, 100);
+        if (modalContainerRef.current) {
+          modalContainerRef.current.scrollTop = 0;
+        }
+      }, 50);
       return () => clearTimeout(timer);
     }
   }, [showAddModal]);
@@ -325,6 +332,7 @@ export const ManageCategories: React.FC = () => {
               className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]"
             />
             <motion.div 
+              ref={modalContainerRef}
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
@@ -384,7 +392,6 @@ export const ManageCategories: React.FC = () => {
                     onChange={(e) => setNewName(e.target.value)}
                     placeholder="Ej. Supermercado, Alquiler, Gimnasio..."
                     className="w-full bg-surface-container-low border border-on-surface/10 rounded-2xl p-4 text-base font-bold text-on-surface placeholder:text-on-surface-variant/30 focus:ring-2 focus:ring-primary/20 outline-none"
-                    autoFocus
                   />
                 </div>
 
