@@ -15,7 +15,9 @@ import {
   getShortcuts,
   Shortcut,
   CreditCard,
-  getCards
+  getCards,
+  checkCardDueAlerts,
+  checkMonthlyReportAlert
 } from '../services/firestoreService';
 import { useAuth } from './AuthContext';
 import { getLocalMonth } from './dateUtils';
@@ -164,7 +166,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Sync cards
     const unsubscribeCards = getCards((data: CreditCard[]) => {
       setCards(data);
+      if (user && data.length > 0) {
+        checkCardDueAlerts(user.uid, data);
+      }
     });
+
+    // Check monthly report alert
+    checkMonthlyReportAlert(user.uid);
 
     return () => {
       unsubscribeNotifs();
