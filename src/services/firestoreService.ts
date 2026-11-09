@@ -1209,20 +1209,37 @@ export const recalculateBudgetAlertsForCategory = async (
       }
     }
 
-    // 2. Buscar alertas existentes para este mes, categoría y contexto (solo index simple por userId)
+    // 2. Buscar alertas existentes para este mes, categoría y contexto
     const existingAlertsByUser: { [uid: string]: any[] } = {};
-    for (const uid of targetUserIds) {
+    if (projectId) {
+      // En proyectos compartidos consultamos por data.projectId
       const qNotif = query(
         collection(db, 'notifications'),
-        where('userId', '==', uid)
+        where('data.projectId', '==', projectId)
       );
       const notifSnap = await getDocs(qNotif);
-      existingAlertsByUser[uid] = notifSnap.docs.filter(docSnap => {
+      const projectAlerts = notifSnap.docs.filter(docSnap => {
+        const d = docSnap.data();
+        return d.type === 'budget_alert' &&
+               d.data?.month === month && 
+               d.data?.categoryId === categoryId;
+      });
+      for (const uid of targetUserIds) {
+        existingAlertsByUser[uid] = projectAlerts.filter(d => d.data().userId === uid);
+      }
+    } else {
+      // En presupuestos personales consultamos únicamente las del usuario actual
+      const qNotif = query(
+        collection(db, 'notifications'),
+        where('userId', '==', currentUserId)
+      );
+      const notifSnap = await getDocs(qNotif);
+      existingAlertsByUser[currentUserId] = notifSnap.docs.filter(docSnap => {
         const d = docSnap.data();
         return d.type === 'budget_alert' &&
                d.data?.month === month && 
                d.data?.categoryId === categoryId && 
-               (projectId ? d.data?.projectId === projectId : !d.data?.projectId);
+               !d.data?.projectId;
       });
     }
 
