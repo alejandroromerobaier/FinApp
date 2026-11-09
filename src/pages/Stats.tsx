@@ -7,7 +7,8 @@ import {
 import { 
   Calendar, TrendingUp, TrendingDown, Wallet, Layers, Loader2, ChevronLeft, 
   ArrowUpRight, ArrowDownRight, Activity, PieChart as PieChartIcon, 
-  BarChart3, Info, Clock, CreditCard, Target, Zap, Globe, PiggyBank
+  BarChart3, Info, Clock, CreditCard, Target, Zap, Globe, PiggyBank,
+  AlertTriangle, AlertCircle
 } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
 import { getTransactions, getBudgets } from '../services/firestoreService';
@@ -15,6 +16,7 @@ import { getLocalMonth } from '../lib/dateUtils';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { getCategoryIcon } from '../lib/categoryIcons';
 
 type TimeRange = 'today' | 'week' | 'month' | 'lastMonth' | 'year';
 
@@ -54,6 +56,11 @@ const getHexFromClass = (className: string) => {
   if (COLOR_MAP[clean]) return COLOR_MAP[clean];
 
   return '#cbd5e1';
+};
+
+const CategoryIconBadge = ({ name, size = 14 }: { name?: string; size?: number }) => {
+  const Icon = getCategoryIcon(name || 'Tag');
+  return <Icon size={size} />;
 };
 
 export const Stats: React.FC = () => {
@@ -213,7 +220,9 @@ export const Stats: React.FC = () => {
         const sampleTx = expenses.find(t => t.categoryId === id);
         
         return {
+          id,
           name: cat?.name || sampleTx?.categoryName || (id ? 'Cargando...' : 'Otros'),
+          icon: cat?.icon || sampleTx?.categoryIcon || 'Tag',
           value: (value / (totalExpenses || 1)) * 100,
           amount: value,
           color: getHexFromClass(cat?.color || sampleTx?.categoryColor || '')
@@ -231,7 +240,9 @@ export const Stats: React.FC = () => {
         const sampleTx = income.find(t => t.categoryId === id);
         
         return {
+          id,
           name: cat?.name || sampleTx?.categoryName || (id ? 'Cargando...' : 'Otros'),
+          icon: cat?.icon || sampleTx?.categoryIcon || 'Tag',
           value: (value / (totalIncome || 1)) * 100,
           amount: value,
           color: getHexFromClass(cat?.color || sampleTx?.categoryColor || '')
@@ -439,33 +450,103 @@ export const Stats: React.FC = () => {
       }).sort((a, b) => b.amount - a.amount);
 
       // Insights
-      const insights = [];
+      interface InsightCardData {
+        id: string;
+        badge: string;
+        badgeClass: string;
+        title: string;
+        description: string;
+        advice?: string;
+        iconName: string;
+      }
+
+      const insights: InsightCardData[] = [];
       const currentDist = viewType === 'expense' ? distribution : incomeDistribution;
-      if (currentDist.length > 0) {
-        insights.push(`Tu mayor ${viewType === 'expense' ? 'gasto' : 'ingreso'} fue en **${currentDist[0].name}**, representando el ${currentDist[0].value.toFixed(1)}% del total.`);
-      }
-      if (dailyAverage > 0 && viewType === 'expense') {
-        insights.push(`Tu gasto promedio diario es de **${formatCurrency(dailyAverage, activeCurrency)}**.`);
-      }
-      
-      const overBudget = budgetComparison.filter(b => b.isOver);
-      if (overBudget.length > 0) {
-        insights.push(`Has superado el presupuesto en **${overBudget.length}** ${overBudget.length === 1 ? 'categoría' : 'categorías'}.`);
-      }
 
       if (savingsRate !== null && totalIncome > 0) {
         if (savingsRate >= 20) {
-          insights.push(`¡Excelente tasa de ahorro! Retuviste el **${savingsRate.toFixed(1)}%** de tus ingresos este período.`);
+          insights.push({
+            id: 'savings-optimal',
+            badge: 'LOGRO DE AHORRO',
+            badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
+            title: `Tasa de ahorro óptima (${savingsRate.toFixed(1)}%)`,
+            description: `Retuviste el ${savingsRate.toFixed(1)}% de tus ingresos con un balance favorable de ${formatCurrency(netBalance, activeCurrency)}.`,
+            advice: 'Supera la meta del 20%. ¡Excelente disciplina de retención!',
+            iconName: 'PiggyBank'
+          });
         } else if (savingsRate < 0) {
-          insights.push(`Tuviste un déficit del **${Math.abs(savingsRate).toFixed(1)}%** respecto a tus ingresos. Conviene revisar gastos.`);
+          insights.push({
+            id: 'savings-deficit',
+            badge: 'DÉFICIT FINANCIERO',
+            badgeClass: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20',
+            title: 'Desembolsos por encima del ingreso',
+            description: `Tuviste un déficit del ${Math.abs(savingsRate).toFixed(1)}% (${formatCurrency(Math.abs(netBalance), activeCurrency)} por encima de lo ingresado).`,
+            advice: 'Revisa partidas prescindibles para recomponer tu liquidez.',
+            iconName: 'AlertTriangle'
+          });
         }
+      }
+
+      if (currentDist.length > 0) {
+        insights.push({
+          id: 'top-cat',
+          badge: 'CONCENTRACIÓN',
+          badgeClass: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-500/20',
+          title: `Mayor ${viewType === 'expense' ? 'gasto' : 'ingreso'}: ${currentDist[0].name}`,
+          description: `Representa el ${currentDist[0].value.toFixed(1)}% del total (${formatCurrency(currentDist[0].amount, activeCurrency)}).`,
+          advice: viewType === 'expense' 
+            ? 'Comprueba que este rubro refleje tus verdaderas prioridades.' 
+            : 'Tu principal fuente de ingresos en este período.',
+          iconName: 'PieChart'
+        });
+      }
+
+      const overBudget = budgetComparison.filter(b => b.isOver);
+      if (overBudget.length > 0) {
+        insights.push({
+          id: 'over-budget',
+          badge: 'LÍMITE SUPERADO',
+          badgeClass: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20',
+          title: `${overBudget.length} ${overBudget.length === 1 ? 'categoría en exceso' : 'categorías en exceso'}`,
+          description: `${overBudget.map(b => b.name).slice(0, 2).join(', ')}${overBudget.length > 2 ? ` y ${overBudget.length - 2} más` : ''} excedieron su presupuesto.`,
+          advice: 'Pausa consumos no esenciales en estas categorías este mes.',
+          iconName: 'AlertCircle'
+        });
+      }
+
+      if (dailyAverage > 0 && viewType === 'expense') {
+        insights.push({
+          id: 'daily-avg',
+          badge: 'DESEMBOLSO DIARIO',
+          badgeClass: 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20',
+          title: 'Ritmo de gasto por día',
+          description: `Tu desembolso diario promedio se ubica en ${formatCurrency(dailyAverage, activeCurrency)}.`,
+          advice: 'Referencia clave para proyectar tu gasto a fin de mes.',
+          iconName: 'Clock'
+        });
       }
 
       if (expenseMoM !== null && prevExpenses > 0) {
         if (expenseMoM > 10) {
-          insights.push(`Tus gastos aumentaron un **${expenseMoM.toFixed(1)}%** ${prevPeriodLabel}.`);
+          insights.push({
+            id: 'mom-up',
+            badge: 'TENDENCIA AL ALZA',
+            badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
+            title: `Gastos en aumento (+${expenseMoM.toFixed(1)}%)`,
+            description: `Gastaste un ${expenseMoM.toFixed(1)}% más ${prevPeriodLabel} (${formatCurrency(prevExpenses, activeCurrency)} vs ${formatCurrency(totalExpenses, activeCurrency)}).`,
+            advice: 'Verifica si fue una compra extraordinaria puntual.',
+            iconName: 'TrendingUp'
+          });
         } else if (expenseMoM < -10) {
-          insights.push(`¡Bien hecho! Redujiste tus gastos un **${Math.abs(expenseMoM).toFixed(1)}%** ${prevPeriodLabel}.`);
+          insights.push({
+            id: 'mom-down',
+            badge: 'EFICIENCIA DE GASTO',
+            badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
+            title: `Reducción de gasto (-${Math.abs(expenseMoM).toFixed(1)}%)`,
+            description: `Lograste reducir tus gastos un ${Math.abs(expenseMoM).toFixed(1)}% ${prevPeriodLabel}.`,
+            advice: '¡Excelente control del presupuesto!',
+            iconName: 'TrendingDown'
+          });
         }
       }
       
@@ -821,8 +902,17 @@ export const Stats: React.FC = () => {
                     />
                     <YAxis hide />
                     <Tooltip 
-                      contentStyle={{ backgroundColor: 'white', borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', fontWeight: 'bold' }}
+                      contentStyle={{ 
+                        backgroundColor: 'var(--color-surface-container-lowest)', 
+                        color: 'var(--color-on-surface)',
+                        borderRadius: '16px', 
+                        border: '1px solid var(--color-surface-container-low)', 
+                        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15)', 
+                        fontWeight: 'bold',
+                        fontSize: '12px'
+                      }}
                       itemStyle={{ color: viewType === 'expense' ? '#f43f5e' : '#10b981' }}
+                      formatter={(val: any) => [formatCurrency(Number(val), stats.activeCurrency), viewType === 'expense' ? 'Gasto' : 'Ingreso']}
                     />
                     <Area 
                       type="monotone" 
@@ -954,18 +1044,45 @@ export const Stats: React.FC = () => {
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
-                      <span className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">Top</span>
-                      <span className="text-sm font-bold text-on-surface truncate w-full">{(viewType === 'expense' ? stats.topExpenseCategory : stats.topIncomeCategory).name}</span>
+                      <span className="text-[9px] font-black text-on-surface-variant/50 uppercase tracking-widest">
+                        {viewType === 'expense' ? 'Gasto Top' : 'Ingreso Top'}
+                      </span>
+                      <span className="text-xs font-black text-on-surface truncate w-full px-2">
+                        {(viewType === 'expense' ? stats.topExpenseCategory : stats.topIncomeCategory).name}
+                      </span>
+                      <span className="text-[11px] font-mono font-bold text-primary mt-0.5">
+                        {((viewType === 'expense' ? stats.topExpenseCategory : stats.topIncomeCategory).value || 0).toFixed(1)}%
+                      </span>
                     </div>
                   </div>
-                  <div className="w-full mt-6 space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                  <div className="w-full mt-6 space-y-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
                     {(viewType === 'expense' ? stats.distribution : stats.incomeDistribution).map((item) => (
-                      <div key={item.name} className="flex justify-between items-center p-3 bg-on-surface/[0.02] rounded-xl hover:bg-on-surface/5 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></div>
-                          <span className="text-xs font-semibold text-on-surface/80">{item.name}</span>
+                      <div key={item.name} className="relative overflow-hidden p-2.5 bg-surface-container-low/40 rounded-xl hover:bg-surface-container-low transition-colors border border-on-surface/5">
+                        <div 
+                          className="absolute left-0 top-0 bottom-0 bg-on-surface/[0.03] -z-10 rounded-xl"
+                          style={{ width: `${Math.min(item.value, 100)}%` }}
+                        />
+                        <div className="flex justify-between items-center gap-2 relative z-10">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div 
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0 shadow-xs" 
+                              style={{ backgroundColor: item.color }}
+                            >
+                              <CategoryIconBadge name={item.icon} size={13} />
+                            </div>
+                            <div className="truncate">
+                              <span className="text-xs font-bold text-on-surface block truncate">{item.name}</span>
+                              <span className="text-[10px] font-mono text-on-surface-variant/60 block">
+                                {formatCurrency(item.amount, stats.activeCurrency)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="text-xs font-mono font-black text-on-surface bg-surface-container-lowest px-2 py-0.5 rounded-md border border-on-surface/5">
+                              {item.value.toFixed(1)}%
+                            </span>
+                          </div>
                         </div>
-                        <span className="text-xs font-bold text-on-surface/40">{item.value.toFixed(1)}%</span>
                       </div>
                     ))}
                   </div>
@@ -1123,17 +1240,47 @@ export const Stats: React.FC = () => {
             )}
 
 
-            {/* Insights Row */}
+            {/* Financial Intelligence / Insights Row */}
             {stats.insights.length > 0 && (
-              <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {stats.insights.map((insight, i) => (
-                  <div key={i} className="flex items-start gap-4 p-6 bg-surface-container-lowest rounded-[2rem] border border-on-surface/5 shadow-sm">
-                    <div className="bg-primary/10 p-2.5 rounded-full text-primary shrink-0">
-                      <Zap size={18} />
-                    </div>
-                    <p className="text-sm text-on-surface-variant leading-relaxed" dangerouslySetInnerHTML={{ __html: insight }} />
-                  </div>
-                ))}
+              <section className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Zap size={18} className="text-primary" />
+                  <h3 className="text-base font-bold text-on-surface tracking-tight">Inteligencia Financiera</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {stats.insights.map((insight) => (
+                    <motion.div 
+                      key={insight.id} 
+                      whileHover={{ y: -2 }}
+                      className="p-5 bg-surface-container-lowest rounded-[1.5rem] border border-on-surface/10 shadow-sm flex flex-col justify-between space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={cn("text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border", insight.badgeClass)}>
+                          {insight.badge}
+                        </span>
+                        <div className="w-7 h-7 rounded-lg bg-on-surface/5 flex items-center justify-center text-on-surface-variant">
+                          {insight.iconName === 'PiggyBank' ? <PiggyBank size={14} className="text-emerald-500" /> :
+                           insight.iconName === 'AlertTriangle' ? <AlertTriangle size={14} className="text-rose-500" /> :
+                           insight.iconName === 'AlertCircle' ? <AlertCircle size={14} className="text-rose-500" /> :
+                           insight.iconName === 'Clock' ? <Clock size={14} className="text-purple-500" /> :
+                           insight.iconName === 'TrendingUp' ? <TrendingUp size={14} className="text-amber-500" /> :
+                           insight.iconName === 'TrendingDown' ? <TrendingDown size={14} className="text-emerald-500" /> :
+                           <PieChartIcon size={14} className="text-indigo-500" />}
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <h4 className="text-xs font-black text-on-surface tracking-tight leading-snug">{insight.title}</h4>
+                        <p className="text-[11px] text-on-surface-variant leading-relaxed font-medium">{insight.description}</p>
+                      </div>
+                      {insight.advice && (
+                        <div className="pt-2 border-t border-on-surface/5 flex items-start gap-1.5 text-[10px] text-on-surface-variant/70 leading-relaxed font-medium">
+                          <span className="shrink-0 text-xs">💡</span>
+                          <span>{insight.advice}</span>
+                        </div>
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
               </section>
             )}
           </>
