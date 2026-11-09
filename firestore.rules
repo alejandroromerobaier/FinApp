@@ -142,22 +142,7 @@ service cloud.firestore {
     }
     // Notifications
     match /notifications/{notifId} {
-      allow read: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        (resource.data.data.projectId != null && isProjectMember(resource.data.data.projectId)) ||
-        isAdmin()
-      );
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        (resource.data.data.projectId != null && isProjectMember(resource.data.data.projectId)) ||
-        isAdmin()
-      );
-      allow delete: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        (resource.data.data.projectId != null && isProjectMember(resource.data.data.projectId)) ||
-        isAdmin()
-      );
+      allow read, create, update, delete: if isAuthenticated();
     }
 
     // Budgets

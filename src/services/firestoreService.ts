@@ -1028,18 +1028,44 @@ export const syncNotificationsOnExpenseUpdated = async (
     const finalProjectId = updatedTransaction.projectId || null;
     const oldProjectId = oldTransaction?.projectId || null;
 
-    // Buscar notificaciones vinculadas a esta transacción
+    console.log(`[SyncNotif] Syncing notifications for tx: ${transactionId}, finalProjectId: ${finalProjectId}`);
+
+    // 1. Buscar primero por data.transactionId
+    let notifsDocs: any[] = [];
     const qNotifs = query(
       collection(db, 'notifications'),
       where('data.transactionId', '==', transactionId)
     );
     const notifsSnap = await getDocs(qNotifs);
+    notifsDocs = [...notifsSnap.docs];
+
+    // 2. Fallback: Si no se encontraron por transactionId y hay un proyecto compartido,
+    // buscar en las notificaciones del proyecto que sean de tipo expense_added
+    if (notifsDocs.length === 0 && finalProjectId) {
+      const qProject = query(
+        collection(db, 'notifications'),
+        where('data.projectId', '==', finalProjectId)
+      );
+      const pSnap = await getDocs(qProject);
+      const targetCat = oldTransaction?.categoryName || updatedTransaction?.categoryName;
+      notifsDocs = pSnap.docs.filter(d => {
+        const data = d.data();
+        if (data.type !== 'expense_added') return false;
+        if (!data.data?.transactionId) {
+          if (targetCat && data.data?.categoryName === targetCat) return true;
+          return true;
+        }
+        return false;
+      });
+    }
+
+    console.log(`[SyncNotif] Found ${notifsDocs.length} collaborator notifications to update`);
 
     // Caso A: No estaba en un proyecto compartido y ahora sí
     if (!oldProjectId && finalProjectId) {
       await notifyCollaboratorsOnExpenseAdded({
-        id: transactionId,
         ...updatedTransaction,
+        id: transactionId,
         projectId: finalProjectId
       });
       return;
@@ -1047,13 +1073,13 @@ export const syncNotificationsOnExpenseUpdated = async (
 
     // Caso B: Estaba en un proyecto y se quitó o cambió de proyecto
     if (oldProjectId && (!finalProjectId || finalProjectId !== oldProjectId)) {
-      for (const docSnap of notifsSnap.docs) {
+      for (const docSnap of notifsDocs) {
         await deleteDoc(docSnap.ref);
       }
       if (finalProjectId) {
         await notifyCollaboratorsOnExpenseAdded({
-          id: transactionId,
           ...updatedTransaction,
+          id: transactionId,
           projectId: finalProjectId
         });
       }
@@ -1064,10 +1090,11 @@ export const syncNotificationsOnExpenseUpdated = async (
     if (!finalProjectId) return;
 
     // Si aún no existía la notificación por compatibilidad histórica
-    if (notifsSnap.empty) {
+    if (notifsDocs.length === 0) {
+      console.log('[SyncNotif] No existing notification found, creating new one for collaborators');
       await notifyCollaboratorsOnExpenseAdded({
-        id: transactionId,
         ...updatedTransaction,
+        id: transactionId,
         projectId: finalProjectId
       });
       return;
@@ -1091,30 +1118,17 @@ export const syncNotificationsOnExpenseUpdated = async (
       updatedContent = `${authorName} actualizó la compra financiada a ${formattedAmount} (${updatedTransaction.totalInstallments} cuotas de ${formattedInstallment}) en "${projectName}" (${catName})`;
     }
 
-    for (const docSnap of notifsSnap.docs) {
-      const notifData = docSnap.data();
-      const wasRead = !!notifData.isRead;
-
-      if (wasRead) {
-        // Enfoque 3: Ya leída -> marcar como modificada y pasar a no leída para notificar el cambio
-        await updateDoc(docSnap.ref, {
-          content: updatedContent,
-          isRead: false,
-          'data.amount': updatedTransaction.amount,
-          'data.categoryName': catName,
-          'data.isModified': true,
-          updatedAt: serverTimestamp()
-        });
-      } else {
-        // Enfoque 3: No leída -> actualización silenciosa en el lugar
-        await updateDoc(docSnap.ref, {
-          content: updatedContent,
-          'data.amount': updatedTransaction.amount,
-          'data.categoryName': catName,
-          'data.isModified': false,
-          updatedAt: serverTimestamp()
-        });
-      }
+    for (const docSnap of notifsDocs) {
+      console.log(`[SyncNotif] Updating notification doc: ${docSnap.id} with new amount: ${updatedTransaction.amount}`);
+      await updateDoc(docSnap.ref, {
+        content: updatedContent,
+        isRead: false,
+        'data.transactionId': transactionId,
+        'data.amount': updatedTransaction.amount,
+        'data.categoryName': catName,
+        'data.isModified': true,
+        updatedAt: serverTimestamp()
+      });
     }
   } catch (err) {
     console.error('Error syncing notifications on expense updated:', err);
@@ -1453,14 +1467,14 @@ export const addTransaction = async (transaction: any) => {
 
     // Notify collaborators if in a shared project
     if (finalProjectId) {
-      notifyCollaboratorsOnExpenseAdded({ id: docRef.id, ...transaction, projectId: finalProjectId }).catch(err =>
+      notifyCollaboratorsOnExpenseAdded({ ...transaction, id: docRef.id, projectId: finalProjectId }).catch(err =>
         console.error('Collaborator notification error:', err)
       );
     }
 
     // Check budget thresholds if expense
     if (transaction.type === 'expense') {
-      checkAndNotifyBudgetAlerts({ id: docRef.id, ...transaction, projectId: finalProjectId, date: transactionDate }).catch(err =>
+      checkAndNotifyBudgetAlerts({ ...transaction, id: docRef.id, projectId: finalProjectId, date: transactionDate }).catch(err =>
         console.error('Budget alert error:', err)
       );
     }
@@ -1550,7 +1564,7 @@ export const updateTransaction = async (transactionId: string, transaction: any)
     // 1. Sincronizar notificaciones de colaboradores (Enfoque 3)
     syncNotificationsOnExpenseUpdated(
       transactionId, 
-      { id: transactionId, ...transaction, projectId: finalProjectId, date: finalDate }, 
+      { ...transaction, id: transactionId, projectId: finalProjectId, date: finalDate }, 
       prevData
     ).catch(err =>
       console.error('Error syncing notifications on update:', err)
