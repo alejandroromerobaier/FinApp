@@ -7,7 +7,7 @@ import {
 import { 
   Calendar, TrendingUp, TrendingDown, Wallet, Layers, Loader2, ChevronLeft, 
   ArrowUpRight, ArrowDownRight, Activity, PieChart as PieChartIcon, 
-  BarChart3, Info, Clock, CreditCard, Target, Zap, Globe
+  BarChart3, Info, Clock, CreditCard, Target, Zap, Globe, PiggyBank
 } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
 import { getTransactions, getBudgets } from '../services/firestoreService';
@@ -279,15 +279,102 @@ export const Stats: React.FC = () => {
         income: data.income 
       }));
 
-      // Busiest day
-      const busiestDayEntry = Object.entries(evolutionMap).sort((a, b) => (b[1].expense + b[1].income) - (a[1].expense + a[1].income))[0];
-      const busiestDay = busiestDayEntry ? busiestDayEntry[0] : 'N/A';
+      // Previous period calculation for MoM (Month over Month / Period over Period)
+      const prevPeriodLabel = 
+        timeRange === 'today' ? 'vs ayer' :
+        timeRange === 'week' ? 'vs sem. ant.' :
+        timeRange === 'year' ? 'vs año ant.' :
+        timeRange === 'lastMonth' ? 'vs mes previo' : 'vs mes ant.';
 
-      // Comparison data
-      const comparisonData = [
-        { name: 'Ingresos', value: totalIncome, color: '#10b981' },
-        { name: 'Gastos', value: totalExpenses, color: '#f43f5e' }
-      ];
+      const prevUniverse = transactions.filter(t => {
+        if (t.projectId) {
+          const proj = projects.find(p => p.id === t.projectId);
+          if (proj && proj.status === 'inactive') return false;
+        } else {
+          if (!isPersonalActive) return false;
+        }
+
+        const d = new Date(t.date);
+        if (timeRange === 'today') {
+          const yesterday = new Date(now);
+          yesterday.setDate(now.getDate() - 1);
+          return d.toDateString() === yesterday.toDateString();
+        }
+        if (timeRange === 'week') {
+          const twoWeeksAgo = new Date(now);
+          twoWeeksAgo.setDate(now.getDate() - 14);
+          const oneWeekAgo = new Date(now);
+          oneWeekAgo.setDate(now.getDate() - 7);
+          return d >= twoWeeksAgo && d < oneWeekAgo;
+        }
+        if (timeRange === 'month') {
+          const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+          const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+          return d.getMonth() === prevMonth && d.getFullYear() === prevYear;
+        }
+        if (timeRange === 'lastMonth') {
+          const twoMonthsAgoMonth = currentMonth <= 1 ? (currentMonth === 0 ? 10 : 11) : currentMonth - 2;
+          const twoMonthsAgoYear = currentMonth <= 1 ? currentYear - 1 : currentYear;
+          return d.getMonth() === twoMonthsAgoMonth && d.getFullYear() === twoMonthsAgoYear;
+        }
+        if (timeRange === 'year') {
+          return d.getFullYear() === currentYear - 1;
+        }
+        return false;
+      }).filter(t => {
+        if (filterProject === 'all') return true;
+        if (filterProject === 'personal') return !t.projectId;
+        return t.projectId === filterProject;
+      }).filter(t => {
+        const tCurrency = t.projectId 
+          ? projects.find(p => p.id === t.projectId)?.currency || 'ARS'
+          : profile?.currency || 'ARS';
+        return tCurrency === activeCurrency;
+      });
+
+      const prevExpenses = prevUniverse.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
+      const prevIncome = prevUniverse.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
+
+      // MoM Percentage Changes
+      let expenseMoM: number | null = null;
+      if (prevExpenses > 0) {
+        expenseMoM = ((totalExpenses - prevExpenses) / prevExpenses) * 100;
+      } else if (totalExpenses > 0 && prevExpenses === 0) {
+        expenseMoM = 100;
+      }
+
+      let incomeMoM: number | null = null;
+      if (prevIncome > 0) {
+        incomeMoM = ((totalIncome - prevIncome) / prevIncome) * 100;
+      } else if (totalIncome > 0 && prevIncome === 0) {
+        incomeMoM = 100;
+      }
+
+      // Tasa de Ahorro (% Savings Rate): (Ingresos - Gastos) / Ingresos * 100
+      let savingsRate: number | null = null;
+      if (totalIncome > 0) {
+        savingsRate = ((totalIncome - totalExpenses) / totalIncome) * 100;
+      } else if (totalExpenses > 0) {
+        savingsRate = -100;
+      }
+
+      // Peak day label according to viewType
+      const targetEvolutionKey = viewType === 'expense' ? 'expense' : 'income';
+      const peakDayEntry = Object.entries(evolutionMap)
+        .filter(([_, d]) => d[targetEvolutionKey] > 0)
+        .sort((a, b) => b[1][targetEvolutionKey] - a[1][targetEvolutionKey])[0];
+        
+      let peakDayLabel = 'N/A';
+      if (peakDayEntry) {
+        const peakAmount = formatCurrency(peakDayEntry[1][targetEvolutionKey], activeCurrency);
+        if (timeRange === 'month' || timeRange === 'lastMonth') {
+          peakDayLabel = `Día ${peakDayEntry[0]} (${peakAmount})`;
+        } else if (timeRange === 'week' || timeRange === 'year') {
+          peakDayLabel = `${peakDayEntry[0]} (${peakAmount})`;
+        } else {
+          peakDayLabel = `${peakDayEntry[0]} (${peakAmount})`;
+        }
+      }
 
       // Budget Comparison for the specific period's month
       const budgetComparison = periodBudgets.filter(b => {
@@ -358,12 +445,28 @@ export const Stats: React.FC = () => {
         insights.push(`Tu mayor ${viewType === 'expense' ? 'gasto' : 'ingreso'} fue en **${currentDist[0].name}**, representando el ${currentDist[0].value.toFixed(1)}% del total.`);
       }
       if (dailyAverage > 0 && viewType === 'expense') {
-        insights.push(`Tu gasto promedio diario es de ${formatCurrency(dailyAverage, selectedCurrency)}.`);
+        insights.push(`Tu gasto promedio diario es de **${formatCurrency(dailyAverage, activeCurrency)}**.`);
       }
       
       const overBudget = budgetComparison.filter(b => b.isOver);
       if (overBudget.length > 0) {
-        insights.push(`Has superado el presupuesto en **${overBudget.length}** categorías.`);
+        insights.push(`Has superado el presupuesto en **${overBudget.length}** ${overBudget.length === 1 ? 'categoría' : 'categorías'}.`);
+      }
+
+      if (savingsRate !== null && totalIncome > 0) {
+        if (savingsRate >= 20) {
+          insights.push(`¡Excelente tasa de ahorro! Retuviste el **${savingsRate.toFixed(1)}%** de tus ingresos este período.`);
+        } else if (savingsRate < 0) {
+          insights.push(`Tuviste un déficit del **${Math.abs(savingsRate).toFixed(1)}%** respecto a tus ingresos. Conviene revisar gastos.`);
+        }
+      }
+
+      if (expenseMoM !== null && prevExpenses > 0) {
+        if (expenseMoM > 10) {
+          insights.push(`Tus gastos aumentaron un **${expenseMoM.toFixed(1)}%** ${prevPeriodLabel}.`);
+        } else if (expenseMoM < -10) {
+          insights.push(`¡Bien hecho! Redujiste tus gastos un **${Math.abs(expenseMoM).toFixed(1)}%** ${prevPeriodLabel}.`);
+        }
       }
       
       return {
@@ -379,8 +482,7 @@ export const Stats: React.FC = () => {
         userContributions,
         evolution,
         transactionCount,
-        busiestDay,
-        comparisonData,
+        peakDayLabel,
         budgetComparison,
         classificationData,
         fixedCoverage,
@@ -390,7 +492,13 @@ export const Stats: React.FC = () => {
         insights,
         hasData: filtered.length > 0,
         currenciesInUniverse,
-        activeCurrency
+        activeCurrency,
+        expenseMoM,
+        incomeMoM,
+        savingsRate,
+        prevPeriodLabel,
+        prevExpenses,
+        prevIncome
       };
     } catch (e) {
       console.error("Error calculating stats:", e);
@@ -578,25 +686,110 @@ export const Stats: React.FC = () => {
           </div>
         ) : (
           <>
-            {/* Main KPIs */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Main KPIs (4 Cards: Gastos, Ingresos, Balance, Tasa de Ahorro) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <MainKPICard 
                 title="Gastos" 
                 value={formatCurrency(stats.totalExpenses, stats.activeCurrency)} 
                 icon={<ArrowDownRight size={20} className="text-rose-500" />}
                 color="text-rose-500"
+                badge={
+                  stats.expenseMoM !== null ? (
+                    <span className={cn(
+                      "inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full border uppercase tracking-wider font-mono",
+                      stats.expenseMoM > 0 
+                        ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20" 
+                        : stats.expenseMoM < 0 
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                        : "bg-on-surface/5 text-on-surface-variant border-on-surface/10"
+                    )}>
+                      {stats.expenseMoM > 0 ? <ArrowUpRight size={11} /> : stats.expenseMoM < 0 ? <ArrowDownRight size={11} /> : null}
+                      {stats.expenseMoM > 0 ? `+${stats.expenseMoM.toFixed(1)}%` : `${stats.expenseMoM.toFixed(1)}%`} {stats.prevPeriodLabel}
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-bold text-on-surface-variant/40 uppercase tracking-widest">
+                      Sin datos prev.
+                    </span>
+                  )
+                }
               />
               <MainKPICard 
                 title="Ingresos" 
                 value={formatCurrency(stats.totalIncome, stats.activeCurrency)} 
                 icon={<ArrowUpRight size={20} className="text-emerald-500" />}
                 color="text-emerald-500"
+                badge={
+                  stats.incomeMoM !== null ? (
+                    <span className={cn(
+                      "inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full border uppercase tracking-wider font-mono",
+                      stats.incomeMoM > 0 
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" 
+                        : stats.incomeMoM < 0 
+                        ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
+                        : "bg-on-surface/5 text-on-surface-variant border-on-surface/10"
+                    )}>
+                      {stats.incomeMoM > 0 ? <ArrowUpRight size={11} /> : stats.incomeMoM < 0 ? <ArrowDownRight size={11} /> : null}
+                      {stats.incomeMoM > 0 ? `+${stats.incomeMoM.toFixed(1)}%` : `${stats.incomeMoM.toFixed(1)}%`} {stats.prevPeriodLabel}
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-bold text-on-surface-variant/40 uppercase tracking-widest">
+                      Sin datos prev.
+                    </span>
+                  )
+                }
               />
               <MainKPICard 
                 title="Balance" 
                 value={formatCurrency(stats.netBalance, stats.activeCurrency)} 
                 icon={<Wallet size={20} className={stats.netBalance >= 0 ? "text-primary" : "text-rose-500"} />}
                 color={stats.netBalance >= 0 ? "text-primary" : "text-rose-500"}
+                badge={
+                  <span className={cn(
+                    "text-[10px] font-black px-2 py-0.5 rounded-full border uppercase tracking-wider",
+                    stats.netBalance >= 0
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                      : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
+                  )}>
+                    {stats.netBalance >= 0 ? "Superávit neto" : "Déficit neto"}
+                  </span>
+                }
+              />
+              <MainKPICard 
+                title="Tasa de Ahorro" 
+                value={stats.savingsRate !== null ? `${stats.savingsRate.toFixed(1)}%` : "0.0%"} 
+                icon={<PiggyBank size={20} className={
+                  stats.savingsRate !== null && stats.savingsRate >= 20 
+                    ? "text-emerald-500" 
+                    : stats.savingsRate !== null && stats.savingsRate > 0 
+                    ? "text-amber-500" 
+                    : "text-rose-500"
+                } />}
+                color={
+                  stats.savingsRate !== null && stats.savingsRate >= 20 
+                    ? "text-emerald-500" 
+                    : stats.savingsRate !== null && stats.savingsRate > 0 
+                    ? "text-amber-500" 
+                    : "text-rose-500"
+                }
+                badge={
+                  stats.savingsRate !== null ? (
+                    <span className={cn(
+                      "text-[10px] font-black px-2 py-0.5 rounded-full border uppercase tracking-wider",
+                      stats.savingsRate >= 20 
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" 
+                        : stats.savingsRate > 0 
+                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                        : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
+                    )}>
+                      {stats.savingsRate >= 20 ? "Óptimo (>20%)" : stats.savingsRate > 0 ? "Moderado" : "Déficit"}
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-bold text-on-surface-variant/40 uppercase tracking-widest">
+                      Sin ingresos
+                    </span>
+                  )
+                }
+                subtitle="Ingresos netos retenidos"
               />
             </div>
 
@@ -604,7 +797,7 @@ export const Stats: React.FC = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <SecondaryKPICard title="Promedio Diario" value={formatCurrency(stats.dailyAverage, stats.activeCurrency)} icon={<Clock size={14} />} />
               <SecondaryKPICard title="Transacciones" value={stats.transactionCount.toString()} icon={<CreditCard size={14} />} />
-              <SecondaryKPICard title="Día Pico" value={stats.busiestDay} icon={<Zap size={14} />} />
+              <SecondaryKPICard title={viewType === 'expense' ? "Pico de Gasto" : "Pico de Ingreso"} value={stats.peakDayLabel} icon={<Zap size={14} className={viewType === 'expense' ? "text-rose-500" : "text-emerald-500"} />} />
               <SecondaryKPICard title="Prom. x Trans." value={formatCurrency(stats.avgPerTransaction, stats.activeCurrency)} icon={<Target size={14} />} />
             </div>
 
@@ -929,43 +1122,6 @@ export const Stats: React.FC = () => {
               </ChartCard>
             )}
 
-            {/* Comparison Bar */}
-            <ChartCard title="Balance General" icon={<Layers size={18} />}>
-              <div className="h-48 w-full mt-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.comparisonData} barGap={20}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.15)" />
-                    <XAxis 
-                      dataKey="name" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fontSize: 12, fontWeight: 600, fill: 'var(--color-on-surface-variant)' }} 
-                    />
-                    <YAxis hide />
-                    <Tooltip 
-                      cursor={{ fill: 'rgba(128,128,128,0.06)' }}
-                      contentStyle={{ 
-                        backgroundColor: 'var(--color-surface-container-lowest)', 
-                        color: 'var(--color-on-surface)',
-                        borderRadius: '16px', 
-                        border: '1px solid var(--color-surface-container-low)', 
-                        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.2)' 
-                      }}
-                    />
-                    <Bar 
-                      dataKey="value" 
-                      radius={[10, 10, 0, 0]} 
-                      barSize={40}
-                      animationDuration={1500}
-                    >
-                      {stats.comparisonData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </ChartCard>
 
             {/* Insights Row */}
             {stats.insights.length > 0 && (
@@ -987,10 +1143,19 @@ export const Stats: React.FC = () => {
   );
 };
 
-const MainKPICard = ({ title, value, icon, color }: any) => (
+interface MainKPICardProps {
+  title: string;
+  value: string;
+  icon: React.ReactNode;
+  color?: string;
+  badge?: React.ReactNode;
+  subtitle?: string;
+}
+
+const MainKPICard = ({ title, value, icon, color, badge, subtitle }: MainKPICardProps) => (
   <motion.div 
     whileHover={{ y: -2 }}
-    className="bg-surface-container-lowest p-6 rounded-[1.5rem] border border-on-surface/10 shadow-sm space-y-4"
+    className="bg-surface-container-lowest p-5 sm:p-6 rounded-[1.5rem] border border-on-surface/10 shadow-sm flex flex-col justify-between space-y-3"
   >
     <div className="flex items-center justify-between">
       <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">{title}</span>
@@ -998,7 +1163,17 @@ const MainKPICard = ({ title, value, icon, color }: any) => (
         {icon}
       </div>
     </div>
-    <h2 className={cn("text-2xl font-bold tracking-tight font-headline", color)}>{value}</h2>
+    <div>
+      <h2 className={cn("text-xl sm:text-2xl font-bold tracking-tight font-headline", color)}>{value}</h2>
+      {badge && (
+        <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+          {badge}
+        </div>
+      )}
+      {subtitle && (
+        <p className="text-[10px] font-medium text-on-surface-variant/60 mt-1">{subtitle}</p>
+      )}
+    </div>
   </motion.div>
 );
 
