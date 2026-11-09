@@ -1030,38 +1030,7 @@ export const syncNotificationsOnExpenseUpdated = async (
 
     console.log(`[SyncNotif] Syncing notifications for tx: ${transactionId}, finalProjectId: ${finalProjectId}`);
 
-    // 1. Buscar primero por data.transactionId
-    let notifsDocs: any[] = [];
-    const qNotifs = query(
-      collection(db, 'notifications'),
-      where('data.transactionId', '==', transactionId)
-    );
-    const notifsSnap = await getDocs(qNotifs);
-    notifsDocs = [...notifsSnap.docs];
-
-    // 2. Fallback: Si no se encontraron por transactionId y hay un proyecto compartido,
-    // buscar en las notificaciones del proyecto que sean de tipo expense_added
-    if (notifsDocs.length === 0 && finalProjectId) {
-      const qProject = query(
-        collection(db, 'notifications'),
-        where('data.projectId', '==', finalProjectId)
-      );
-      const pSnap = await getDocs(qProject);
-      const targetCat = oldTransaction?.categoryName || updatedTransaction?.categoryName;
-      notifsDocs = pSnap.docs.filter(d => {
-        const data = d.data();
-        if (data.type !== 'expense_added') return false;
-        if (!data.data?.transactionId) {
-          if (targetCat && data.data?.categoryName === targetCat) return true;
-          return true;
-        }
-        return false;
-      });
-    }
-
-    console.log(`[SyncNotif] Found ${notifsDocs.length} collaborator notifications to update`);
-
-    // Caso A: No estaba en un proyecto compartido y ahora sí
+    // Caso A: No estaba en un proyecto compartido y ahora sí -> notificar como nuevo
     if (!oldProjectId && finalProjectId) {
       await notifyCollaboratorsOnExpenseAdded({
         ...updatedTransaction,
@@ -1070,6 +1039,17 @@ export const syncNotificationsOnExpenseUpdated = async (
       });
       return;
     }
+
+    // Buscar EXCLUSIVAMENTE las notificaciones asociadas a este transactionId específico
+    let notifsDocs: any[] = [];
+    const qNotifs = query(
+      collection(db, 'notifications'),
+      where('data.transactionId', '==', transactionId)
+    );
+    const notifsSnap = await getDocs(qNotifs);
+    notifsDocs = [...notifsSnap.docs];
+
+    console.log(`[SyncNotif] Found ${notifsDocs.length} collaborator notifications for tx: ${transactionId}`);
 
     // Caso B: Estaba en un proyecto y se quitó o cambió de proyecto
     if (oldProjectId && (!finalProjectId || finalProjectId !== oldProjectId)) {
@@ -1086,21 +1066,59 @@ export const syncNotificationsOnExpenseUpdated = async (
       return;
     }
 
-    // Caso C: No tiene proyecto (personal)
+    // Caso C: No tiene proyecto (personal) -> nada que sincronizar a colaboradores
     if (!finalProjectId) return;
 
-    // Si aún no existía la notificación por compatibilidad histórica
+    // Caso D: Si no existía notificación previa con este transactionId exacto (por ejemplo,
+    // gastos históricos creados antes de v2.14.0 o notificación expirada),
+    // creamos una nueva notificación de actualización para los colaboradores.
+    // NUNCA buscamos ni modificamos notificaciones ajenas del proyecto.
     if (notifsDocs.length === 0) {
-      console.log('[SyncNotif] No existing notification found, creating new one for collaborators');
-      await notifyCollaboratorsOnExpenseAdded({
-        ...updatedTransaction,
-        id: transactionId,
-        projectId: finalProjectId
-      });
+      console.log('[SyncNotif] No existing notification found for this transactionId, creating update notification for collaborators');
+      
+      const projectRef = doc(db, 'projects', finalProjectId);
+      const projectSnap = await getDoc(projectRef);
+      if (!projectSnap.exists()) return;
+
+      const projectData = projectSnap.data();
+      const currentUserId = auth.currentUser.uid;
+      const targetMemberIds = (projectData.memberIds || []).filter((id: string) => id !== currentUserId);
+      if (targetMemberIds.length === 0) return;
+
+      const projectName = projectData.name || 'Proyecto compartido';
+      const currency = projectData.currency || 'ARS';
+      const authorName = auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || 'Un colaborador';
+      const catName = updatedTransaction.categoryName || updatedTransaction.description || 'General';
+      const formattedAmount = formatCurrency(updatedTransaction.amount, currency);
+
+      let content = `${authorName} actualizó el ${updatedTransaction.type === 'income' ? 'ingreso' : 'gasto'} a ${formattedAmount} en "${projectName}" (${catName})`;
+      if (updatedTransaction.isInstallmentPlan && updatedTransaction.totalInstallments > 1) {
+        const formattedInstallment = formatCurrency(updatedTransaction.installmentAmount, currency);
+        content = `${authorName} actualizó la compra financiada a ${formattedAmount} (${updatedTransaction.totalInstallments} cuotas de ${formattedInstallment}) en "${projectName}" (${catName})`;
+      }
+
+      for (const memberId of targetMemberIds) {
+        await addNotification({
+          userId: memberId,
+          type: 'expense_added',
+          content,
+          data: {
+            transactionId,
+            projectId: finalProjectId,
+            projectName,
+            amount: updatedTransaction.amount,
+            categoryName: catName,
+            isInstallmentPlan: !!updatedTransaction.isInstallmentPlan,
+            totalInstallments: updatedTransaction.totalInstallments || 1,
+            isModified: true
+          }
+        });
+      }
       return;
     }
 
-    // Obtener datos del proyecto
+    // Caso E: Se encontraron notificaciones que pertenecen de forma unívoca a este transactionId.
+    // Actualizamos únicamente esas notificaciones.
     const projectRef = doc(db, 'projects', finalProjectId);
     const projectSnap = await getDoc(projectRef);
     if (!projectSnap.exists()) return;
