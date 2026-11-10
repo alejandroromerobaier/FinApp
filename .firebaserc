@@ -1,5 +1,18 @@
 {
   "projects": {
     "default": "gen-lang-client-0187524364"
-  }
+  },
+  "targets": {
+    "gen-lang-client-0187524364": {
+      "hosting": {
+        "main": [
+          "gen-lang-client-0187524364"
+        ],
+        "vbeta": [
+          "finapp-vbeta"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

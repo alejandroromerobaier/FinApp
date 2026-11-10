@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "deploy:qa": "vite build --mode qa && firebase hosting:channel:deploy qa",
+    "deploy:qa": "vite build --mode qa && firebase hosting:channel:deploy qa --only main",
     "deploy:prod": "vite build --mode production && firebase deploy --only hosting",
     "release:patch": "npm version patch",
     "release:minor": "npm version minor",
