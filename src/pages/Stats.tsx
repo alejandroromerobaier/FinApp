@@ -8,7 +8,7 @@ import {
   Calendar, TrendingUp, TrendingDown, Wallet, Layers, Loader2, ChevronLeft, ChevronRight,
   ArrowUpRight, ArrowDownRight, Activity, PieChart as PieChartIcon, 
   BarChart3, Info, Clock, CreditCard, Target, Zap, Globe, PiggyBank,
-  AlertTriangle, AlertCircle, X, Banknote, CheckCircle2
+  AlertTriangle, AlertCircle, X, Banknote, CheckCircle2, Landmark
 } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
 import { getTransactions, getBudgets } from '../services/firestoreService';
@@ -69,11 +69,24 @@ const safeToDate = (raw: any): Date => {
 };
 
 const PAYMENT_METHOD_CONFIG: Record<string, { label: string; icon: string; color: string; badgeClass: string }> = {
-  credit_card: { label: 'Tarjeta de Crédito', icon: 'CreditCard', color: '#ec4899', badgeClass: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20' },
   cash: { label: 'Efectivo', icon: 'Banknote', color: '#10b981', badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
-  debit: { label: 'Débito', icon: 'CreditCard', color: '#06b6d4', badgeClass: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20' },
+  credit_card: { label: 'Tarjeta de Crédito', icon: 'CreditCard', color: '#ec4899', badgeClass: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20' },
+  debit: { label: 'Débito', icon: 'Landmark', color: '#06b6d4', badgeClass: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20' },
   transfer: { label: 'Transferencia', icon: 'ArrowUpRight', color: '#6366f1', badgeClass: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20' },
   other: { label: 'Otros / Sin Especificar', icon: 'Wallet', color: '#94a3b8', badgeClass: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20' }
+};
+
+const normalizePaymentMethodKey = (method?: string | null, hasCardInfo?: boolean): string => {
+  if (hasCardInfo) return 'credit_card';
+  if (!method || method.trim() === '') return 'cash'; // El valor por defecto histórico de FinApp es Efectivo
+  
+  const m = method.toLowerCase().trim();
+  if (m === 'efectivo' || m === 'cash') return 'cash';
+  if (m.includes('credito') || m.includes('crédito') || m.includes('tarjeta') || m.includes('credit')) return 'credit_card';
+  if (m.includes('debito') || m.includes('débito') || m.includes('debit')) return 'debit';
+  if (m.includes('transfer') || m.includes('banco') || m.includes('transferencia')) return 'transfer';
+  
+  return 'other';
 };
 
 const CategoryIconBadge = ({ name, size = 14 }: { name?: string; size?: number }) => {
@@ -573,9 +586,9 @@ export const Stats: React.FC = () => {
       }> = {};
 
       expenses.forEach(t => {
-        const raw = t.paymentMethod || 'other';
-        const key = PAYMENT_METHOD_CONFIG[raw] ? raw : 'other';
-        const cfg = PAYMENT_METHOD_CONFIG[key];
+        const hasCardInfo = Boolean(t.cardName || t.cardId || (t.isInstallment && t.totalInstallments));
+        const key = normalizePaymentMethodKey(t.paymentMethod, hasCardInfo);
+        const cfg = PAYMENT_METHOD_CONFIG[key] || PAYMENT_METHOD_CONFIG.other;
 
         if (!methodMap[key]) {
           methodMap[key] = {
@@ -796,8 +809,8 @@ export const Stats: React.FC = () => {
   const modalMethodTransactions = useMemo(() => {
     if (!selectedMethodModal || !stats) return [];
     return stats.filteredTransactions.filter((t: any) => {
-      const raw = t.paymentMethod || 'other';
-      const key = PAYMENT_METHOD_CONFIG[raw] ? raw : 'other';
+      const hasCardInfo = Boolean(t.cardName || t.cardId || (t.isInstallment && t.totalInstallments));
+      const key = normalizePaymentMethodKey(t.paymentMethod, hasCardInfo);
       return key === selectedMethodModal.id && t.type === 'expense';
     }).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [selectedMethodModal, stats]);
@@ -1945,6 +1958,7 @@ export const Stats: React.FC = () => {
                                     >
                                       {method.id === 'credit_card' ? <CreditCard size={18} /> :
                                        method.id === 'cash' ? <Banknote size={18} /> :
+                                       method.id === 'debit' ? <Landmark size={18} /> :
                                        method.id === 'transfer' ? <ArrowUpRight size={18} /> :
                                        <Wallet size={18} />}
                                     </div>
@@ -2168,6 +2182,7 @@ export const Stats: React.FC = () => {
                   >
                     {selectedMethodModal.id === 'credit_card' ? <CreditCard size={20} /> :
                      selectedMethodModal.id === 'cash' ? <Banknote size={20} /> :
+                     selectedMethodModal.id === 'debit' ? <Landmark size={20} /> :
                      selectedMethodModal.id === 'transfer' ? <ArrowUpRight size={20} /> :
                      <Wallet size={20} />}
                   </div>
@@ -2296,10 +2311,15 @@ export const Stats: React.FC = () => {
                                     <span className="truncate">{tx.categoryName}</span>
                                   </>
                                 )}
-                                {tx.cardName && (
+                                {(tx.cardName || tx.paymentMethod) ? (
                                   <>
                                     <span>•</span>
-                                    <span className="truncate">{tx.cardName}</span>
+                                    <span className="truncate">{tx.cardName || tx.paymentMethod}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span>•</span>
+                                    <span className="truncate">Efectivo</span>
                                   </>
                                 )}
                               </div>
