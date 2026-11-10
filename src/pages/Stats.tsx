@@ -8,7 +8,7 @@ import {
   Calendar, TrendingUp, TrendingDown, Wallet, Layers, Loader2, ChevronLeft, ChevronRight,
   ArrowUpRight, ArrowDownRight, Activity, PieChart as PieChartIcon, 
   BarChart3, Info, Clock, CreditCard, Target, Zap, Globe, PiggyBank,
-  AlertTriangle, AlertCircle, X
+  AlertTriangle, AlertCircle, X, Banknote, CheckCircle2
 } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
 import { getTransactions, getBudgets } from '../services/firestoreService';
@@ -68,6 +68,14 @@ const safeToDate = (raw: any): Date => {
   return new Date();
 };
 
+const PAYMENT_METHOD_CONFIG: Record<string, { label: string; icon: string; color: string; badgeClass: string }> = {
+  credit_card: { label: 'Tarjeta de Crédito', icon: 'CreditCard', color: '#ec4899', badgeClass: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20' },
+  cash: { label: 'Efectivo', icon: 'Banknote', color: '#10b981', badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
+  debit: { label: 'Débito', icon: 'CreditCard', color: '#06b6d4', badgeClass: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20' },
+  transfer: { label: 'Transferencia', icon: 'ArrowUpRight', color: '#6366f1', badgeClass: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20' },
+  other: { label: 'Otros / Sin Especificar', icon: 'Wallet', color: '#94a3b8', badgeClass: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20' }
+};
+
 const CategoryIconBadge = ({ name, size = 14 }: { name?: string; size?: number }) => {
   const Icon = getCategoryIcon(name || 'Tag');
   return <Icon size={size} />;
@@ -83,6 +91,7 @@ export const Stats: React.FC = () => {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState<StatsTab>('overview');
   const [selectedCategoryModal, setSelectedCategoryModal] = useState<any | null>(null);
+  const [selectedMethodModal, setSelectedMethodModal] = useState<any | null>(null);
   const [filterProject, setFilterProject] = useState<string>('all');
   const [viewType, setViewType] = useState<'expense' | 'income'>('expense');
   const [selectedCurrency, setSelectedCurrency] = useState<string>('');
@@ -550,6 +559,84 @@ export const Stats: React.FC = () => {
         };
       }).sort((a, b) => b.amount - a.amount);
 
+      // Payment Methods Breakdown (Financing & Liquidity Structure)
+      const methodMap: Record<string, {
+        id: string;
+        name: string;
+        amount: number;
+        color: string;
+        badgeClass: string;
+        icon: string;
+        count: number;
+        categoriesMap: Record<string, { id: string; name: string; amount: number; color: string; icon: string; count: number }>;
+        cardsMap: Record<string, { name: string; amount: number; count: number }>;
+      }> = {};
+
+      expenses.forEach(t => {
+        const raw = t.paymentMethod || 'other';
+        const key = PAYMENT_METHOD_CONFIG[raw] ? raw : 'other';
+        const cfg = PAYMENT_METHOD_CONFIG[key];
+
+        if (!methodMap[key]) {
+          methodMap[key] = {
+            id: key,
+            name: cfg.label,
+            amount: 0,
+            color: cfg.color,
+            badgeClass: cfg.badgeClass,
+            icon: cfg.icon,
+            count: 0,
+            categoriesMap: {},
+            cardsMap: {}
+          };
+        }
+
+        methodMap[key].amount += t.amount;
+        methodMap[key].count += 1;
+
+        // Categories within this payment method
+        const catId = t.categoryId || 'other';
+        const cat = categories.find(c => c.id === catId);
+        const catName = cat?.name || t.categoryName || 'Otros';
+        const catColor = getHexFromClass(cat?.color || t.categoryColor || '');
+        const catIcon = cat?.icon || t.categoryIcon || 'Tag';
+
+        if (!methodMap[key].categoriesMap[catId]) {
+          methodMap[key].categoriesMap[catId] = {
+            id: catId,
+            name: catName,
+            amount: 0,
+            color: catColor,
+            icon: catIcon,
+            count: 0
+          };
+        }
+        methodMap[key].categoriesMap[catId].amount += t.amount;
+        methodMap[key].categoriesMap[catId].count += 1;
+
+        // If credit card, track individual plásticos
+        if (key === 'credit_card') {
+          const cardName = t.cardName || 'Tarjeta de Crédito';
+          if (!methodMap[key].cardsMap[cardName]) {
+            methodMap[key].cardsMap[cardName] = { name: cardName, amount: 0, count: 0 };
+          }
+          methodMap[key].cardsMap[cardName].amount += t.amount;
+          methodMap[key].cardsMap[cardName].count += 1;
+        }
+      });
+
+      const paymentMethodsBreakdown = Object.values(methodMap).map(m => ({
+        ...m,
+        value: totalExpenses > 0 ? (m.amount / totalExpenses) * 100 : 0,
+        categories: Object.values(m.categoriesMap).sort((a, b) => b.amount - a.amount),
+        cards: Object.values(m.cardsMap).sort((a, b) => b.amount - a.amount)
+      })).sort((a, b) => b.amount - a.amount);
+
+      const financingTotal = methodMap['credit_card']?.amount || 0;
+      const liquidityTotal = (methodMap['cash']?.amount || 0) + (methodMap['debit']?.amount || 0) + (methodMap['transfer']?.amount || 0);
+      const financingRatio = totalExpenses > 0 ? (financingTotal / totalExpenses) * 100 : 0;
+      const liquidityRatio = totalExpenses > 0 ? (liquidityTotal / totalExpenses) * 100 : 0;
+
       // Insights
       interface InsightCardData {
         id: string;
@@ -676,6 +763,11 @@ export const Stats: React.FC = () => {
         savingsPotential,
         variableRatio,
         categoryIncomeImpact,
+        paymentMethodsBreakdown,
+        financingTotal,
+        liquidityTotal,
+        financingRatio,
+        liquidityRatio,
         insights,
         hasData: filtered.length > 0,
         currenciesInUniverse,
@@ -700,6 +792,15 @@ export const Stats: React.FC = () => {
       t.categoryId === selectedCategoryModal.id && t.type === viewType
     ).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [selectedCategoryModal, stats, viewType]);
+
+  const modalMethodTransactions = useMemo(() => {
+    if (!selectedMethodModal || !stats) return [];
+    return stats.filteredTransactions.filter((t: any) => {
+      const raw = t.paymentMethod || 'other';
+      const key = PAYMENT_METHOD_CONFIG[raw] ? raw : 'other';
+      return key === selectedMethodModal.id && t.type === 'expense';
+    }).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [selectedMethodModal, stats]);
 
   if (loading) {
     return (
@@ -1362,97 +1463,290 @@ export const Stats: React.FC = () => {
                   </ChartCard>
                 </div>
 
-                {/* Budget Compliance Chart */}
-                {stats.budgetComparison.length > 0 && (
-                  <ChartCard title="Cumplimiento de Presupuesto" icon={<Target size={18} />}>
-                    <div className="space-y-6 mt-4">
-                      {stats.budgetComparison.map((item) => (
-                        <div key={item.id} className="space-y-2">
-                          <div className="flex justify-between items-end">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></div>
-                              <span className="text-xs font-bold text-on-surface uppercase tracking-tight">{item.name}</span>
-                            </div>
-                            <div className="text-right">
-                              <span className={cn("text-xs font-black tracking-tight", item.isOver ? "text-rose-500" : "text-on-surface")}>
-                                {formatCurrency(item.actual, stats.activeCurrency)}
-                              </span>
-                              <span className="text-[10px] font-bold text-on-surface-variant/40 ml-1 uppercase tracking-widest">
-                                / {formatCurrency(item.budget, stats.activeCurrency)}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="relative h-3 w-full bg-on-surface/[0.05] rounded-full overflow-hidden">
-                            <motion.div 
-                              initial={{ width: 0 }}
-                              animate={{ width: `${item.percent}%` }}
-                              transition={{ duration: 1.5, ease: "easeOut" }}
-                              className={cn(
-                                "h-full rounded-full transition-all duration-500",
-                                item.isOver ? "bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.4)]" : "bg-primary shadow-[0_0_12px_rgba(var(--primary-rgb),0.3)]"
-                              )}
-                            />
-                            {item.isOver && (
-                              <div className="absolute right-0 top-0 h-full flex items-center pr-2">
-                                <Zap size={8} className="text-white animate-pulse" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-[0.2em] opacity-40">
-                            <span>{item.percent.toFixed(0)}% Utilizado</span>
-                            {item.isOver && <span className="text-rose-500 text-[8px] animate-pulse">Límite Superado</span>}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </ChartCard>
-                )}
+                {/* Budget Compliance Chart (Consolidado Ejecutivo) */}
+                {stats.budgetComparison.length > 0 && (() => {
+                  const totalBudgeted = stats.budgetComparison.reduce((acc: number, b: any) => acc + b.budget, 0);
+                  const totalActualBudgeted = stats.budgetComparison.reduce((acc: number, b: any) => acc + b.actual, 0);
+                  const totalPercentBudgeted = totalBudgeted > 0 ? (totalActualBudgeted / totalBudgeted) * 100 : 0;
+                  const isTotalOver = totalActualBudgeted > totalBudgeted;
+                  
+                  const exceededCount = stats.budgetComparison.filter((b: any) => b.isOver).length;
+                  const warningCount = stats.budgetComparison.filter((b: any) => !b.isOver && b.percent >= 80).length;
+                  const onTrackCount = stats.budgetComparison.filter((b: any) => b.percent < 80).length;
 
-                {/* Category Income Impact */}
-                {viewType === 'expense' && stats.categoryIncomeImpact.length > 0 && (
-                  <ChartCard title="Impacto en Ingresos por Categoría" icon={<TrendingDown size={18} />}>
-                    <div className="space-y-6 mt-4">
-                      {stats.categoryIncomeImpact.map((item) => (
-                        <div key={item.name} className="space-y-2">
-                          <div className="flex justify-between items-end">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></div>
-                              <span className="text-xs font-bold text-on-surface uppercase tracking-tight">{item.name}</span>
+                  // Sort to show exceeded and warning first
+                  const sortedBudgets = [...stats.budgetComparison].sort((a: any, b: any) => b.percent - a.percent);
+
+                  return (
+                    <ChartCard title="Cumplimiento de Presupuesto" icon={<Target size={18} />}>
+                      <div className="space-y-6 mt-3">
+                        {/* Master Executive Consolidated Bar */}
+                        <div className="p-4 bg-surface-container-low/60 rounded-2xl border border-on-surface/5 space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                              <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">Consumo Global Presupuestado</span>
+                              <div className="flex items-baseline gap-2 mt-0.5">
+                                <span className={cn("text-lg font-black tracking-tight", isTotalOver ? "text-rose-500" : "text-on-surface")}>
+                                  {formatCurrency(totalActualBudgeted, stats.activeCurrency)}
+                                </span>
+                                <span className="text-xs font-bold text-on-surface-variant/50">
+                                  / {formatCurrency(totalBudgeted, stats.activeCurrency)}
+                                </span>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <span className="text-xs font-black text-on-surface tracking-tight">
-                                {formatCurrency(item.amount, stats.activeCurrency)}
-                              </span>
-                              <span className={cn(
-                                "text-[10px] font-black ml-2 uppercase tracking-widest",
-                                item.percentage > 15 ? "text-rose-500" : "text-on-surface-variant/40"
-                              )}>
-                                {item.percentage.toFixed(1)}% del Ingreso
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {exceededCount > 0 && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                                  <AlertCircle size={10} />
+                                  {exceededCount} {exceededCount === 1 ? 'Excedido' : 'Excedidos'}
+                                </span>
+                              )}
+                              {warningCount > 0 && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                                  <AlertTriangle size={10} />
+                                  {warningCount} Al límite
+                                </span>
+                              )}
+                              <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                <CheckCircle2 size={10} />
+                                {onTrackCount} En regla
                               </span>
                             </div>
                           </div>
-                          <div className="relative h-2 w-full bg-on-surface/[0.05] rounded-full overflow-hidden">
-                            <motion.div 
-                              initial={{ width: 0 }}
-                              animate={{ width: `${Math.min(item.percentage, 100)}%` }}
-                              transition={{ duration: 1.5, ease: "easeOut" }}
-                              className={cn(
-                                "h-full rounded-full transition-all duration-500",
-                                item.percentage > 15 ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.3)]" : "bg-primary shadow-[0_0_8px_rgba(var(--primary-rgb),0.2)]"
-                              )}
-                            />
+
+                          {/* Progress Master */}
+                          <div className="space-y-1">
+                            <div className="relative h-2.5 w-full bg-on-surface/[0.06] rounded-full overflow-hidden">
+                              <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${Math.min(totalPercentBudgeted, 100)}%` }}
+                                transition={{ duration: 1.2, ease: "easeOut" }}
+                                className={cn(
+                                  "h-full rounded-full transition-all duration-500",
+                                  isTotalOver ? "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.4)]" : totalPercentBudgeted > 85 ? "bg-amber-500" : "bg-primary shadow-[0_0_10px_rgba(var(--primary-rgb),0.3)]"
+                                )}
+                              />
+                            </div>
+                            <div className="flex justify-between items-center text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/50">
+                              <span>{totalPercentBudgeted.toFixed(0)}% del total presupuestado consumido</span>
+                              <span>{stats.budgetComparison.length} {stats.budgetComparison.length === 1 ? 'rubro con meta' : 'rubros con metas'}</span>
+                            </div>
                           </div>
                         </div>
-                      ))}
-                      <div className="bg-primary/5 rounded-2xl p-4 border border-primary/10 mt-4">
-                        <p className="text-[10px] text-on-surface-variant/70 leading-relaxed font-medium">
-                          Este gráfico muestra qué porcentaje de tus <strong>ingresos totales</strong> consume cada categoría. 
-                          Te ayuda a identificar dónde se va la mayor parte de tu dinero relativo a lo que generas.
-                        </p>
+
+                        {/* Compact 2-column Grid for Budgets */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {sortedBudgets.map((item: any) => (
+                            <div 
+                              key={item.id} 
+                              className={cn(
+                                "p-3.5 rounded-2xl border transition-all space-y-2 bg-on-surface/[0.02]",
+                                item.isOver 
+                                  ? "border-rose-500/30 bg-rose-500/[0.02]" 
+                                  : item.percent >= 80 
+                                    ? "border-amber-500/30 bg-amber-500/[0.02]" 
+                                    : "border-on-surface/5"
+                              )}
+                            >
+                              <div className="flex justify-between items-center gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                  <span className="text-xs font-bold text-on-surface truncate tracking-tight">{item.name}</span>
+                                </div>
+                                <span className={cn(
+                                  "text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0",
+                                  item.isOver 
+                                    ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" 
+                                    : item.percent >= 80 
+                                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" 
+                                      : "bg-on-surface/5 text-on-surface-variant/70"
+                                )}>
+                                  {item.percent.toFixed(0)}%
+                                </span>
+                              </div>
+
+                              <div className="relative h-1.5 w-full bg-on-surface/[0.06] rounded-full overflow-hidden">
+                                <motion.div 
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${Math.min(item.percent, 100)}%` }}
+                                  transition={{ duration: 1, ease: "easeOut" }}
+                                  className={cn(
+                                    "h-full rounded-full transition-all duration-500",
+                                    item.isOver ? "bg-rose-500" : item.percent >= 80 ? "bg-amber-500" : "bg-primary"
+                                  )}
+                                />
+                              </div>
+
+                              <div className="flex justify-between items-center text-[10px] font-medium text-on-surface-variant/60">
+                                <span>{formatCurrency(item.actual, stats.activeCurrency)}</span>
+                                <span>Meta: {formatCurrency(item.budget, stats.activeCurrency)}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  </ChartCard>
-                )}
+                    </ChartCard>
+                  );
+                })()}
+
+                {/* Category Income Impact (Barra Continua de Distribución del Sueldo - 100%) */}
+                {viewType === 'expense' && stats.totalIncome > 0 && stats.categoryIncomeImpact.length > 0 && (() => {
+                  const topCategories = stats.categoryIncomeImpact.slice(0, 4);
+                  const remainingCategories = stats.categoryIncomeImpact.slice(4);
+                  const otherAmount = remainingCategories.reduce((acc: number, c: any) => acc + c.amount, 0);
+                  const otherPercentage = (otherAmount / stats.totalIncome) * 100;
+
+                  const retainedMargin = Math.max(0, stats.totalIncome - stats.totalExpenses);
+                  const retainedMarginPercentage = (retainedMargin / stats.totalIncome) * 100;
+
+                  // Continuous distribution bar items
+                  const continuousItems = [
+                    ...topCategories.map((c: any) => ({
+                      name: c.name,
+                      percent: c.percentage,
+                      amount: c.amount,
+                      color: c.color
+                    })),
+                    ...(otherAmount > 0 ? [{
+                      name: 'Otras categorías',
+                      percent: otherPercentage,
+                      amount: otherAmount,
+                      color: '#94a3b8'
+                    }] : []),
+                    ...(retainedMargin > 0 ? [{
+                      name: 'Margen no consumido (Ahorro)',
+                      percent: retainedMarginPercentage,
+                      amount: retainedMargin,
+                      color: '#10b981'
+                    }] : [])
+                  ];
+
+                  return (
+                    <ChartCard title="Distribución de Ingresos (Impacto 100%)" icon={<TrendingDown size={18} />}>
+                      <div className="space-y-6 mt-3">
+                        {/* Executive intro */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <p className="text-xs text-on-surface-variant/80">
+                            Proporción del sueldo/ingresos consumida por tus gastos principales vs. margen retenido.
+                          </p>
+                          <div className="text-right shrink-0">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60 block">Ingreso Total Período</span>
+                            <span className="text-sm font-black text-on-surface">{formatCurrency(stats.totalIncome, stats.activeCurrency)}</span>
+                          </div>
+                        </div>
+
+                        {/* Continuous Proportional Stacked Bar */}
+                        <div className="space-y-2">
+                          <div className="relative h-4 w-full bg-on-surface/[0.06] rounded-full overflow-hidden flex">
+                            {continuousItems.map((segment: any, idx: number) => (
+                              <motion.div
+                                key={segment.name}
+                                initial={{ width: 0 }}
+                                animate={{ width: `${Math.min(segment.percent, 100)}%` }}
+                                transition={{ duration: 1.2, delay: idx * 0.08, ease: "easeOut" }}
+                                style={{ backgroundColor: segment.color }}
+                                className="h-full relative group cursor-pointer transition-opacity hover:opacity-90"
+                                title={`${segment.name}: ${segment.percent.toFixed(1)}% (${formatCurrency(segment.amount, stats.activeCurrency)})`}
+                              />
+                            ))}
+                          </div>
+                          
+                          {/* Segment Legend / Micro-indicator */}
+                          <div className="flex items-center justify-between text-[9px] font-bold text-on-surface-variant/50 uppercase tracking-wider">
+                            <span>0%</span>
+                            <span>50% (Punto medio)</span>
+                            <span>100% de tus ingresos</span>
+                          </div>
+                        </div>
+
+                        {/* Top Impact Cards + Margen Retenido Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {topCategories.map((item: any) => (
+                            <div 
+                              key={item.name} 
+                              className="p-3.5 bg-surface-container-low/60 rounded-2xl border border-on-surface/5 flex flex-col justify-between space-y-2 hover:border-on-surface/15 transition-all"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                  <span className="text-xs font-bold text-on-surface truncate">{item.name}</span>
+                                </div>
+                                <span className={cn(
+                                  "text-[10px] font-black uppercase px-1.5 py-0.5 rounded shrink-0",
+                                  item.percentage > 25 ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" : "bg-primary/10 text-primary"
+                                )}>
+                                  {item.percentage.toFixed(1)}%
+                                </span>
+                              </div>
+                              <div className="flex items-baseline justify-between">
+                                <span className="text-[10px] text-on-surface-variant/50 uppercase tracking-wider font-bold">Consumido</span>
+                                <span className="text-xs font-black text-on-surface">{formatCurrency(item.amount, stats.activeCurrency)}</span>
+                              </div>
+                            </div>
+                          ))}
+
+                          {otherAmount > 0 && (
+                            <div className="p-3.5 bg-surface-container-low/60 rounded-2xl border border-on-surface/5 flex flex-col justify-between space-y-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0" />
+                                  <span className="text-xs font-bold text-on-surface truncate">Otras categorías ({remainingCategories.length})</span>
+                                </div>
+                                <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-on-surface/5 text-on-surface-variant shrink-0">
+                                  {otherPercentage.toFixed(1)}%
+                                </span>
+                              </div>
+                              <div className="flex items-baseline justify-between">
+                                <span className="text-[10px] text-on-surface-variant/50 uppercase tracking-wider font-bold">Consumido</span>
+                                <span className="text-xs font-black text-on-surface">{formatCurrency(otherAmount, stats.activeCurrency)}</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Retained Margin / Savings */}
+                          <div className={cn(
+                            "p-3.5 rounded-2xl border flex flex-col justify-between space-y-2",
+                            retainedMargin > 0 
+                              ? "bg-emerald-500/[0.04] border-emerald-500/20" 
+                              : "bg-rose-500/[0.04] border-rose-500/20"
+                          )}>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className={cn("w-2.5 h-2.5 rounded-full shrink-0", retainedMargin > 0 ? "bg-emerald-500" : "bg-rose-500")} />
+                                <span className="text-xs font-bold text-on-surface truncate">
+                                  {retainedMargin > 0 ? "Margen no consumido" : "Sin margen de ahorro"}
+                                </span>
+                              </div>
+                              <span className={cn(
+                                "text-[10px] font-black uppercase px-1.5 py-0.5 rounded shrink-0",
+                                retainedMargin > 0 
+                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" 
+                                  : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                              )}>
+                                {retainedMargin > 0 ? `${retainedMarginPercentage.toFixed(1)}%` : "0%"}
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between">
+                              <span className="text-[10px] text-on-surface-variant/50 uppercase tracking-wider font-bold">
+                                {retainedMargin > 0 ? "Superávit" : "Déficit del mes"}
+                              </span>
+                              <span className={cn("text-xs font-black", retainedMargin > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500")}>
+                                {retainedMargin > 0 ? formatCurrency(retainedMargin, stats.activeCurrency) : formatCurrency(stats.totalExpenses - stats.totalIncome, stats.activeCurrency)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Subtle footnote */}
+                        <div className="bg-primary/5 rounded-2xl p-4 border border-primary/10">
+                          <p className="text-[10px] text-on-surface-variant/70 leading-relaxed font-medium">
+                            Esta visualización consolida el destino de cada peso ganado. Si tus categorías principales superan el 70% de tus ingresos, evalúa optimizar gastos fijos o partidas secundarias para resguardar tu capacidad de ahorro.
+                          </p>
+                        </div>
+                      </div>
+                    </ChartCard>
+                  );
+                })()}
               </div>
             )}
 
@@ -1467,89 +1761,224 @@ export const Stats: React.FC = () => {
                       El análisis de estructura clasifica tus desembolsos entre fijos y variables. Cambia la vista superior a "Gastos" para explorarlo.
                     </p>
                   </div>
-                ) : stats.classificationData.length === 0 ? (
-                  <div className="p-8 text-center bg-surface-container-lowest rounded-[2rem] border border-on-surface/10 space-y-3">
-                    <Layers size={32} className="mx-auto text-on-surface-variant/40" />
-                    <h3 className="text-base font-bold text-on-surface">Sin clasificación</h3>
-                    <p className="text-xs text-on-surface-variant max-w-sm mx-auto">
-                      Clasifica tus gastos como "Fijos" o "Variables" al cargarlos para ver el desglose de estructura financiera y compromiso de ingresos.
-                    </p>
-                  </div>
                 ) : (
-                  <ChartCard title="Análisis de Estabilidad y Estructura" icon={<Layers size={18} />}>
-                    <div className="flex flex-col items-center py-4">
-                      <div className="relative w-52 h-52">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={stats.classificationData}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={70}
-                              outerRadius={95}
-                              paddingAngle={6}
-                              dataKey="value"
-                              animationDuration={1500}
-                            >
-                              {stats.classificationData.map((entry, index) => (
-                                <Cell key={`cell-class-${index}`} fill={entry.color} stroke="none" />
-                              ))}
-                            </Pie>
-                          </PieChart>
-                        </ResponsiveContainer>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
-                          <span className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">Total Gastos</span>
-                          <span className="text-base font-black text-on-surface">{formatCurrency(stats.totalExpenses, stats.activeCurrency)}</span>
-                        </div>
+                  <>
+                    {stats.classificationData.length === 0 ? (
+                      <div className="p-8 text-center bg-surface-container-lowest rounded-[2rem] border border-on-surface/10 space-y-3">
+                        <Layers size={32} className="mx-auto text-on-surface-variant/40" />
+                        <h3 className="text-base font-bold text-on-surface">Sin clasificación de fijos y variables</h3>
+                        <p className="text-xs text-on-surface-variant max-w-sm mx-auto">
+                          Clasifica tus gastos como "Fijos" o "Variables" al cargarlos para ver el desglose de estructura financiera y compromiso de ingresos.
+                        </p>
                       </div>
-                      
-                      <div className="w-full mt-6 space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          {stats.classificationData.map((item) => (
-                            <div key={item.name} className="flex flex-col p-4 bg-on-surface/[0.02] rounded-2xl border border-on-surface/5">
-                              <div className="flex items-center gap-2 mb-1.5">
-                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></div>
-                                <span className="text-[10px] font-black text-on-surface-variant/70 uppercase tracking-wider">{item.name}</span>
-                              </div>
-                              <span className="text-base font-black text-on-surface">{formatCurrency(item.value, stats.activeCurrency)}</span>
-                              <span className="text-[10px] font-bold text-on-surface-variant/50 mt-0.5">
-                                {((item.value / stats.totalExpenses) * 100).toFixed(1)}% del gasto
-                              </span>
+                    ) : (
+                      <ChartCard title="Análisis de Estabilidad y Estructura" icon={<Layers size={18} />}>
+                        <div className="flex flex-col items-center py-4">
+                          <div className="relative w-52 h-52">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={stats.classificationData}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={70}
+                                  outerRadius={95}
+                                  paddingAngle={6}
+                                  dataKey="value"
+                                  animationDuration={1500}
+                                >
+                                  {stats.classificationData.map((entry, index) => (
+                                    <Cell key={`cell-class-${index}`} fill={entry.color} stroke="none" />
+                                  ))}
+                                </Pie>
+                              </PieChart>
+                            </ResponsiveContainer>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
+                              <span className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest">Total Gastos</span>
+                              <span className="text-base font-black text-on-surface">{formatCurrency(stats.totalExpenses, stats.activeCurrency)}</span>
                             </div>
-                          ))}
-                        </div>
-
-                        {/* Financial Health Indicators */}
-                        <div className="bg-primary/5 rounded-2xl p-5 border border-primary/10 space-y-4">
-                          <div className="flex items-center justify-between">
-                            <h5 className="text-xs font-black text-primary uppercase tracking-widest">Salud Financiera & Estructura</h5>
-                            <span className={cn(
-                              "text-xs font-black px-2 py-0.5 rounded-md",
-                              stats.fixedCoverage > 50 ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                            )}>
-                              {stats.fixedCoverage.toFixed(1)}% Compromiso Fijo
-                            </span>
                           </div>
                           
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-center text-xs font-semibold text-on-surface/70">
-                              <span>Compromiso de Ingresos en Gastos Fijos</span>
-                              <span className="font-bold">{stats.fixedCoverage.toFixed(1)}% (Meta: &lt; 50%)</span>
+                          <div className="w-full mt-6 space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              {stats.classificationData.map((item) => (
+                                <div key={item.name} className="flex flex-col p-4 bg-on-surface/[0.02] rounded-2xl border border-on-surface/5">
+                                  <div className="flex items-center gap-2 mb-1.5">
+                                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></div>
+                                    <span className="text-[10px] font-black text-on-surface-variant/70 uppercase tracking-wider">{item.name}</span>
+                                  </div>
+                                  <span className="text-base font-black text-on-surface">{formatCurrency(item.value, stats.activeCurrency)}</span>
+                                  <span className="text-[10px] font-bold text-on-surface-variant/50 mt-0.5">
+                                    {((item.value / stats.totalExpenses) * 100).toFixed(1)}% del gasto
+                                  </span>
+                                </div>
+                              ))}
                             </div>
-                            <div className="w-full h-2 bg-on-surface/5 rounded-full overflow-hidden">
-                              <div 
-                                className={cn("h-full transition-all duration-1000", stats.fixedCoverage > 50 ? "bg-rose-500" : "bg-emerald-500")}
-                                style={{ width: `${Math.min(stats.fixedCoverage, 100)}%` }}
-                              />
+
+                            {/* Financial Health Indicators */}
+                            <div className="bg-primary/5 rounded-2xl p-5 border border-primary/10 space-y-4">
+                              <div className="flex items-center justify-between">
+                                <h5 className="text-xs font-black text-primary uppercase tracking-widest">Salud Financiera & Estructura</h5>
+                                <span className={cn(
+                                  "text-xs font-black px-2 py-0.5 rounded-md",
+                                  stats.fixedCoverage > 50 ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                )}>
+                                  {stats.fixedCoverage.toFixed(1)}% Compromiso Fijo
+                                </span>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-center text-xs font-semibold text-on-surface/70">
+                                  <span>Compromiso de Ingresos en Gastos Fijos</span>
+                                  <span className="font-bold">{stats.fixedCoverage.toFixed(1)}% (Meta: &lt; 50%)</span>
+                                </div>
+                                <div className="w-full h-2 bg-on-surface/5 rounded-full overflow-hidden">
+                                  <div 
+                                    className={cn("h-full transition-all duration-1000", stats.fixedCoverage > 50 ? "bg-rose-500" : "bg-emerald-500")}
+                                    style={{ width: `${Math.min(stats.fixedCoverage, 100)}%` }}
+                                  />
+                                </div>
+                                <p className="text-[10px] text-on-surface-variant/60 leading-relaxed">
+                                  Según la regla de finanzas personales 50/30/20, se recomienda que tus gastos fijos (necesidades básicas) no superen el 50% de tus ingresos netos.
+                                </p>
+                              </div>
                             </div>
-                            <p className="text-[10px] text-on-surface-variant/60 leading-relaxed">
-                              Según la regla de finanzas personales 50/30/20, se recomienda que tus gastos fijos (necesidades básicas) no superen el 50% de tus ingresos netos.
-                            </p>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  </ChartCard>
+                      </ChartCard>
+                    )}
+
+                    {/* Bloque 2: Medios de Pago y Liquidez */}
+                    {stats.paymentMethodsBreakdown.length > 0 && (
+                      <ChartCard title="Medios de Pago & Liquidez" icon={<CreditCard size={18} />}>
+                        <div className="space-y-6 mt-3">
+                          {/* Macro KPIs: Liquidez vs Financiamiento */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="p-4 bg-surface-container-low/60 rounded-2xl border border-on-surface/5 flex items-center justify-between">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <Banknote size={16} className="text-emerald-500" />
+                                  <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">Liquidez Inmediata</span>
+                                </div>
+                                <div className="flex items-baseline gap-2">
+                                  <span className="text-lg font-black text-on-surface tracking-tight">
+                                    {formatCurrency(stats.liquidityTotal, stats.activeCurrency)}
+                                  </span>
+                                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                    {stats.liquidityRatio.toFixed(1)}%
+                                  </span>
+                                </div>
+                                <p className="text-[9px] text-on-surface-variant/50 font-medium">Débito, Efectivo y Transferencias</p>
+                              </div>
+                              <span className="text-[10px] font-black uppercase px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                Fondos Propios
+                              </span>
+                            </div>
+
+                            <div className="p-4 bg-surface-container-low/60 rounded-2xl border border-on-surface/5 flex items-center justify-between">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <CreditCard size={16} className="text-pink-500" />
+                                  <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">Financiamiento (Tarjetas)</span>
+                                </div>
+                                <div className="flex items-baseline gap-2">
+                                  <span className="text-lg font-black text-on-surface tracking-tight">
+                                    {formatCurrency(stats.financingTotal, stats.activeCurrency)}
+                                  </span>
+                                  <span className="text-xs font-bold text-pink-600 dark:text-pink-400">
+                                    {stats.financingRatio.toFixed(1)}%
+                                  </span>
+                                </div>
+                                <p className="text-[9px] text-on-surface-variant/50 font-medium">Tarjetas de Crédito y Cuotas</p>
+                              </div>
+                              <span className="text-[10px] font-black uppercase px-2 py-1 rounded-lg bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20">
+                                Deuda a Vencer
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Donut Chart + Payment Method Cards */}
+                          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center pt-2">
+                            {/* Donut Chart */}
+                            <div className="lg:col-span-5 flex flex-col items-center justify-center">
+                              <div className="relative w-48 h-48">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <PieChart>
+                                    <Pie
+                                      data={stats.paymentMethodsBreakdown}
+                                      cx="50%"
+                                      cy="50%"
+                                      innerRadius={65}
+                                      outerRadius={88}
+                                      paddingAngle={5}
+                                      dataKey="amount"
+                                      animationDuration={1200}
+                                    >
+                                      {stats.paymentMethodsBreakdown.map((entry: any, index: number) => (
+                                        <Cell key={`cell-pm-${index}`} fill={entry.color} stroke="none" />
+                                      ))}
+                                    </Pie>
+                                  </PieChart>
+                                </ResponsiveContainer>
+                                <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4 pointer-events-none">
+                                  <span className="text-[9px] font-bold text-on-surface/40 uppercase tracking-widest">Gastos Totales</span>
+                                  <span className="text-sm font-black text-on-surface">{formatCurrency(stats.totalExpenses, stats.activeCurrency)}</span>
+                                </div>
+                              </div>
+                              <span className="text-[10px] text-on-surface-variant/50 font-medium mt-2">
+                                Toca un medio para ver el drill-down
+                              </span>
+                            </div>
+
+                            {/* Interactive Payment Method Cards */}
+                            <div className="lg:col-span-7 space-y-2.5">
+                              {stats.paymentMethodsBreakdown.map((method: any) => (
+                                <button
+                                  key={method.id}
+                                  onClick={() => setSelectedMethodModal(method)}
+                                  className="w-full text-left p-3.5 bg-surface-container-low/60 hover:bg-surface-container-low rounded-2xl border border-on-surface/5 hover:border-on-surface/15 transition-all group flex items-center justify-between gap-3"
+                                >
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <div 
+                                      className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" 
+                                      style={{ backgroundColor: `${method.color}15`, color: method.color }}
+                                    >
+                                      {method.id === 'credit_card' ? <CreditCard size={18} /> :
+                                       method.id === 'cash' ? <Banknote size={18} /> :
+                                       method.id === 'transfer' ? <ArrowUpRight size={18} /> :
+                                       <Wallet size={18} />}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-on-surface truncate group-hover:text-primary transition-colors">
+                                          {method.name}
+                                        </span>
+                                        <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-on-surface/5 text-on-surface-variant/60">
+                                          {method.count} {method.count === 1 ? 'mov.' : 'movs.'}
+                                        </span>
+                                      </div>
+                                      <span className="text-[10px] text-on-surface-variant/50 font-medium">
+                                        {method.categories.length} {method.categories.length === 1 ? 'rubro pagado' : 'rubros pagados'}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="text-right shrink-0">
+                                    <div className="text-xs font-black text-on-surface font-mono">
+                                      {formatCurrency(method.amount, stats.activeCurrency)}
+                                    </div>
+                                    <span className="text-[10px] font-bold text-on-surface-variant/50">
+                                      {method.value.toFixed(1)}% del gasto
+                                    </span>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </ChartCard>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -1708,6 +2137,190 @@ export const Stats: React.FC = () => {
               <div className="p-4 bg-surface-container-low/40 border-t border-on-surface/5 text-center">
                 <button
                   onClick={() => setSelectedCategoryModal(null)}
+                  className="w-full py-2.5 bg-surface-container-lowest hover:bg-surface-container-low border border-on-surface/10 rounded-xl text-xs font-black text-on-surface uppercase tracking-wider transition-all"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Payment Method Drill-Down Modal */}
+        {selectedMethodModal && (
+          <div 
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs"
+            onClick={() => setSelectedMethodModal(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-lg bg-surface-container-lowest rounded-t-[2.5rem] sm:rounded-[2rem] border border-on-surface/10 shadow-2xl max-h-[85vh] flex flex-col overflow-hidden"
+            >
+              {/* Modal Header */}
+              <div className="p-6 border-b border-on-surface/5 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div 
+                    className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm"
+                    style={{ backgroundColor: `${selectedMethodModal.color}20`, color: selectedMethodModal.color }}
+                  >
+                    {selectedMethodModal.id === 'credit_card' ? <CreditCard size={20} /> :
+                     selectedMethodModal.id === 'cash' ? <Banknote size={20} /> :
+                     selectedMethodModal.id === 'transfer' ? <ArrowUpRight size={20} /> :
+                     <Wallet size={20} />}
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-base font-bold text-on-surface tracking-tight truncate">
+                      {selectedMethodModal.name}
+                    </h3>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest">
+                        {modalMethodTransactions.length} movimientos
+                      </span>
+                      <span>•</span>
+                      <span className="text-[10px] font-black text-primary">
+                        {selectedMethodModal.value.toFixed(1)}% del total
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedMethodModal(null)}
+                  className="w-8 h-8 rounded-full bg-on-surface/5 hover:bg-on-surface/10 flex items-center justify-center text-on-surface-variant transition-colors shrink-0"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Total Summary */}
+              <div className="px-6 py-3 bg-surface-container-low/40 flex items-center justify-between border-b border-on-surface/5 shrink-0">
+                <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Desembolso acumulado</span>
+                <span className="text-base font-black font-headline text-on-surface">
+                  {formatCurrency(selectedMethodModal.amount, stats.activeCurrency)}
+                </span>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto space-y-5 custom-scrollbar flex-1">
+                {/* Plásticos Utilizados (Only if Credit Card) */}
+                {selectedMethodModal.id === 'credit_card' && selectedMethodModal.cards && selectedMethodModal.cards.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">
+                      Plásticos Utilizados ({selectedMethodModal.cards.length})
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {selectedMethodModal.cards.map((card: any) => (
+                        <div key={card.name} className="p-2.5 bg-surface-container-low/60 rounded-xl border border-on-surface/5 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <CreditCard size={14} className="text-pink-500 shrink-0" />
+                            <span className="text-xs font-bold text-on-surface truncate">{card.name}</span>
+                          </div>
+                          <span className="text-xs font-mono font-bold text-on-surface shrink-0">
+                            {formatCurrency(card.amount, stats.activeCurrency)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Categories Paid with this Method */}
+                {selectedMethodModal.categories && selectedMethodModal.categories.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">
+                      Rubros Pagados con este Medio ({selectedMethodModal.categories.length})
+                    </span>
+                    <div className="space-y-2">
+                      {selectedMethodModal.categories.map((cat: any) => {
+                        const catPct = selectedMethodModal.amount > 0 ? (cat.amount / selectedMethodModal.amount) * 100 : 0;
+                        return (
+                          <div key={cat.id || cat.name} className="p-2.5 bg-surface-container-low/60 rounded-xl border border-on-surface/5 space-y-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+                                <span className="font-bold text-on-surface truncate">{cat.name}</span>
+                                <span className="text-[9px] text-on-surface-variant/50">({cat.count} movs)</span>
+                              </div>
+                              <div className="text-right shrink-0 flex items-center gap-1.5">
+                                <span className="font-black text-on-surface font-mono">{formatCurrency(cat.amount, stats.activeCurrency)}</span>
+                                <span className="text-[10px] font-bold text-on-surface-variant/50">({catPct.toFixed(0)}%)</span>
+                              </div>
+                            </div>
+                            <div className="h-1 w-full bg-on-surface/[0.05] rounded-full overflow-hidden">
+                              <div 
+                                className="h-full rounded-full transition-all duration-700" 
+                                style={{ width: `${Math.min(catPct, 100)}%`, backgroundColor: cat.color }} 
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Transaction List */}
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">
+                    Movimientos ({modalMethodTransactions.length})
+                  </span>
+                  {modalMethodTransactions.length === 0 ? (
+                    <p className="text-center text-on-surface-variant text-sm py-4">No se encontraron movimientos para este medio en este período.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {modalMethodTransactions.map((tx: any) => {
+                        const txDate = safeToDate(tx.date);
+                        return (
+                          <div 
+                            key={tx.id} 
+                            className="p-3 bg-surface-container-low/60 rounded-2xl border border-on-surface/5 flex items-center justify-between gap-3 hover:bg-surface-container-low transition-colors"
+                          >
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-bold text-on-surface truncate">
+                                  {tx.description || tx.categoryName || 'Gasto'}
+                                </span>
+                                {tx.isInstallment && tx.installmentNumber && (
+                                  <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20">
+                                    Cuota {tx.installmentNumber}/{tx.totalInstallments || '?'}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-[10px] text-on-surface-variant/70 font-medium">
+                                <span>{txDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                                {tx.categoryName && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="truncate">{tx.categoryName}</span>
+                                  </>
+                                )}
+                                {tx.cardName && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="truncate">{tx.cardName}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="text-xs font-black font-mono text-rose-500">
+                                -{formatCurrency(tx.amount, stats.activeCurrency)}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 bg-surface-container-low/40 border-t border-on-surface/5 text-center shrink-0">
+                <button
+                  onClick={() => setSelectedMethodModal(null)}
                   className="w-full py-2.5 bg-surface-container-lowest hover:bg-surface-container-low border border-on-surface/10 rounded-xl text-xs font-black text-on-surface uppercase tracking-wider transition-all"
                 >
                   Cerrar
