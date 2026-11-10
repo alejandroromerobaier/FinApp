@@ -8,7 +8,8 @@ import {
   Calendar, TrendingUp, TrendingDown, Wallet, Layers, Loader2, ChevronLeft, ChevronRight,
   ArrowUpRight, ArrowDownRight, Activity, PieChart as PieChartIcon, 
   BarChart3, Info, Clock, CreditCard, Target, Zap, Globe, PiggyBank,
-  AlertTriangle, AlertCircle, X, Banknote, CheckCircle2, Landmark
+  AlertTriangle, AlertCircle, X, Banknote, CheckCircle2, Landmark,
+  Users, Scale, ArrowRight
 } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
 import { getTransactions, getBudgets } from '../services/firestoreService';
@@ -106,6 +107,7 @@ export const Stats: React.FC = () => {
   const [selectedCategoryModal, setSelectedCategoryModal] = useState<any | null>(null);
   const [selectedMethodModal, setSelectedMethodModal] = useState<any | null>(null);
   const [selectedClassificationModal, setSelectedClassificationModal] = useState<any | null>(null);
+  const [selectedMemberModal, setSelectedMemberModal] = useState<any | null>(null);
   const [filterProject, setFilterProject] = useState<string>('all');
   const [viewType, setViewType] = useState<'expense' | 'income'>('expense');
   const [selectedCurrency, setSelectedCurrency] = useState<string>('');
@@ -371,21 +373,100 @@ export const Stats: React.FC = () => {
       const topExpenseCategory = distribution[0] || { name: 'N/A', value: 0 };
       const topIncomeCategory = incomeDistribution[0] || { name: 'N/A', value: 0 };
 
-      // User contribution
-      const userContributionMap: Record<string, { income: number; expense: number }> = {};
+      // User contribution & Shared Expenses
+      const MEMBER_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6', '#f43f5e', '#3b82f6'];
+      const userContributionMap: Record<string, { 
+        income: number; 
+        expense: number;
+        count: number;
+        categoriesMap: Record<string, { id: string; name: string; amount: number; color: string; icon: string; count: number }>;
+      }> = {};
+
       filtered.forEach(t => {
         if (!userContributionMap[t.authorId]) {
-          userContributionMap[t.authorId] = { income: 0, expense: 0 };
+          userContributionMap[t.authorId] = { income: 0, expense: 0, count: 0, categoriesMap: {} };
         }
-        if (t.type === 'income') userContributionMap[t.authorId].income += t.amount;
-        else userContributionMap[t.authorId].expense += t.amount;
+        if (t.type === 'income') {
+          userContributionMap[t.authorId].income += t.amount;
+        } else {
+          userContributionMap[t.authorId].expense += t.amount;
+          userContributionMap[t.authorId].count += 1;
+
+          const catId = t.categoryId || 'other';
+          const cat = categories.find(c => c.id === catId);
+          const catName = cat?.name || t.categoryName || 'Otros';
+          const catColor = getHexFromClass(cat?.color || t.categoryColor || '');
+          const catIcon = cat?.icon || t.categoryIcon || 'Tag';
+
+          if (!userContributionMap[t.authorId].categoriesMap[catId]) {
+            userContributionMap[t.authorId].categoriesMap[catId] = {
+              id: catId,
+              name: catName,
+              amount: 0,
+              color: catColor,
+              icon: catIcon,
+              count: 0
+            };
+          }
+          userContributionMap[t.authorId].categoriesMap[catId].amount += t.amount;
+          userContributionMap[t.authorId].categoriesMap[catId].count += 1;
+        }
       });
 
-      const userContributions = Object.entries(userContributionMap).map(([uid, data]) => ({
+      const userContributionsRaw = Object.entries(userContributionMap).map(([uid, data], idx) => ({
         name: userNames[uid] || 'Usuario',
         id: uid,
-        ...data
+        income: data.income,
+        expense: data.expense,
+        count: data.count,
+        color: MEMBER_COLORS[idx % MEMBER_COLORS.length],
+        percentageOfExpenses: totalExpenses > 0 ? (data.expense / totalExpenses) * 100 : 0,
+        categories: Object.values(data.categoriesMap).sort((a, b) => b.amount - a.amount)
       })).sort((a, b) => b.expense - a.expense);
+
+      // Shared expenses settlement (Compensation: Quién le debe a quién - Partes Iguales)
+      const activeMembers = userContributionsRaw.filter(u => u.expense > 0 || u.income > 0);
+      const totalSharedExpense = activeMembers.reduce((acc, u) => acc + u.expense, 0);
+      const memberCount = activeMembers.length;
+      const fairShare = memberCount > 0 ? totalSharedExpense / memberCount : 0;
+
+      const userContributions = userContributionsRaw.map(u => ({
+        ...u,
+        fairShare,
+        netBalance: u.expense - fairShare
+      }));
+
+      // Debt resolution
+      const debts: Array<{ fromId: string; fromName: string; toId: string; toName: string; amount: number }> = [];
+      const creditors = userContributions.filter(m => m.netBalance > 0.5).map(m => ({ ...m }));
+      const debtors = userContributions.filter(m => m.netBalance < -0.5).map(m => ({ ...m, netBalance: Math.abs(m.netBalance) }));
+
+      creditors.sort((a, b) => b.netBalance - a.netBalance);
+      debtors.sort((a, b) => b.netBalance - a.netBalance);
+
+      let cIdx = 0;
+      let dIdx = 0;
+      while (cIdx < creditors.length && dIdx < debtors.length) {
+        const c = creditors[cIdx];
+        const d = debtors[dIdx];
+        const amount = Math.min(c.netBalance, d.netBalance);
+
+        if (amount > 0.5) {
+          debts.push({
+            fromId: d.id,
+            fromName: d.name,
+            toId: c.id,
+            toName: c.name,
+            amount
+          });
+        }
+
+        c.netBalance -= amount;
+        d.netBalance -= amount;
+
+        if (c.netBalance <= 0.5) cIdx++;
+        if (d.netBalance <= 0.5) dIdx++;
+      }
 
       // Evolution data
       const evolutionMap: Record<string, { expense: number; income: number }> = {};
@@ -798,6 +879,9 @@ export const Stats: React.FC = () => {
         topExpenseCategory,
         topIncomeCategory,
         userContributions,
+        debts,
+        fairShare,
+        totalSharedExpense,
         evolution,
         transactionCount,
         peakDayLabel,
@@ -854,6 +938,13 @@ export const Stats: React.FC = () => {
       return typeKey === selectedClassificationModal.id && t.type === 'expense';
     }).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [selectedClassificationModal, stats]);
+
+  const modalMemberTransactions = useMemo(() => {
+    if (!selectedMemberModal || !stats) return [];
+    return stats.filteredTransactions.filter((t: any) => 
+      t.authorId === selectedMemberModal.id && t.type === 'expense'
+    ).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [selectedMemberModal, stats]);
 
   if (loading) {
     return (
@@ -2006,43 +2097,203 @@ export const Stats: React.FC = () => {
             {/* TAB: MIEMBROS */}
             {activeTab === 'members' && (
               <div className="space-y-8">
-                <ChartCard title="Actividad por Miembro" icon={<Target size={18} />}>
-                  {stats.userContributions.length === 0 ? (
-                    <p className="text-center text-on-surface-variant text-sm py-8">
-                      No hay transacciones registradas de miembros para este período.
+                {stats.userContributions.length === 0 ? (
+                  <div className="p-8 text-center bg-surface-container-lowest rounded-[2rem] border border-on-surface/10 space-y-3">
+                    <Users size={32} className="mx-auto text-on-surface-variant/40" />
+                    <h3 className="text-base font-bold text-on-surface">Sin actividad registrada</h3>
+                    <p className="text-xs text-on-surface-variant max-w-sm mx-auto">
+                      No hay transacciones registradas de miembros para este período y filtros seleccionados.
                     </p>
-                  ) : (
-                    <div className="space-y-4 mt-4">
-                      {stats.userContributions.map((user) => (
-                        <div key={user.id} className="bg-on-surface/[0.02] p-5 rounded-2xl flex flex-col gap-3 border border-on-surface/5">
-                          <div className="flex justify-between items-center">
-                            <span className="font-bold text-on-surface">{user.name}</span>
-                            <div className="flex gap-4">
-                              <div className="text-right">
-                                <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Gastos</p>
-                                <p className="text-sm font-bold text-on-surface">{formatCurrency(user.expense, stats.activeCurrency)}</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Bloque 1: Balance de Compensación (Quién le debe a quién) */}
+                    {stats.userContributions.length > 1 ? (
+                      <ChartCard title="Balance de Compensación" icon={<Scale size={18} />}>
+                        <div className="space-y-5 mt-3">
+                          {/* Macro KPIs: Gasto Compartido y Aporte Equitativo */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="p-4 bg-surface-container-low/60 rounded-2xl border border-on-surface/5 flex items-center justify-between">
+                              <div className="space-y-1">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">Fondo Común Gastado</span>
+                                <div className="text-lg font-black text-on-surface tracking-tight">
+                                  {formatCurrency(stats.totalSharedExpense, stats.activeCurrency)}
+                                </div>
+                                <p className="text-[9px] text-on-surface-variant/50 font-medium">Suma de aportes de todos los miembros</p>
                               </div>
-                              <div className="text-right">
-                                <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Ingresos</p>
-                                <p className="text-sm font-bold text-on-surface">{formatCurrency(user.income, stats.activeCurrency)}</p>
+                              <span className="text-[10px] font-black uppercase px-2 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20">
+                                {stats.userContributions.length} Miembros
+                              </span>
+                            </div>
+
+                            <div className="p-4 bg-surface-container-low/60 rounded-2xl border border-on-surface/5 flex items-center justify-between">
+                              <div className="space-y-1">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">Aporte Equitativo (50/50)</span>
+                                <div className="text-lg font-black text-on-surface tracking-tight">
+                                  {formatCurrency(stats.fairShare, stats.activeCurrency)}
+                                </div>
+                                <p className="text-[9px] text-on-surface-variant/50 font-medium">Monto ideal por persona en partes iguales</p>
                               </div>
+                              <span className="text-[10px] font-black uppercase px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                Por Persona
+                              </span>
                             </div>
                           </div>
-                          <div className="w-full h-2 bg-on-surface/[0.05] rounded-full overflow-hidden flex">
-                            <div 
-                              className="h-full bg-rose-500 transition-all duration-1000" 
-                              style={{ width: `${(user.expense / (user.expense + user.income || 1)) * 100}%` }}
-                            />
-                            <div 
-                              className="h-full bg-emerald-500 transition-all duration-1000" 
-                              style={{ width: `${(user.income / (user.expense + user.income || 1)) * 100}%` }}
-                            />
+
+                          {/* Debt / Settlement Cards */}
+                          <div className="space-y-2.5">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">
+                              Liquidación del Período
+                            </span>
+
+                            {stats.debts.length === 0 ? (
+                              <div className="p-4 bg-emerald-500/[0.05] border border-emerald-500/20 rounded-2xl flex items-center gap-3 text-emerald-700 dark:text-emerald-300">
+                                <CheckCircle2 size={20} className="shrink-0 text-emerald-500" />
+                                <div>
+                                  <p className="text-xs font-bold">¡Cuentas equilibradas!</p>
+                                  <p className="text-[10px] opacity-80">Todos los miembros aportaron partes equivalentes en este período. No hay saldos pendientes.</p>
+                                </div>
+                              </div>
+                            ) : (
+                              stats.debts.map((debt: any, idx: number) => (
+                                <div 
+                                  key={idx} 
+                                  className="p-4 bg-surface-container-low/60 rounded-2xl border border-on-surface/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                                >
+                                  <div className="flex items-center gap-2.5 flex-wrap">
+                                    <div className="w-8 h-8 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 font-black text-xs flex items-center justify-center shrink-0">
+                                      {debt.fromName.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="text-xs font-bold text-on-surface">{debt.fromName}</span>
+                                    <div className="flex items-center gap-1 text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-on-surface/5">
+                                      <span>debe transferir a</span>
+                                      <ArrowRight size={12} className="text-primary" />
+                                    </div>
+                                    <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-black text-xs flex items-center justify-center shrink-0">
+                                      {debt.toName.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="text-xs font-bold text-on-surface">{debt.toName}</span>
+                                  </div>
+                                  <div className="text-right sm:shrink-0">
+                                    <span className="text-sm font-black font-mono text-primary bg-primary/10 px-2.5 py-1 rounded-xl border border-primary/20">
+                                      {formatCurrency(debt.amount, stats.activeCurrency)}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+
+                          <div className="bg-primary/5 rounded-2xl p-4 border border-primary/10">
+                            <p className="text-[10px] text-on-surface-variant/70 leading-relaxed font-medium">
+                              Cálculo informativo basado en una división equitativa en partes iguales del total de gastos compartidos del período.
+                            </p>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </ChartCard>
+                      </ChartCard>
+                    ) : (
+                      <div className="p-4 bg-surface-container-low/40 rounded-2xl border border-on-surface/5 text-xs text-on-surface-variant/70 flex items-center gap-3">
+                        <Users size={18} className="text-primary shrink-0" />
+                        <span>En este período solo se registraron gastos de un único miembro. Al registrar gastos de otros participantes en proyectos compartidos, aquí verás el cálculo automático de compensación.</span>
+                      </div>
+                    )}
+
+                    {/* Bloque 2: Distribución de Aportes & Tarjetas Interactivas de Miembros */}
+                    <ChartCard title="Participación y Aportes" icon={<Users size={18} />}>
+                      <div className="space-y-6 mt-3">
+                        {/* Continuous Effort Bar (% of Common Pool) */}
+                        {stats.totalSharedExpense > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">
+                              <span>Distribución del Gasto Total</span>
+                              <span>100% fondo común</span>
+                            </div>
+                            <div className="relative h-3.5 w-full bg-on-surface/[0.06] rounded-full overflow-hidden flex">
+                              {stats.userContributions.map((u: any, idx: number) => (
+                                <motion.div
+                                  key={u.id}
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${Math.min(u.percentageOfExpenses, 100)}%` }}
+                                  transition={{ duration: 1.2, delay: idx * 0.1, ease: "easeOut" }}
+                                  style={{ backgroundColor: u.color }}
+                                  className="h-full relative group cursor-pointer hover:opacity-90 transition-opacity"
+                                  title={`${u.name}: ${u.percentageOfExpenses.toFixed(1)}% (${formatCurrency(u.expense, stats.activeCurrency)})`}
+                                />
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-4 flex-wrap pt-1">
+                              {stats.userContributions.map((u: any) => (
+                                <div key={u.id} className="flex items-center gap-1.5 text-[10px] font-bold text-on-surface-variant">
+                                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: u.color }} />
+                                  <span>{u.name} ({u.percentageOfExpenses.toFixed(0)}%)</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Interactive Member Cards */}
+                        <div className="space-y-3">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">
+                            Detalle por Miembro (Toca para ver sus gastos)
+                          </span>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {stats.userContributions.map((u: any) => (
+                              <button
+                                key={u.id}
+                                onClick={() => setSelectedMemberModal(u)}
+                                className="w-full text-left p-4 bg-surface-container-low/60 hover:bg-surface-container-low rounded-2xl border border-on-surface/5 hover:border-on-surface/15 transition-all group flex flex-col justify-between space-y-3 active:scale-[0.99] cursor-pointer"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <div 
+                                      className="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-black text-sm shrink-0 shadow-sm"
+                                      style={{ backgroundColor: u.color }}
+                                    >
+                                      {u.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <span className="text-xs font-bold text-on-surface block truncate group-hover:text-primary transition-colors">
+                                        {u.name}
+                                      </span>
+                                      <span className="text-[10px] text-on-surface-variant/60 font-medium">
+                                        {u.count} {u.count === 1 ? 'movimiento' : 'movimientos'} • {u.categories.length} {u.categories.length === 1 ? 'rubro' : 'rubros'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <ChevronRight size={14} className="text-on-surface-variant/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+                                </div>
+
+                                <div className="flex items-end justify-between border-t border-on-surface/5 pt-3">
+                                  <div>
+                                    <span className="text-[9px] font-black text-on-surface-variant/50 uppercase tracking-widest block">Aporte Real</span>
+                                    <span className="text-sm font-black font-headline text-on-surface">{formatCurrency(u.expense, stats.activeCurrency)}</span>
+                                  </div>
+                                  {stats.userContributions.length > 1 && (
+                                    <div className="text-right">
+                                      <span className={cn(
+                                        "text-[10px] font-black uppercase px-2 py-0.5 rounded-md inline-block",
+                                        u.netBalance > 0.5 
+                                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" 
+                                          : u.netBalance < -0.5 
+                                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20" 
+                                            : "bg-on-surface/5 text-on-surface-variant/70"
+                                      )}>
+                                        {u.netBalance > 0.5 ? `+${formatCurrency(u.netBalance, stats.activeCurrency)} a favor` :
+                                         u.netBalance < -0.5 ? `-${formatCurrency(Math.abs(u.netBalance), stats.activeCurrency)} debe` :
+                                         'A mano'}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </ChartCard>
+                  </>
+                )}
               </div>
             )}
           </>
@@ -2506,6 +2757,200 @@ export const Stats: React.FC = () => {
               <div className="p-4 bg-surface-container-low/40 border-t border-on-surface/5 text-center shrink-0">
                 <button
                   onClick={() => setSelectedClassificationModal(null)}
+                  className="w-full py-2.5 bg-surface-container-lowest hover:bg-surface-container-low border border-on-surface/10 rounded-xl text-xs font-black text-on-surface uppercase tracking-wider transition-all"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Member Drill-Down Modal */}
+        {selectedMemberModal && (
+          <div 
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs"
+            onClick={() => setSelectedMemberModal(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-lg bg-surface-container-lowest rounded-t-[2.5rem] sm:rounded-[2rem] border border-on-surface/10 shadow-2xl max-h-[85vh] flex flex-col overflow-hidden"
+            >
+              {/* Modal Header */}
+              <div className="p-6 border-b border-on-surface/5 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div 
+                    className="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-black text-sm shrink-0 shadow-sm"
+                    style={{ backgroundColor: selectedMemberModal.color }}
+                  >
+                    {selectedMemberModal.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-base font-bold text-on-surface tracking-tight truncate">
+                      {selectedMemberModal.name}
+                    </h3>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest">
+                        {modalMemberTransactions.length} movimientos
+                      </span>
+                      {stats.totalSharedExpense > 0 && (
+                        <>
+                          <span>•</span>
+                          <span className="text-[10px] font-black text-primary">
+                            {selectedMemberModal.percentageOfExpenses.toFixed(1)}% del fondo común
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedMemberModal(null)}
+                  className="w-8 h-8 rounded-full bg-on-surface/5 hover:bg-on-surface/10 flex items-center justify-center text-on-surface-variant transition-colors shrink-0"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto space-y-6">
+                {/* Total Summary Banner */}
+                <div className="p-4 bg-surface-container-low/50 rounded-2xl border border-on-surface/5 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/60 block">
+                      Aporte Total del Miembro
+                    </span>
+                    <span className="text-xl font-black font-headline text-on-surface">
+                      {formatCurrency(selectedMemberModal.expense, stats.activeCurrency)}
+                    </span>
+                  </div>
+                  {stats.userContributions.length > 1 && (
+                    <div className="text-right">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/60 block">
+                        Balance Neto
+                      </span>
+                      <span className={cn(
+                        "text-xs font-black uppercase px-2 py-0.5 rounded-md inline-block mt-0.5",
+                        selectedMemberModal.netBalance > 0.5 
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" 
+                          : selectedMemberModal.netBalance < -0.5 
+                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20" 
+                            : "bg-on-surface/5 text-on-surface-variant/70"
+                      )}>
+                        {selectedMemberModal.netBalance > 0.5 ? `+${formatCurrency(selectedMemberModal.netBalance, stats.activeCurrency)} a favor` :
+                         selectedMemberModal.netBalance < -0.5 ? `-${formatCurrency(Math.abs(selectedMemberModal.netBalance), stats.activeCurrency)} debe` :
+                         'A mano'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Categories breakdown by this member */}
+                {selectedMemberModal.categories && selectedMemberModal.categories.length > 0 && (
+                  <div className="space-y-3">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">
+                      Gastos por Categoría
+                    </span>
+                    <div className="space-y-2">
+                      {selectedMemberModal.categories.map((c: any) => {
+                        const catPercent = selectedMemberModal.expense > 0 ? (c.amount / selectedMemberModal.expense) * 100 : 0;
+                        return (
+                          <div 
+                            key={c.id}
+                            className="p-3 bg-surface-container-low/40 rounded-xl border border-on-surface/5 space-y-2"
+                          >
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div 
+                                  className="w-5 h-5 rounded-lg flex items-center justify-center shrink-0"
+                                  style={{ backgroundColor: `${c.color}20`, color: c.color }}
+                                >
+                                  <CategoryIconBadge name={c.icon} size={11} />
+                                </div>
+                                <span className="font-bold text-on-surface truncate">{c.name}</span>
+                                <span className="text-[10px] text-on-surface-variant/50 font-medium">({c.count})</span>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <span className="font-bold text-on-surface font-mono">{formatCurrency(c.amount, stats.activeCurrency)}</span>
+                                <span className="text-[10px] text-on-surface-variant/60 ml-1.5 font-bold">({catPercent.toFixed(0)}%)</span>
+                              </div>
+                            </div>
+                            <div className="w-full h-1.5 bg-on-surface/5 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full rounded-full transition-all duration-700"
+                                style={{ width: `${Math.min(catPercent, 100)}%`, backgroundColor: c.color || selectedMemberModal.color }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Transactions List */}
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">
+                    Movimientos ({modalMemberTransactions.length})
+                  </span>
+                  {modalMemberTransactions.length === 0 ? (
+                    <p className="text-center text-on-surface-variant text-sm py-4">No se encontraron movimientos registrados por este miembro.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {modalMemberTransactions.map((tx: any) => {
+                        const txDate = safeToDate(tx.date);
+                        return (
+                          <div 
+                            key={tx.id} 
+                            className="p-3 bg-surface-container-low/60 rounded-2xl border border-on-surface/5 flex items-center justify-between gap-3 hover:bg-surface-container-low transition-colors"
+                          >
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-bold text-on-surface truncate">
+                                  {tx.description || tx.categoryName || 'Gasto'}
+                                </span>
+                                {tx.isInstallment && tx.installmentNumber && (
+                                  <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20">
+                                    Cuota {tx.installmentNumber}/{tx.totalInstallments || '?'}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-[10px] text-on-surface-variant/70 font-medium">
+                                <span>{txDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                                {tx.categoryName && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="truncate">{tx.categoryName}</span>
+                                  </>
+                                )}
+                                {(tx.cardName || tx.paymentMethod) && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="truncate">{tx.cardName || tx.paymentMethod}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="text-xs font-black font-mono text-rose-500">
+                                -{formatCurrency(tx.amount, stats.activeCurrency)}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 bg-surface-container-low/40 border-t border-on-surface/5 text-center shrink-0">
+                <button
+                  onClick={() => setSelectedMemberModal(null)}
                   className="w-full py-2.5 bg-surface-container-lowest hover:bg-surface-container-low border border-on-surface/10 rounded-xl text-xs font-black text-on-surface uppercase tracking-wider transition-all"
                 >
                   Cerrar
