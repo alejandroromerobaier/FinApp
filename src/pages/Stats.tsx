@@ -105,6 +105,7 @@ export const Stats: React.FC = () => {
   const [activeTab, setActiveTab] = useState<StatsTab>('overview');
   const [selectedCategoryModal, setSelectedCategoryModal] = useState<any | null>(null);
   const [selectedMethodModal, setSelectedMethodModal] = useState<any | null>(null);
+  const [selectedClassificationModal, setSelectedClassificationModal] = useState<any | null>(null);
   const [filterProject, setFilterProject] = useState<string>('all');
   const [viewType, setViewType] = useState<'expense' | 'income'>('expense');
   const [selectedCurrency, setSelectedCurrency] = useState<string>('');
@@ -537,27 +538,57 @@ export const Stats: React.FC = () => {
       }).sort((a, b) => b.actual - a.actual);
 
       // Classification breakdown
-      const classMap = {
-        fixed: 0,
-        variable: 0,
-        unclassified: 0
+      const classMap: Record<string, {
+        id: string;
+        name: string;
+        amount: number;
+        color: string;
+        count: number;
+        categoriesMap: Record<string, { id: string; name: string; amount: number; color: string; icon: string; count: number }>;
+      }> = {
+        fixed: { id: 'fixed', name: 'Fijos', amount: 0, color: '#6366f1', count: 0, categoriesMap: {} },
+        variable: { id: 'variable', name: 'Variables', amount: 0, color: '#f59e0b', count: 0, categoriesMap: {} },
+        unclassified: { id: 'unclassified', name: 'Sin Clasif.', amount: 0, color: '#94a3b8', count: 0, categoriesMap: {} }
       };
 
       expenses.forEach(t => {
-        if (t.classification === 'fixed') classMap.fixed += t.amount;
-        else if (t.classification === 'variable') classMap.variable += t.amount;
-        else classMap.unclassified += t.amount;
+        const typeKey = (t.classification === 'fixed' || t.classification === 'variable') ? t.classification : 'unclassified';
+        classMap[typeKey].amount += t.amount;
+        classMap[typeKey].count += 1;
+
+        const catId = t.categoryId || 'other';
+        const cat = categories.find(c => c.id === catId);
+        const catName = cat?.name || t.categoryName || 'Otros';
+        const catColor = getHexFromClass(cat?.color || t.categoryColor || '');
+        const catIcon = cat?.icon || t.categoryIcon || 'Tag';
+
+        if (!classMap[typeKey].categoriesMap[catId]) {
+          classMap[typeKey].categoriesMap[catId] = {
+            id: catId,
+            name: catName,
+            amount: 0,
+            color: catColor,
+            icon: catIcon,
+            count: 0
+          };
+        }
+        classMap[typeKey].categoriesMap[catId].amount += t.amount;
+        classMap[typeKey].categoriesMap[catId].count += 1;
       });
 
-      const classificationData = [
-        { name: 'Fijos', value: classMap.fixed, color: '#6366f1' },
-        { name: 'Variables', value: classMap.variable, color: '#f59e0b' },
-        { name: 'Sin Clasif.', value: classMap.unclassified, color: '#94a3b8' }
-      ].filter(d => d.value > 0);
+      const classificationData = Object.values(classMap).filter(d => d.amount > 0).map(d => ({
+        id: d.id,
+        name: d.name,
+        value: d.amount,
+        amount: d.amount,
+        color: d.color,
+        count: d.count,
+        categories: Object.values(d.categoriesMap).sort((a, b) => b.amount - a.amount)
+      }));
 
-      const fixedCoverage = totalIncome > 0 ? (classMap.fixed / totalIncome) * 100 : 0;
-      const savingsPotential = totalIncome - classMap.fixed;
-      const variableRatio = totalExpenses > 0 ? (classMap.variable / totalExpenses) * 100 : 0;
+      const fixedCoverage = totalIncome > 0 ? (classMap.fixed.amount / totalIncome) * 100 : 0;
+      const savingsPotential = totalIncome - classMap.fixed.amount;
+      const variableRatio = totalExpenses > 0 ? (classMap.variable.amount / totalExpenses) * 100 : 0;
 
       // Category Income Impact
       const categoryIncomeImpact = Object.entries(catMap).map(([id, value]) => {
@@ -814,6 +845,15 @@ export const Stats: React.FC = () => {
       return key === selectedMethodModal.id && t.type === 'expense';
     }).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [selectedMethodModal, stats]);
+
+  const modalClassificationTransactions = useMemo(() => {
+    if (!selectedClassificationModal || !stats) return [];
+    return stats.filteredTransactions.filter((t: any) => {
+      const c = t.classification;
+      const typeKey = (c === 'fixed' || c === 'variable') ? c : 'unclassified';
+      return typeKey === selectedClassificationModal.id && t.type === 'expense';
+    }).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [selectedClassificationModal, stats]);
 
   if (loading) {
     return (
@@ -1333,25 +1373,25 @@ export const Stats: React.FC = () => {
             {activeTab === 'categories' && (
               <div className="space-y-8">
                 {/* Distribution Donut & Category List with Drill-Down */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Distribution Card */}
-                  <ChartCard 
-                    title={`Distribución de ${viewType === 'expense' ? 'Gastos' : 'Ingresos'}`} 
-                    icon={<PieChartIcon size={18} />}
-                  >
-                    <div className="flex flex-col items-center py-4">
-                      <div className="relative w-48 h-48">
+                <ChartCard 
+                  title={`Distribución de ${viewType === 'expense' ? 'Gastos' : 'Ingresos'}`} 
+                  icon={<PieChartIcon size={18} />}
+                >
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center pt-2">
+                    {/* Donut Chart */}
+                    <div className="lg:col-span-5 flex flex-col items-center justify-center">
+                      <div className="relative w-52 h-52">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie
                               data={viewType === 'expense' ? stats.distribution : stats.incomeDistribution}
                               cx="50%"
                               cy="50%"
-                              innerRadius={65}
-                              outerRadius={85}
+                              innerRadius={68}
+                              outerRadius={92}
                               paddingAngle={4}
                               dataKey="value"
-                              animationDuration={1500}
+                              animationDuration={1200}
                             >
                               {(viewType === 'expense' ? stats.distribution : stats.incomeDistribution).map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={entry.color} />
@@ -1359,7 +1399,7 @@ export const Stats: React.FC = () => {
                             </Pie>
                           </PieChart>
                         </ResponsiveContainer>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4 pointer-events-none">
                           <span className="text-[9px] font-black text-on-surface-variant/50 uppercase tracking-widest">
                             {viewType === 'expense' ? 'Gasto Top' : 'Ingreso Top'}
                           </span>
@@ -1371,110 +1411,61 @@ export const Stats: React.FC = () => {
                           </span>
                         </div>
                       </div>
+                      <span className="text-[10px] text-on-surface-variant/50 font-medium mt-2">
+                        Toca una categoría para ver su detalle
+                      </span>
+                    </div>
 
-                      <div className="w-full mt-6 space-y-2 max-h-80 overflow-y-auto pr-1 custom-scrollbar">
-                        <div className="flex items-center justify-between px-2 mb-1">
-                          <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider">
-                            Categoría (Toca para ver detalle)
-                          </span>
-                          <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider">
-                            % / Importe
-                          </span>
-                        </div>
-                        {(viewType === 'expense' ? stats.distribution : stats.incomeDistribution).map((item) => (
+                    {/* Interactive Category List */}
+                    <div className="lg:col-span-7 space-y-2 max-h-96 overflow-y-auto pr-1 custom-scrollbar">
+                      <div className="flex items-center justify-between px-2 mb-1">
+                        <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider">
+                          Categoría (Toca para ver movimientos)
+                        </span>
+                        <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider">
+                          % / Importe
+                        </span>
+                      </div>
+                      {(viewType === 'expense' ? stats.distribution : stats.incomeDistribution).map((item) => (
+                        <div 
+                          key={item.id || item.name} 
+                          onClick={() => setSelectedCategoryModal(item)}
+                          className="relative overflow-hidden p-3 bg-surface-container-low/40 hover:bg-surface-container-low transition-all cursor-pointer rounded-2xl border border-on-surface/5 hover:border-primary/30 active:scale-[0.99] group"
+                          title="Tocar para ver movimientos"
+                        >
                           <div 
-                            key={item.id || item.name} 
-                            onClick={() => setSelectedCategoryModal(item)}
-                            className="relative overflow-hidden p-3 bg-surface-container-low/40 hover:bg-surface-container-low transition-all cursor-pointer rounded-2xl border border-on-surface/5 hover:border-primary/30 active:scale-[0.99] group"
-                            title="Tocar para ver movimientos"
-                          >
-                            <div 
-                              className="absolute left-0 top-0 bottom-0 bg-primary/[0.04] group-hover:bg-primary/[0.08] transition-colors -z-10 rounded-2xl"
-                              style={{ width: `${Math.min(item.value, 100)}%` }}
-                            />
-                            <div className="flex justify-between items-center gap-2 relative z-10">
-                              <div className="flex items-center gap-3 min-w-0">
-                                <div 
-                                  className="w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0 shadow-xs group-hover:scale-105 transition-transform" 
-                                  style={{ backgroundColor: item.color }}
-                                >
-                                  <CategoryIconBadge name={item.icon} size={15} />
-                                </div>
-                                <div className="truncate">
-                                  <span className="text-xs font-bold text-on-surface block truncate group-hover:text-primary transition-colors">
-                                    {item.name}
-                                  </span>
-                                  <span className="text-[10px] font-mono text-on-surface-variant/60 block">
-                                    {formatCurrency(item.amount, stats.activeCurrency)}
-                                  </span>
-                                </div>
+                            className="absolute left-0 top-0 bottom-0 bg-primary/[0.04] group-hover:bg-primary/[0.08] transition-colors -z-10 rounded-2xl"
+                            style={{ width: `${Math.min(item.value, 100)}%` }}
+                          />
+                          <div className="flex justify-between items-center gap-2 relative z-10">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div 
+                                className="w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0 shadow-xs group-hover:scale-105 transition-transform" 
+                                style={{ backgroundColor: item.color }}
+                              >
+                                <CategoryIconBadge name={item.icon} size={15} />
                               </div>
-                              <div className="text-right shrink-0 flex items-center gap-2">
-                                <span className="text-xs font-mono font-black text-on-surface bg-surface-container-lowest px-2 py-0.5 rounded-md border border-on-surface/5">
-                                  {item.value.toFixed(1)}%
+                              <div className="truncate">
+                                <span className="text-xs font-bold text-on-surface block truncate group-hover:text-primary transition-colors">
+                                  {item.name}
                                 </span>
-                                <ChevronRight size={14} className="text-on-surface-variant/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+                                <span className="text-[10px] font-mono text-on-surface-variant/60 block">
+                                  {formatCurrency(item.amount, stats.activeCurrency)}
+                                </span>
                               </div>
                             </div>
+                            <div className="text-right shrink-0 flex items-center gap-2">
+                              <span className="text-xs font-mono font-black text-on-surface bg-surface-container-lowest px-2 py-0.5 rounded-md border border-on-surface/5">
+                                {item.value.toFixed(1)}%
+                              </span>
+                              <ChevronRight size={14} className="text-on-surface-variant/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+                            </div>
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ))}
                     </div>
-                  </ChartCard>
-
-                  {/* Category Ranking Bar Chart */}
-                  <ChartCard 
-                    title={`Top 10 ${viewType === 'expense' ? 'Gastos' : 'Ingresos'}`} 
-                    icon={<BarChart3 size={18} />}
-                  >
-                    <div className="h-[420px] w-full mt-4">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart 
-                          layout="vertical" 
-                          data={(viewType === 'expense' ? stats.distribution : stats.incomeDistribution).slice(0, 10)} 
-                          margin={{ left: -20, right: 20 }}
-                          onClick={(data: any) => {
-                            if (data && data.activePayload && data.activePayload[0]) {
-                              setSelectedCategoryModal(data.activePayload[0].payload);
-                            }
-                          }}
-                        >
-                          <XAxis type="number" hide />
-                          <YAxis 
-                            dataKey="name" 
-                            type="category" 
-                            axisLine={false} 
-                            tickLine={false} 
-                            tick={{ fontSize: 10, fontWeight: 700, fill: 'var(--color-on-surface-variant)' }}
-                            width={90}
-                          />
-                          <Tooltip 
-                            cursor={{ fill: 'rgba(128,128,128,0.06)' }}
-                            contentStyle={{ 
-                              backgroundColor: 'var(--color-surface-container-lowest)', 
-                              color: 'var(--color-on-surface)',
-                              borderRadius: '12px', 
-                              border: '1px solid var(--color-surface-container-low)', 
-                              boxShadow: '0 4px 12px rgba(0,0,0,0.15)' 
-                            }}
-                            formatter={(val: any) => [formatCurrency(Number(val), stats.activeCurrency), 'Monto']}
-                          />
-                          <Bar 
-                            dataKey="amount" 
-                            radius={[0, 10, 10, 0]} 
-                            barSize={14}
-                            animationDuration={1500}
-                            className="cursor-pointer"
-                          >
-                            {(viewType === 'expense' ? stats.distribution : stats.incomeDistribution).slice(0, 10).map((entry, index) => (
-                              <Cell key={`cell-bar-${index}`} fill={entry.color} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </ChartCard>
-                </div>
+                  </div>
+                </ChartCard>
 
                 {/* Budget Compliance Chart (Consolidado Ejecutivo) */}
                 {stats.budgetComparison.length > 0 && (() => {
@@ -1811,22 +1802,37 @@ export const Stats: React.FC = () => {
                               <span className="text-base font-black text-on-surface">{formatCurrency(stats.totalExpenses, stats.activeCurrency)}</span>
                             </div>
                           </div>
-                          
-                          <div className="w-full mt-6 space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                              {stats.classificationData.map((item) => (
-                                <div key={item.name} className="flex flex-col p-4 bg-on-surface/[0.02] rounded-2xl border border-on-surface/5">
-                                  <div className="flex items-center gap-2 mb-1.5">
-                                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></div>
-                                    <span className="text-[10px] font-black text-on-surface-variant/70 uppercase tracking-wider">{item.name}</span>
+                          <span className="text-[10px] text-on-surface-variant/50 font-medium mt-2">
+                            Toca Fijos o Variables para ver el desglose
+                          </span>
+                        
+                        <div className="w-full mt-6 space-y-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            {stats.classificationData.map((item: any) => (
+                              <button
+                                key={item.id || item.name}
+                                onClick={() => setSelectedClassificationModal(item)}
+                                className="flex flex-col p-4 bg-on-surface/[0.02] hover:bg-on-surface/[0.06] rounded-2xl border border-on-surface/5 hover:border-on-surface/20 transition-all text-left cursor-pointer group active:scale-[0.99]"
+                              >
+                                <div className="flex items-center justify-between w-full mb-1.5">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }}></div>
+                                    <span className="text-[10px] font-black text-on-surface-variant/70 uppercase tracking-wider truncate group-hover:text-primary transition-colors">{item.name}</span>
                                   </div>
-                                  <span className="text-base font-black text-on-surface">{formatCurrency(item.value, stats.activeCurrency)}</span>
-                                  <span className="text-[10px] font-bold text-on-surface-variant/50 mt-0.5">
+                                  <ChevronRight size={14} className="text-on-surface-variant/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+                                </div>
+                                <span className="text-base font-black text-on-surface font-headline">{formatCurrency(item.value, stats.activeCurrency)}</span>
+                                <div className="flex items-center justify-between w-full mt-1">
+                                  <span className="text-[10px] font-bold text-on-surface-variant/50">
                                     {((item.value / stats.totalExpenses) * 100).toFixed(1)}% del gasto
                                   </span>
+                                  <span className="text-[9px] font-black text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                                    Ver rubros
+                                  </span>
                                 </div>
-                              ))}
-                            </div>
+                              </button>
+                            ))}
+                          </div>
 
                             {/* Financial Health Indicators */}
                             <div className="bg-primary/5 rounded-2xl p-5 border border-primary/10 space-y-4">
@@ -2341,6 +2347,165 @@ export const Stats: React.FC = () => {
               <div className="p-4 bg-surface-container-low/40 border-t border-on-surface/5 text-center shrink-0">
                 <button
                   onClick={() => setSelectedMethodModal(null)}
+                  className="w-full py-2.5 bg-surface-container-lowest hover:bg-surface-container-low border border-on-surface/10 rounded-xl text-xs font-black text-on-surface uppercase tracking-wider transition-all"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Classification Drill-Down Modal (Fijos vs Variables) */}
+        {selectedClassificationModal && (
+          <div 
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs"
+            onClick={() => setSelectedClassificationModal(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-lg bg-surface-container-lowest rounded-t-[2.5rem] sm:rounded-[2rem] border border-on-surface/10 shadow-2xl max-h-[85vh] flex flex-col overflow-hidden"
+            >
+              {/* Modal Header */}
+              <div className="p-6 border-b border-on-surface/5 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div 
+                    className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm"
+                    style={{ backgroundColor: `${selectedClassificationModal.color}20`, color: selectedClassificationModal.color }}
+                  >
+                    <Layers size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-base font-bold text-on-surface tracking-tight truncate">
+                      Gastos {selectedClassificationModal.name}
+                    </h3>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest">
+                        {modalClassificationTransactions.length} movimientos
+                      </span>
+                      <span>•</span>
+                      <span className="text-[10px] font-black text-primary">
+                        {((selectedClassificationModal.value / stats.totalExpenses) * 100).toFixed(1)}% del total
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedClassificationModal(null)}
+                  className="w-8 h-8 rounded-full bg-on-surface/5 hover:bg-on-surface/10 flex items-center justify-center text-on-surface-variant transition-colors shrink-0"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Total Summary */}
+              <div className="px-6 py-3 bg-surface-container-low/40 flex items-center justify-between border-b border-on-surface/5 shrink-0">
+                <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Desembolso acumulado</span>
+                <span className="text-base font-black font-headline text-on-surface">
+                  {formatCurrency(selectedClassificationModal.value, stats.activeCurrency)}
+                </span>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto space-y-5 custom-scrollbar flex-1">
+                {/* Categories Breakdown */}
+                {selectedClassificationModal.categories && selectedClassificationModal.categories.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">
+                      Categorías en este bloque ({selectedClassificationModal.categories.length})
+                    </span>
+                    <div className="space-y-2">
+                      {selectedClassificationModal.categories.map((cat: any) => {
+                        const catPct = selectedClassificationModal.value > 0 ? (cat.amount / selectedClassificationModal.value) * 100 : 0;
+                        return (
+                          <div key={cat.id || cat.name} className="p-2.5 bg-surface-container-low/60 rounded-xl border border-on-surface/5 space-y-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+                                <span className="font-bold text-on-surface truncate">{cat.name}</span>
+                                <span className="text-[9px] text-on-surface-variant/50">({cat.count} movs)</span>
+                              </div>
+                              <div className="text-right shrink-0 flex items-center gap-1.5">
+                                <span className="font-black text-on-surface font-mono">{formatCurrency(cat.amount, stats.activeCurrency)}</span>
+                                <span className="text-[10px] font-bold text-on-surface-variant/50">({catPct.toFixed(0)}%)</span>
+                              </div>
+                            </div>
+                            <div className="h-1 w-full bg-on-surface/[0.05] rounded-full overflow-hidden">
+                              <div 
+                                className="h-full rounded-full transition-all duration-700" 
+                                style={{ width: `${Math.min(catPct, 100)}%`, backgroundColor: cat.color }} 
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Transactions List */}
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">
+                    Movimientos ({modalClassificationTransactions.length})
+                  </span>
+                  {modalClassificationTransactions.length === 0 ? (
+                    <p className="text-center text-on-surface-variant text-sm py-4">No se encontraron movimientos registrados bajo esta clasificación.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {modalClassificationTransactions.map((tx: any) => {
+                        const txDate = safeToDate(tx.date);
+                        return (
+                          <div 
+                            key={tx.id} 
+                            className="p-3 bg-surface-container-low/60 rounded-2xl border border-on-surface/5 flex items-center justify-between gap-3 hover:bg-surface-container-low transition-colors"
+                          >
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-bold text-on-surface truncate">
+                                  {tx.description || tx.categoryName || 'Gasto'}
+                                </span>
+                                {tx.isInstallment && tx.installmentNumber && (
+                                  <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20">
+                                    Cuota {tx.installmentNumber}/{tx.totalInstallments || '?'}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-[10px] text-on-surface-variant/70 font-medium">
+                                <span>{txDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                                {tx.categoryName && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="truncate">{tx.categoryName}</span>
+                                  </>
+                                )}
+                                {(tx.cardName || tx.paymentMethod) && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="truncate">{tx.cardName || tx.paymentMethod}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="text-xs font-black font-mono text-rose-500">
+                                -{formatCurrency(tx.amount, stats.activeCurrency)}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 bg-surface-container-low/40 border-t border-on-surface/5 text-center shrink-0">
+                <button
+                  onClick={() => setSelectedClassificationModal(null)}
                   className="w-full py-2.5 bg-surface-container-lowest hover:bg-surface-container-low border border-on-surface/10 rounded-xl text-xs font-black text-on-surface uppercase tracking-wider transition-all"
                 >
                   Cerrar
