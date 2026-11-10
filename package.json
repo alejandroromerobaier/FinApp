@@ -9,8 +9,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "deploy:qa": "vite build --mode qa && firebase hosting:channel:deploy qa --only main",
-    "deploy:prod": "vite build --mode production && firebase deploy --only hosting",
+    "deploy:qa": "node -e \"try{require('fs').rmSync('.firebase',{recursive:true,force:true})}catch(e){}\" && vite build --mode qa && firebase deploy --project qa --config firebase.qa.json --only hosting:qa,firestore:rules",
+    "deploy:prod": "node -e \"try{require('fs').rmSync('.firebase',{recursive:true,force:true})}catch(e){}\" && vite build --mode production && firebase deploy --project default --only hosting,firestore:rules",
     "release:patch": "npm version patch",
     "release:minor": "npm version minor",
     "release:major": "npm version major"

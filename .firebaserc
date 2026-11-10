@@ -1,6 +1,7 @@
 {
   "projects": {
-    "default": "gen-lang-client-0187524364"
+    "default": "gen-lang-client-0187524364",
+    "qa": "finapp-qa"
   },
   "targets": {
     "gen-lang-client-0187524364": {
@@ -10,6 +11,13 @@
         ],
         "vbeta": [
           "finapp-vbeta"
+        ]
+      }
+    },
+    "finapp-qa": {
+      "hosting": {
+        "qa": [
+          "finapp-qa"
         ]
       }
     }
