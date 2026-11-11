@@ -11,6 +11,7 @@
     "lint": "tsc --noEmit",
     "deploy:qa": "node -e \"try{require('fs').rmSync('.firebase',{recursive:true,force:true})}catch(e){}\" && vite build --mode qa && firebase deploy --project qa --config firebase.qa.json --only hosting:qa,firestore:rules",
     "deploy:prod": "node -e \"try{require('fs').rmSync('.firebase',{recursive:true,force:true})}catch(e){}\" && vite build --mode production && firebase deploy --project default --only hosting,firestore:rules",
+    "db:sync-qa": "node scripts/sync-prod-to-qa.mjs",
     "release:patch": "npm version patch",
     "release:minor": "npm version minor",
     "release:major": "npm version major"
@@ -37,6 +38,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.21",
+    "firebase-admin": "^14.5.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
