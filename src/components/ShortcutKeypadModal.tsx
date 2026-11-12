@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Check, Loader2, Zap, Clock, Wallet, CreditCard } from 'lucide-react';
+import { X, Check, Loader2, Zap, Clock } from 'lucide-react';
 import { Shortcut, addTransaction } from '../services/firestoreService';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { ShortcutBadge } from '../pages/ManageShortcuts';
 import { formatCurrency, cn, formatCurrencyInput, formatAmountForDisplay, parseFormattedAmount } from '../lib/utils';
-import { getLocalToday } from '../lib/dateUtils';
+import { getLocalToday, getLocalYesterday } from '../lib/dateUtils';
 import { haptic } from '../lib/haptics';
 
 interface ShortcutKeypadModalProps {
@@ -19,6 +19,7 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
   const { categories, projects } = useData();
   const { profile } = useAuth();
   const [amount, setAmount] = useState<string>('');
+  const [date, setDate] = useState<string>(getLocalToday());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -31,6 +32,7 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
       } else {
         setAmount('');
       }
+      setDate(getLocalToday());
       setErrorMsg('');
       setShowSuccess(false);
 
@@ -55,7 +57,9 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
     : projects.find(p => p.id === targetProjectId);
 
   const currency = project?.currency || profile?.currency || 'ARS';
+  const currencySymbol = currency === 'USD' ? 'US$' : currency === 'ARS' ? '$' : currency;
   const parsedAmount = parseFormattedAmount(amount);
+  const isToday = date === getLocalToday();
 
   const handleConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,7 +76,7 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
         amount: parsedAmount,
         type: 'expense',
         description: shortcut.name,
-        date: getLocalToday(),
+        date: date,
         categoryId: shortcut.categoryId,
         categoryName: category?.name || 'Otros',
         categoryIcon: category?.icon || 'MoreHorizontal',
@@ -98,7 +102,7 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+      <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-6">
         {/* Backdrop */}
         <motion.div 
           initial={{ opacity: 0 }}
@@ -108,15 +112,15 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
           className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         />
 
-        {/* Modal Container (Centered, elevated z-index, PWA-safe) */}
+        {/* Modal Container (Bottom sheet on mobile, centered on desktop) */}
         <motion.div 
-          initial={{ scale: 0.95, opacity: 0, y: 20 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.95, opacity: 0, y: 20 }}
+          initial={{ y: 40, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 40, opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="bg-surface w-full max-w-md rounded-[2.5rem] shadow-2xl relative z-10 flex flex-col overflow-hidden border border-on-surface/10 max-h-[85vh] my-auto"
+          className="bg-surface w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl relative z-10 flex flex-col overflow-hidden border border-on-surface/10 max-h-[90vh] pb-safe"
         >
-          {/* Header with Save Button on Top Right */}
+          {/* Header */}
           <div className="flex justify-between items-center px-5 py-4 border-b border-on-surface/5 bg-surface shrink-0">
             <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
               <ShortcutBadge icon={shortcut.icon} size={20} containerClassName="w-10 h-10 rounded-2xl" />
@@ -142,32 +146,14 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              {!showSuccess && (
-                <button 
-                  type="submit"
-                  form="shortcut-expense-form"
-                  disabled={isSubmitting || parsedAmount <= 0}
-                  className="bg-primary hover:opacity-90 text-white px-4 py-2 rounded-xl font-extrabold text-xs shadow-md shadow-primary/20 transition-all active:scale-95 disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Check size={16} strokeWidth={3} />
-                      <span>Guardar</span>
-                    </>
-                  )}
-                </button>
-              )}
-              <button 
-                type="button"
-                onClick={onClose}
-                className="p-2 hover:bg-on-surface/5 rounded-full transition-colors text-on-surface-variant shrink-0"
-              >
-                <X size={20} />
-              </button>
-            </div>
+            <button 
+              type="button"
+              onClick={onClose}
+              className="p-2 hover:bg-on-surface/5 rounded-full transition-colors text-on-surface-variant shrink-0 cursor-pointer"
+              title="Cerrar"
+            >
+              <X size={20} />
+            </button>
           </div>
 
           {/* Form with Native Input */}
@@ -188,20 +174,51 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
               </motion.div>
             </div>
           ) : (
-            <form id="shortcut-expense-form" onSubmit={handleConfirm} className="p-6 space-y-5 bg-surface">
-              <div className="text-center space-y-1">
+            <form id="shortcut-expense-form" onSubmit={handleConfirm} className="p-6 space-y-4 bg-surface">
+              <div className="text-center space-y-2">
                 <label className="block text-xs font-black uppercase tracking-widest text-on-surface-variant/50">
                   Ingresa el Monto ({currency})
                 </label>
-                <p className="text-[11px] text-on-surface-variant/60 font-medium">
-                  Toca arriba en <span className="font-bold text-primary">"Guardar"</span> o confirma en tu teclado
-                </p>
+
+                {/* Quick Date Toggle */}
+                <div className="flex items-center justify-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptic.selection();
+                      setDate(getLocalToday());
+                    }}
+                    className={cn(
+                      "px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95",
+                      isToday
+                        ? "bg-primary text-white shadow-xs"
+                        : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
+                    )}
+                  >
+                    Hoy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptic.selection();
+                      setDate(getLocalYesterday());
+                    }}
+                    className={cn(
+                      "px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95",
+                      !isToday
+                        ? "bg-primary text-white shadow-xs"
+                        : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
+                    )}
+                  >
+                    Ayer
+                  </button>
+                </div>
               </div>
 
               {/* Native Input Field */}
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-on-surface-variant/40 font-headline">
-                  $
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-on-surface-variant/40 font-headline select-none">
+                  {currencySymbol}
                 </span>
                 <input 
                   ref={inputRef}
@@ -225,7 +242,7 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
                     });
                   }}
                   placeholder="0,00"
-                  className="w-full bg-surface-container-low border-2 border-transparent focus:border-primary/30 rounded-2xl py-4 pl-10 pr-4 text-3xl font-black font-headline text-center text-on-surface focus:ring-0 transition-all placeholder:text-on-surface-variant/20 shadow-inner"
+                  className="w-full bg-surface-container-low border-2 border-transparent focus:border-primary/30 rounded-2xl py-4 pl-12 pr-4 text-3xl font-black font-headline text-center text-on-surface focus:ring-0 transition-all placeholder:text-on-surface-variant/20 shadow-inner"
                 />
               </div>
 
@@ -235,7 +252,7 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
                 </p>
               )}
 
-              {/* Form Body Action Button */}
+              {/* Form Body Action Button (Single Primary CTA) */}
               <button 
                 type="submit"
                 disabled={isSubmitting || parsedAmount <= 0}

@@ -164,9 +164,9 @@ export const AddExpense: React.FC = () => {
 
   const [hasInitializedDefault, setHasInitializedDefault] = useState(false);
 
-  // Auto-focus on amount input when entering new transaction (with slight delay for mobile transitions)
+  // Only autofocus on non-touch devices / desktop screens to avoid mobile viewport jump
   useEffect(() => {
-    if (!id) {
+    if (!id && window.innerWidth >= 768) {
       const timer = setTimeout(() => {
         if (amountInputRef.current) {
           amountInputRef.current.focus();
@@ -357,28 +357,6 @@ export const AddExpense: React.FC = () => {
     return activeCurrency;
   }, [activeCurrency]);
 
-  const quickAddAmounts = useMemo(() => {
-    return activeCurrency === 'USD' ? [10, 50, 100, 200] : [1000, 5000, 10000, 20000];
-  }, [activeCurrency]);
-
-  const handleQuickAdd = (addVal: number) => {
-    haptic.light();
-    const current = parsedAmount || 0;
-    const next = current + addVal;
-    setAmount(formatAmountForDisplay(next));
-    if (amountInputRef.current) {
-      amountInputRef.current.focus();
-    }
-  };
-
-  const handleClearAmount = () => {
-    haptic.light();
-    setAmount('');
-    if (amountInputRef.current) {
-      amountInputRef.current.focus();
-    }
-  };
-
   const frequentCategories = useMemo(() => {
     if (!categories.length) return [];
     const counts: Record<string, number> = {};
@@ -521,13 +499,13 @@ export const AddExpense: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-surface flex flex-col pb-10">
-      {/* Header (Fixed with blur and safe area) */}
-      <header className="fixed top-0 w-full z-40 glass-header pt-safe-top bg-surface/90 backdrop-blur-xl border-b border-on-surface/5">
+      {/* Header (Sticky, keyboard-safe) */}
+      <header className="sticky top-0 w-full z-40 glass-header bg-surface/95 backdrop-blur-xl border-b border-on-surface/5">
         <div className="flex items-center justify-between px-4 sm:px-6 h-16 max-w-2xl mx-auto w-full">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button 
               onClick={() => navigate(-1)} 
-              className="text-on-surface p-2 hover:bg-on-surface/5 rounded-full transition-colors active:scale-90 flex items-center justify-center shrink-0"
+              className="text-on-surface p-2 hover:bg-on-surface/5 rounded-full transition-colors active:scale-90 flex items-center justify-center shrink-0 cursor-pointer"
               title="Volver atrás"
             >
               <ArrowLeft size={22} />
@@ -537,46 +515,30 @@ export const AddExpense: React.FC = () => {
             </span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {/* Cancel Button */}
-            <button
-              onClick={() => navigate(-1)}
-              className="text-xs font-bold text-on-surface-variant/70 hover:text-on-surface px-3 py-1.5 rounded-xl hover:bg-on-surface/5 transition-colors uppercase tracking-wider"
-              title="Descartar cambios y salir"
-            >
-              Cancelar
-            </button>
-
             {id && isAuthor && (
               <button 
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="p-2 text-rose-600 hover:bg-rose-500/10 rounded-full transition-colors active:scale-90"
+                className="p-2 text-rose-600 hover:bg-rose-500/10 rounded-full transition-colors active:scale-90 cursor-pointer"
                 title="Eliminar transacción"
               >
                 {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
               </button>
             )}
 
-            {isAuthor && (
-              <button 
-                onClick={handleSave} 
-                disabled={!isValidAmount || isSaving}
-                className={cn(
-                  "font-bold text-xs sm:text-sm px-3.5 sm:px-4 py-2 rounded-xl transition-all active:scale-95 flex items-center gap-1.5 shadow-sm",
-                  (!isValidAmount || isSaving) 
-                    ? "text-on-surface-variant/30 bg-on-surface/5 cursor-not-allowed shadow-none" 
-                    : "text-white bg-primary hover:bg-primary/90 shadow-primary/20"
-                )}
-              >
-                {isSaving && <Loader2 size={14} className="animate-spin" />}
-                {id ? 'Actualizar' : 'Guardar'}
-              </button>
-            )}
+            {/* Cancel Button */}
+            <button
+              onClick={() => navigate(-1)}
+              className="text-xs font-bold text-on-surface-variant/70 hover:text-on-surface px-3 py-1.5 rounded-xl hover:bg-on-surface/5 transition-colors uppercase tracking-wider cursor-pointer"
+              title="Descartar cambios y salir"
+            >
+              Cancelar
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 pt-[calc(4.5rem+env(safe-area-inset-top,0px))] max-w-2xl mx-auto w-full px-6 flex flex-col gap-8 pb-32 sm:pb-12">
+      <main className="flex-1 py-6 max-w-2xl mx-auto w-full px-6 flex flex-col gap-8 pb-20">
         {!isAuthor && (
           <div className="bg-amber-500/10 border border-amber-500/10 p-4 rounded-2xl flex items-center gap-3 text-amber-700">
             <ShieldCheck size={20} />
@@ -642,36 +604,8 @@ export const AddExpense: React.FC = () => {
                 "w-full max-w-[340px] bg-transparent border-none p-0 focus:ring-0 text-5xl sm:text-7xl font-black tracking-tighter font-headline text-center placeholder:text-on-surface-variant/10 transition-all",
                 type === 'expense' ? "text-on-surface" : "text-emerald-600 dark:text-emerald-400"
               )}
-              autoFocus={isAuthor}
             />
           </div>
-
-          {/* Quick Amount Presets & Clear */}
-          {isAuthor && (
-            <div className="flex items-center justify-center gap-2 flex-wrap pt-3">
-              {quickAddAmounts.map((val) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => handleQuickAdd(val)}
-                  className="px-3 py-1.5 rounded-xl text-xs font-black bg-surface-container-low hover:bg-surface-container text-on-surface border border-on-surface/5 transition-all active:scale-95 shadow-2xs cursor-pointer"
-                >
-                  +{activeCurrency === 'USD' ? `U$S ${val}` : `$${val.toLocaleString('es-AR')}`}
-                </button>
-              ))}
-              {amount && (
-                <button
-                  type="button"
-                  onClick={handleClearAmount}
-                  className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 transition-all active:scale-95 flex items-center gap-1 cursor-pointer"
-                  title="Borrar monto"
-                >
-                  <X size={13} strokeWidth={3} />
-                  <span>Borrar</span>
-                </button>
-              )}
-            </div>
-          )}
         </section>
 
         {/* Form Sections */}
@@ -1387,46 +1321,6 @@ export const AddExpense: React.FC = () => {
           Descartar y volver atrás
         </button>
       </main>
-
-      {/* Sticky Mobile Confirm Bar */}
-      {isAuthor && (
-        <div className="fixed bottom-0 left-0 right-0 z-30 p-3 sm:hidden bg-surface/90 backdrop-blur-xl border-t border-on-surface/10 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] transition-all shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
-          <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
-            <div className="min-w-0 flex-1 pl-1">
-              <p className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/60 truncate">
-                {type === 'expense' ? 'Total Gasto' : 'Total Ingreso'}
-              </p>
-              <p className={cn(
-                "text-lg font-black font-headline truncate leading-tight",
-                type === 'expense' ? "text-on-surface" : "text-emerald-600 dark:text-emerald-400"
-              )}>
-                {isValidAmount ? formatCurrency(currentTotalAmount, activeCurrency) : `${currencySymbol} 0,00`}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={!isValidAmount || isSaving}
-              className={cn(
-                "px-5 py-3 rounded-2xl font-black text-sm shadow-lg transition-all active:scale-95 flex items-center gap-2 shrink-0 cursor-pointer",
-                (!isValidAmount || isSaving)
-                  ? "bg-on-surface/10 text-on-surface-variant/40 cursor-not-allowed shadow-none"
-                  : type === 'expense'
-                    ? "bg-primary text-white shadow-primary/25"
-                    : "bg-emerald-600 text-white shadow-emerald-600/25"
-              )}
-            >
-              {isSaving ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Check size={16} strokeWidth={3} />
-              )}
-              <span>{id ? 'Actualizar' : 'Confirmar'}</span>
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Category Selection Sheet */}
       <AnimatePresence>
