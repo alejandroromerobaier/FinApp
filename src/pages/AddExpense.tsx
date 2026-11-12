@@ -167,17 +167,18 @@ export const AddExpense: React.FC = () => {
 
   const [hasInitializedDefault, setHasInitializedDefault] = useState(false);
 
-  // Only autofocus on non-touch devices / desktop screens to avoid mobile viewport jump
+  // Autofocus and select amount input on mount
   useEffect(() => {
-    if (!id && window.innerWidth >= 768) {
+    if (isAuthor && !initialLoading) {
       const timer = setTimeout(() => {
         if (amountInputRef.current) {
           amountInputRef.current.focus();
+          amountInputRef.current.select();
         }
       }, 150);
       return () => clearTimeout(timer);
     }
-  }, [id]);
+  }, [id, isAuthor, initialLoading]);
 
   const visibleProjects = useMemo(() => {
     return projects.filter(p => {
@@ -502,42 +503,28 @@ export const AddExpense: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-surface flex flex-col pb-10">
-      {/* Header (Sticky, keyboard-safe) */}
+      {/* Header (Sticky, clean & minimal) */}
       <header className="sticky top-0 w-full z-40 glass-header bg-surface/95 backdrop-blur-xl border-b border-on-surface/5">
-        <div className="flex items-center justify-between px-4 sm:px-6 h-16 max-w-2xl mx-auto w-full">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <button 
-              onClick={() => navigate(-1)} 
-              className="text-on-surface p-2 hover:bg-on-surface/5 rounded-full transition-colors active:scale-90 flex items-center justify-center shrink-0 cursor-pointer"
-              title="Volver atrás"
-            >
-              <ArrowLeft size={22} />
-            </button>
-            <span className="text-lg sm:text-xl font-extrabold tracking-tight text-on-surface font-headline truncate">
+        <div className="flex items-center justify-between px-6 h-14 max-w-2xl mx-auto w-full">
+          <div>
+            <h1 className="text-base sm:text-lg font-black tracking-tight text-on-surface font-headline">
               {id ? 'Editar Transacción' : 'Nueva Transacción'}
-            </span>
+            </h1>
+            <p className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider">
+              {destination === 'shared' ? 'Gasto Compartido' : 'Gasto Personal'}
+            </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {id && isAuthor && (
-              <button 
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="p-2 text-rose-600 hover:bg-rose-500/10 rounded-full transition-colors active:scale-90 cursor-pointer"
-                title="Eliminar transacción"
-              >
-                {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
-              </button>
-            )}
-
-            {/* Cancel Button */}
-            <button
-              onClick={() => navigate(-1)}
-              className="text-xs font-bold text-on-surface-variant/70 hover:text-on-surface px-3 py-1.5 rounded-xl hover:bg-on-surface/5 transition-colors uppercase tracking-wider cursor-pointer"
-              title="Descartar cambios y salir"
+          {id && isAuthor && (
+            <button 
+              type="button"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="p-2 text-rose-600 hover:bg-rose-500/10 rounded-xl transition-colors active:scale-90 cursor-pointer"
+              title="Eliminar transacción"
             >
-              Cancelar
+              {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
             </button>
-          </div>
+          )}
         </div>
       </header>
 
@@ -599,9 +586,13 @@ export const AddExpense: React.FC = () => {
               ref={amountInputRef}
               type="text"
               inputMode="decimal"
+              autoFocus
               readOnly={!isAuthor}
               value={amount}
               onChange={handleAmountChange}
+              onFocus={(e) => {
+                e.target.select();
+              }}
               placeholder="0,00"
               className={cn(
                 "w-full max-w-[340px] bg-transparent border-none p-0 focus:ring-0 text-5xl sm:text-7xl font-black tracking-tighter font-headline text-center placeholder:text-on-surface-variant/10 transition-all",
