@@ -61,6 +61,7 @@ const formatMonthLabel = (dateStr: string): string => {
 
 import { getCategoryIcon } from '../lib/categoryIcons';
 import { getProjectIcon, getProjectGradient } from '../lib/constants';
+import { CustomDatePickerModal } from '../components/CustomDatePickerModal';
 
 const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => {
   const Icon = getCategoryIcon(name);
@@ -133,6 +134,8 @@ export const AddExpense: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<any>(null);
   const [showCategorySheet, setShowCategorySheet] = useState(false);
   const [showProjectSheet, setShowProjectSheet] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showFirstDueDatePicker, setShowFirstDueDatePicker] = useState(false);
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(getLocalToday());
   const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Débito' | 'Tarjeta de Crédito'>('Efectivo');
@@ -538,7 +541,7 @@ export const AddExpense: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex-1 py-6 max-w-2xl mx-auto w-full px-6 flex flex-col gap-8 pb-20">
+      <main className="flex-1 py-6 max-w-2xl mx-auto w-full px-6 flex flex-col gap-8 pb-32 sm:pb-36">
         {!isAuthor && (
           <div className="bg-amber-500/10 border border-amber-500/10 p-4 rounded-2xl flex items-center gap-3 text-amber-700">
             <ShieldCheck size={20} />
@@ -626,30 +629,27 @@ export const AddExpense: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Date Selector with Quick Pills */}
             <div 
-              className="date-container relative bg-surface-container-lowest p-5 sm:p-6 rounded-3xl border border-on-surface/5 shadow-sm flex flex-col justify-between group overflow-hidden"
+              className="relative bg-surface-container-lowest p-5 sm:p-6 rounded-3xl border border-on-surface/5 shadow-sm flex flex-col justify-between group overflow-hidden"
             >
-              <input 
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                title="Elegir fecha"
-              />
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70">Fecha</label>
-                <ChevronRight size={18} className="text-on-surface-variant/30" />
-              </div>
-              <div className="flex items-center gap-3 text-on-surface font-extrabold mb-3">
-                <Calendar size={20} className="text-primary" />
-                <span className="text-base sm:text-lg">{formatDateDisplay(date)}</span>
+              <div 
+                onClick={() => setShowDatePicker(true)}
+                className="cursor-pointer group"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70">Fecha</label>
+                  <ChevronRight size={18} className="text-on-surface-variant/30 group-hover:text-on-surface-variant transition-colors" />
+                </div>
+                <div className="flex items-center gap-3 text-on-surface font-extrabold mb-3">
+                  <Calendar size={20} className="text-primary" />
+                  <span className="text-base sm:text-lg">{formatDateDisplay(date)}</span>
+                </div>
               </div>
 
               {/* Quick Date Pills */}
               <div className="flex items-center gap-1.5 pt-2 border-t border-on-surface/5 z-10">
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
+                  onClick={() => {
                     haptic.selection();
                     setDate(getLocalToday());
                   }}
@@ -664,8 +664,7 @@ export const AddExpense: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
+                  onClick={() => {
                     haptic.selection();
                     setDate(getLocalYesterday());
                   }}
@@ -680,14 +679,9 @@ export const AddExpense: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const input = e.currentTarget.closest('.date-container')?.querySelector('input[type="date"]') as HTMLInputElement;
-                    if (input && 'showPicker' in input) {
-                      input.showPicker();
-                    } else if (input) {
-                      input.click();
-                    }
+                  onClick={() => {
+                    haptic.selection();
+                    setShowDatePicker(true);
                   }}
                   className={cn(
                     "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 active:scale-95 cursor-pointer",
@@ -1152,13 +1146,14 @@ export const AddExpense: React.FC = () => {
                               </span>
                             )}
                           </div>
-                          <div className="relative">
-                            <input
-                              type="date"
-                              value={firstDueDate}
-                              onChange={(e) => setFirstDueDate(e.target.value)}
-                              className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-on-surface/10 text-xs font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40"
-                            />
+                          <div 
+                            onClick={() => setShowFirstDueDatePicker(true)}
+                            className="cursor-pointer flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-surface-container-low border border-on-surface/10 hover:border-on-surface/20 transition-all group"
+                          >
+                            <span className="text-xs font-bold text-on-surface">
+                              {firstDueDate ? formatDateDisplay(firstDueDate) : 'Seleccionar fecha...'}
+                            </span>
+                            <Calendar size={16} className="text-primary group-hover:scale-110 transition-transform" />
                           </div>
                           <p className="text-[10px] text-on-surface-variant/60 mt-1">
                             Se distribuirá 1 cuota por mes a partir de esta fecha en el historial y presupuesto.
@@ -1217,12 +1212,15 @@ export const AddExpense: React.FC = () => {
                             <label className="block text-[10px] font-black uppercase tracking-wider text-on-surface-variant/70">
                               Fecha Vencimiento del Resumen
                             </label>
-                            <input
-                              type="date"
-                              value={firstDueDate}
-                              onChange={(e) => setFirstDueDate(e.target.value)}
-                              className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-on-surface/10 text-xs font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/40"
-                            />
+                            <div 
+                              onClick={() => setShowFirstDueDatePicker(true)}
+                              className="cursor-pointer flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-surface-container-low border border-on-surface/10 hover:border-on-surface/20 transition-all group"
+                            >
+                              <span className="text-xs font-bold text-on-surface">
+                                {firstDueDate ? formatDateDisplay(firstDueDate) : 'Seleccionar fecha...'}
+                              </span>
+                              <Calendar size={16} className="text-primary group-hover:scale-110 transition-transform" />
+                            </div>
                             <div className="flex items-start gap-2.5 p-3 rounded-xl bg-primary/5 border border-primary/10 text-primary">
                               <Info size={15} className="shrink-0 mt-0.5" />
                               <p className="text-[11px] leading-relaxed">
@@ -1278,26 +1276,6 @@ export const AddExpense: React.FC = () => {
           </div>
         </div>
 
-        {/* Confirm Button */}
-        {isAuthor && (
-          <button 
-            onClick={handleSave}
-            disabled={!amount || parseFloat(amount) <= 0 || isSaving}
-            className={cn(
-              "w-full py-6 rounded-[2rem] font-black text-xl shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-3",
-              (!amount || parseFloat(amount) <= 0 || isSaving)
-                ? "bg-on-surface/5 text-on-surface-variant/20 cursor-not-allowed"
-                : type === 'expense' 
-                  ? "bg-on-surface text-surface-container-lowest shadow-on-surface/20" 
-                  : "bg-emerald-600 text-white shadow-emerald-500/20"
-            )}
-          >
-            {isSaving ? 'Guardando...' : id ? 'Actualizar Transacción' : `Confirmar ${type === 'expense' ? 'Gasto' : 'Ingreso'}`}
-            {!isSaving && <Check size={24} strokeWidth={3} />}
-            {isSaving && <Loader2 size={24} className="animate-spin" />}
-          </button>
-        )}
-
         {/* Delete Button (Only when editing and is Author) */}
         {id && isAuthor && (
           <button 
@@ -1310,17 +1288,63 @@ export const AddExpense: React.FC = () => {
             Eliminar Transacción
           </button>
         )}
-
-        {/* Cancel / Discard Action */}
-        <button 
-          type="button"
-          onClick={() => navigate(-1)}
-          disabled={isSaving || isDeleting}
-          className="w-full py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider text-on-surface-variant/70 hover:text-on-surface hover:bg-on-surface/5 transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-        >
-          Descartar y volver atrás
-        </button>
       </main>
+
+      {/* Fixed Bottom Action Dock (Thumb Zone) */}
+      {isAuthor && (
+        <div className="fixed bottom-0 left-0 right-0 z-30 p-3 sm:p-4 bg-surface/90 backdrop-blur-xl border-t border-on-surface/10 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shadow-[0_-4px_24px_rgba(0,0,0,0.08)]">
+          <div className="max-w-2xl mx-auto flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              disabled={isSaving || isDeleting}
+              className="px-4 py-3.5 rounded-2xl bg-surface-container hover:bg-surface-container-high text-on-surface font-extrabold text-xs uppercase tracking-wider border border-on-surface/10 transition-all active:scale-95 flex items-center gap-1.5 shrink-0 cursor-pointer"
+              title="Volver atrás"
+            >
+              <ArrowLeft size={16} />
+              <span>Volver</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={!isValidAmount || isSaving}
+              className={cn(
+                "flex-1 py-3.5 px-5 rounded-2xl font-black text-sm sm:text-base shadow-lg transition-all active:scale-98 flex items-center justify-center gap-2 cursor-pointer",
+                (!isValidAmount || isSaving)
+                  ? "bg-on-surface/10 text-on-surface-variant/40 cursor-not-allowed shadow-none"
+                  : type === 'expense'
+                    ? "bg-primary text-white shadow-primary/25 hover:bg-primary/90"
+                    : "bg-emerald-600 text-white shadow-emerald-600/25 hover:bg-emerald-500"
+              )}
+            >
+              {isSaving ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Check size={18} strokeWidth={3} />
+              )}
+              <span>{id ? 'Actualizar Transacción' : `Confirmar ${type === 'expense' ? 'Gasto' : 'Ingreso'}`}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Date Pickers */}
+      <CustomDatePickerModal
+        isOpen={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        selectedDate={date}
+        onSelectDate={(newDate) => setDate(newDate)}
+        title="Fecha de la Transacción"
+      />
+
+      <CustomDatePickerModal
+        isOpen={showFirstDueDatePicker}
+        onClose={() => setShowFirstDueDatePicker(false)}
+        selectedDate={firstDueDate}
+        onSelectDate={(newDate) => setFirstDueDate(newDate)}
+        title="Primer Vencimiento"
+      />
 
       {/* Category Selection Sheet */}
       <AnimatePresence>
