@@ -142,6 +142,7 @@ export const AddExpense: React.FC = () => {
   const [classification, setClassification] = useState<'fixed' | 'variable'>('variable');
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [initialLoading, setInitialLoading] = useState(!!id);
   const [authorId, setAuthorId] = useState<string | null>(null);
   const [originalDate, setOriginalDate] = useState<Date | null>(null);
@@ -471,22 +472,18 @@ export const AddExpense: React.FC = () => {
     }
   };
 
-  const handleDelete = async () => {
-    const confirmMsg = isExistingInstallment 
-      ? `¿Estás seguro de que deseas eliminar esta cuota individual (${existingInstallmentNumber}/${existingTotalInstallments})?`
-      : '¿Estás seguro de que deseas eliminar esta transacción?';
-    if (!id || !window.confirm(confirmMsg)) return;
-    
+  const executeDelete = async () => {
+    if (!id) return;
     setIsDeleting(true);
     try {
       await deleteTransaction(id);
       haptic.medium();
       toast.info('Transacción eliminada con éxito');
+      setShowDeleteModal(false);
       navigate(-1);
     } catch (error) {
       console.error('Error deleting transaction:', error);
       toast.error('Error al eliminar la transacción');
-    } finally {
       setIsDeleting(false);
     }
   };
@@ -1256,18 +1253,6 @@ export const AddExpense: React.FC = () => {
           </div>
         </div>
 
-        {/* Delete Button (Only when editing and is Author) */}
-        {id && isAuthor && (
-          <button 
-            type="button"
-            onClick={handleDelete}
-            disabled={isDeleting || isSaving}
-            className="w-full py-4 rounded-2xl font-bold text-rose-600 bg-rose-500/5 hover:bg-rose-500/10 transition-all active:scale-95 flex items-center justify-center gap-2"
-          >
-            {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
-            Eliminar Transacción
-          </button>
-        )}
       </main>
 
       {/* Fixed Bottom Action Dock (Thumb Zone) */}
@@ -1290,9 +1275,12 @@ export const AddExpense: React.FC = () => {
           {id && isAuthor && (
             <button
               type="button"
-              onClick={handleDelete}
+              onClick={() => {
+                haptic.medium();
+                setShowDeleteModal(true);
+              }}
               disabled={isDeleting || isSaving}
-              className="p-3.5 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 border border-rose-500/20 transition-all active:scale-95 flex items-center justify-center shrink-0 cursor-pointer"
+              className="p-3.5 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 transition-all active:scale-95 flex items-center justify-center shrink-0 cursor-pointer"
               title="Eliminar transacción"
             >
               {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
@@ -1323,6 +1311,78 @@ export const AddExpense: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Custom Destructive Confirmation Modal (Phase 1) */}
+      <AnimatePresence>
+        {showDeleteModal && (
+          <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !isDeleting && setShowDeleteModal(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+            />
+
+            {/* Modal Dialog / Bottom Sheet */}
+            <motion.div
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 250 }}
+              className="relative w-full max-w-md bg-surface-container-lowest rounded-t-[2.5rem] sm:rounded-3xl p-6 sm:p-7 shadow-2xl border border-on-surface/10 z-10 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]"
+            >
+              {/* Header Icon */}
+              <div className="w-14 h-14 rounded-2xl bg-rose-500/10 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto mb-4 border border-rose-500/20">
+                <Trash2 size={26} strokeWidth={2.2} />
+              </div>
+
+              {/* Title & Body */}
+              <div className="text-center space-y-2 mb-6">
+                <h3 className="text-lg sm:text-xl font-black text-on-surface font-headline tracking-tight">
+                  ¿Eliminar transacción?
+                </h3>
+                <p className="text-xs sm:text-sm text-on-surface-variant/80 leading-relaxed max-w-sm mx-auto">
+                  {isExistingInstallment
+                    ? `Estás a punto de eliminar la cuota ${existingInstallmentNumber} de ${existingTotalInstallments}. Los cambios aplicarán únicamente a esta cuota mensual.`
+                    : 'Esta acción no se puede deshacer. La transacción será eliminada permanentemente de tu historial y balances.'}
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={isDeleting}
+                  className="flex-1 py-3.5 px-4 rounded-2xl bg-surface-container hover:bg-surface-container-high text-on-surface font-extrabold text-xs uppercase tracking-wider border border-on-surface/10 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={executeDelete}
+                  disabled={isDeleting}
+                  className="flex-1 py-3.5 px-4 rounded-2xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-rose-600/25 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Eliminando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={16} />
+                      <span>Eliminar</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Custom Date Pickers */}
       <CustomDatePickerModal
