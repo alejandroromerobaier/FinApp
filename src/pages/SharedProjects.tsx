@@ -6,17 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { createProject, updateProject, deleteProject, removeMemberFromProject, inviteUserToProjectByEmail, updateUserProfile, getUsersByIds } from '../services/firestoreService';
-import { PROJECT_COLOR_OPTIONS } from '../lib/constants';
-
-const PROJECT_ICONS = [
-  { id: 'plane', icon: Plane, label: 'Viajes' },
-  { id: 'home', icon: Home, label: 'Hogar' },
-  { id: 'wallet', icon: Wallet, label: 'Finanzas' },
-  { id: 'briefcase', icon: Briefcase, label: 'Trabajo' },
-  { id: 'heart', icon: Heart, label: 'Pareja' },
-  { id: 'shopping-bag', icon: ShoppingBag, label: 'Compras' },
-  { id: 'landmark', icon: Landmark, label: 'Inversiones' },
-];
+import { PROJECT_COLOR_OPTIONS, PROJECT_ICONS, getProjectIcon, getProjectGradient } from '../lib/constants';
 
 export const isProjectOwner = (project: any, userId?: string): boolean => {
   if (!userId || !project) return false;
@@ -791,7 +781,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
   onToggleStatus, 
   onView 
 }) => {
-  const Icon = PROJECT_ICONS.find(i => i.id === project.icon)?.icon || Plane;
+  const Icon = getProjectIcon(project.icon);
   const isInactive = project.status === 'inactive';
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
@@ -830,8 +820,10 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
       <div className="flex justify-between items-start gap-3 mb-5">
         <div className="flex items-start gap-3.5 sm:gap-5 min-w-0 flex-1">
           <div className={cn(
-            "w-12 h-12 sm:w-16 sm:h-16 rounded-[18px] sm:rounded-[22px] flex items-center justify-center shrink-0 mt-0.5",
-            isInactive ? "bg-on-surface/10 text-on-surface-variant" : isOwner ? "bg-primary/5 text-primary" : "bg-secondary/5 text-secondary"
+            "w-12 h-12 sm:w-16 sm:h-16 rounded-[18px] sm:rounded-[22px] flex items-center justify-center shrink-0 mt-0.5 shadow-sm",
+            isInactive
+              ? "bg-on-surface/10 text-on-surface-variant"
+              : cn(getProjectGradient(project.cardColor, Boolean(project.isPersonal)), "text-white shadow-md")
           )}>
             <Icon className="w-6 h-6 sm:w-8 sm:h-8" strokeWidth={2.5} />
           </div>

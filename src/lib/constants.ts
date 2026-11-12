@@ -1,4 +1,26 @@
+import { Plane, Home, Wallet, Briefcase, Heart, ShoppingBag, Landmark, type LucideIcon } from 'lucide-react';
+
 export { APP_VERSION } from './version';
+
+export interface ProjectIconOption {
+  id: string;
+  icon: LucideIcon;
+  label: string;
+}
+
+export const PROJECT_ICONS: ProjectIconOption[] = [
+  { id: 'plane', icon: Plane, label: 'Viajes' },
+  { id: 'home', icon: Home, label: 'Hogar' },
+  { id: 'wallet', icon: Wallet, label: 'Finanzas' },
+  { id: 'briefcase', icon: Briefcase, label: 'Trabajo' },
+  { id: 'heart', icon: Heart, label: 'Pareja' },
+  { id: 'shopping-bag', icon: ShoppingBag, label: 'Compras' },
+  { id: 'landmark', icon: Landmark, label: 'Inversiones' },
+];
+
+export function getProjectIcon(iconId?: string): LucideIcon {
+  return PROJECT_ICONS.find(i => i.id === iconId)?.icon || Plane;
+}
 
 export interface ProjectColorOption {
   id: string;

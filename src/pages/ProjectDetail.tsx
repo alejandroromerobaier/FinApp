@@ -10,6 +10,7 @@ import { expandProjectedTransactions } from '../lib/installmentUtils';
 import { getLocalMonth } from '../lib/dateUtils';
 
 import { getCategoryIcon } from '../lib/categoryIcons';
+import { getProjectIcon, getProjectGradient } from '../lib/constants';
 
 const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => {
   const Icon = getCategoryIcon(name);
@@ -262,6 +263,12 @@ export const ProjectDetail: React.FC = () => {
           <button onClick={() => navigate(-1)} className="p-3 bg-surface-container-lowest rounded-2xl shadow-sm border border-on-surface/10 hover:bg-on-surface/5 transition-colors">
             <ArrowLeft size={20} />
           </button>
+          <div className={cn(
+            "w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-md shrink-0",
+            getProjectGradient(project.cardColor)
+          )}>
+            {React.createElement(getProjectIcon(project.icon), { size: 22 })}
+          </div>
           <div>
             <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-1 block">Proyecto Compartido</span>
             <h2 className="text-2xl font-extrabold text-on-surface font-headline leading-tight">{project.name}</h2>
@@ -300,8 +307,8 @@ export const ProjectDetail: React.FC = () => {
                     }
                   </p>
                 </div>
-                <div className="bg-primary text-white p-6 rounded-3xl shadow-xl shadow-primary/20 min-w-[200px]">
-                  <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Gasto del Mes</p>
+                <div className={cn("text-white p-6 rounded-3xl shadow-xl min-w-[200px]", getProjectGradient(project.cardColor))}>
+                  <p className="text-white/70 text-[10px] font-black uppercase tracking-widest mb-1">Gasto del Mes</p>
                   <div className="text-3xl font-black tracking-tight font-headline">{formatCurrency(stats.currentMonthTotal, project.currency)}</div>
                   <p className="text-white/40 text-[9px] font-bold uppercase mt-2">Total: {formatCurrency(stats.total, project.currency)}</p>
                 </div>

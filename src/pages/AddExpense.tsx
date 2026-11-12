@@ -60,9 +60,15 @@ const formatMonthLabel = (dateStr: string): string => {
 };
 
 import { getCategoryIcon } from '../lib/categoryIcons';
+import { getProjectIcon, getProjectGradient } from '../lib/constants';
 
 const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => {
   const Icon = getCategoryIcon(name);
+  return <Icon size={size} />;
+};
+
+const ProjectIconComponent = ({ name, size = 20 }: { name?: string, size?: number }) => {
+  const Icon = getProjectIcon(name);
   return <Icon size={size} />;
 };
 
@@ -700,9 +706,33 @@ export const AddExpense: React.FC = () => {
               )}
             </div>
 
-            <AnimatePresence>
-              {destination === 'shared' && (
+            <AnimatePresence mode="wait">
+              {destination === 'personal' ? (
+                <motion.div
+                  key="personal-preview"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="mt-4 flex items-center gap-4 p-5 bg-surface-container-lowest rounded-2xl border border-on-surface/5 shadow-sm">
+                    <div className={cn(
+                      "w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-sm shrink-0",
+                      getProjectGradient(profile?.personalCardColor, true)
+                    )}>
+                      <ProjectIconComponent name="wallet" size={20} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-extrabold text-on-surface">Gastos Personales</p>
+                      <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-wider">
+                        Bóveda individual • {profile?.currency || 'ARS'}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              ) : (
                 <motion.div 
+                  key="shared-selector"
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
@@ -715,8 +745,11 @@ export const AddExpense: React.FC = () => {
                     <div className="flex items-center gap-4">
                       {selectedProject ? (
                         <>
-                          <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
-                            <IconComponent name={selectedProject.icon} size={20} />
+                          <div className={cn(
+                            "w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-sm shrink-0",
+                            getProjectGradient(selectedProject.cardColor)
+                          )}>
+                            <ProjectIconComponent name={selectedProject.icon} size={20} />
                           </div>
                           <div>
                             <p className="text-sm font-extrabold text-on-surface">{selectedProject.name}</p>
@@ -1275,8 +1308,11 @@ export const AddExpense: React.FC = () => {
                       selectedProjectId === proj.id ? "bg-primary/5 border-primary/20" : "bg-surface-container-low border-on-surface/5 hover:bg-on-surface/5"
                     )}
                   >
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                      <IconComponent name={proj.icon} size={24} />
+                    <div className={cn(
+                      "w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-sm shrink-0",
+                      getProjectGradient(proj.cardColor)
+                    )}>
+                      <ProjectIconComponent name={proj.icon} size={24} />
                     </div>
                     <div className="text-left">
                       <p className="font-bold text-on-surface">{proj.name}</p>
