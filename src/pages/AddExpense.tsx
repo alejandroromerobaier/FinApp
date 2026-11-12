@@ -1282,20 +1282,23 @@ export const AddExpense: React.FC = () => {
       </main>
 
       {/* Fixed Bottom Action Dock (Thumb Zone) */}
-      {isAuthor && (
-        <div className="fixed bottom-0 left-0 right-0 z-30 p-3 sm:p-4 bg-surface/90 backdrop-blur-xl border-t border-on-surface/10 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shadow-[0_-4px_24px_rgba(0,0,0,0.08)]">
-          <div className="max-w-2xl mx-auto flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              disabled={isSaving || isDeleting}
-              className="px-4 py-3.5 rounded-2xl bg-surface-container hover:bg-surface-container-high text-on-surface font-extrabold text-xs uppercase tracking-wider border border-on-surface/10 transition-all active:scale-95 flex items-center gap-1.5 shrink-0 cursor-pointer"
-              title="Volver atrás"
-            >
-              <ArrowLeft size={16} />
-              <span>Volver</span>
-            </button>
+      <div className="fixed bottom-0 left-0 right-0 z-40 p-3 sm:p-4 bg-surface/90 backdrop-blur-xl border-t border-on-surface/10 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shadow-[0_-4px_24px_rgba(0,0,0,0.08)]">
+        <div className="max-w-2xl mx-auto flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            disabled={isSaving || isDeleting}
+            className={cn(
+              "py-3.5 rounded-2xl bg-surface-container hover:bg-surface-container-high text-on-surface font-extrabold text-xs uppercase tracking-wider border border-on-surface/10 transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer",
+              isAuthor ? "px-4 shrink-0" : "w-full"
+            )}
+            title="Volver atrás"
+          >
+            <ArrowLeft size={16} />
+            <span>Volver</span>
+          </button>
 
+          {isAuthor && (
             <button
               type="button"
               onClick={handleSave}
@@ -1316,9 +1319,9 @@ export const AddExpense: React.FC = () => {
               )}
               <span>{id ? 'Actualizar Transacción' : `Confirmar ${type === 'expense' ? 'Gasto' : 'Ingreso'}`}</span>
             </button>
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Custom Date Pickers */}
       <CustomDatePickerModal

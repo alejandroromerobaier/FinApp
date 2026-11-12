@@ -344,7 +344,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const versionInfo = getAppVersionInfo();
   
   const isAuthPage = location.pathname === '/login';
-  const isAddPage = location.pathname === '/add';
+  const isAddPage = location.pathname === '/add' || location.pathname.startsWith('/edit/');
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
   const displayedNotifs = notifications.filter(n => filterNotifs === 'all' || !n.isRead);
