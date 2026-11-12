@@ -15,6 +15,8 @@ import { useAuth } from '../lib/AuthContext';
 import { createShortcut, updateShortcut, deleteShortcut, updateShortcutOrders, Shortcut } from '../services/firestoreService';
 import { PageHeader } from '../components/PageHeader';
 import { CustomSelect } from '../components/CustomSelect';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
+import { haptic } from '../lib/haptics';
 
 export const SHORTCUT_ICONS: Record<string, any> = {
   Coffee,
@@ -315,11 +317,24 @@ export const ManageShortcuts: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de que deseas eliminar este atajo?')) return;
-    setIsDeleting(id);
+  const [shortcutToDelete, setShortcutToDelete] = useState<{ id: string; name: string } | null>(null);
+
+  const handleDelete = (id: string) => {
+    haptic.medium();
+    const item = shortcuts.find(s => s.id === id);
+    setShortcutToDelete({
+      id,
+      name: item?.name || 'este atajo'
+    });
+  };
+
+  const executeDeleteShortcut = async () => {
+    if (!shortcutToDelete) return;
+    setIsDeleting(shortcutToDelete.id);
     try {
-      await deleteShortcut(id);
+      await deleteShortcut(shortcutToDelete.id);
+      haptic.medium();
+      setShortcutToDelete(null);
     } catch (error) {
       console.error('Error deleting shortcut:', error);
     } finally {
@@ -714,6 +729,20 @@ export const ManageShortcuts: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Confirm Delete Modal */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(shortcutToDelete)}
+        onClose={() => setShortcutToDelete(null)}
+        onConfirm={executeDeleteShortcut}
+        isDeleting={Boolean(isDeleting)}
+        title="¿Eliminar atajo?"
+        description={
+          shortcutToDelete
+            ? `¿Estás seguro de que deseas eliminar permanentemente el atajo "${shortcutToDelete.name}"? Esta acción no se puede deshacer.`
+            : ''
+        }
+      />
     </div>
   );
 };

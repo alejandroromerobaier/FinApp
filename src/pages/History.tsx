@@ -43,6 +43,8 @@ import { useAuth } from '../lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { formatDisplayDate, parseLocalYYYYMMDD } from '../lib/dateUtils';
 import { PageHeader } from '../components/PageHeader';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
+import { haptic } from '../lib/haptics';
 
 import { getCategoryIcon } from '../lib/categoryIcons';
 
@@ -93,6 +95,22 @@ export const History: React.FC = () => {
     isVirtual?: boolean;
   } | null>(null);
   const [isDeletingPlan, setIsDeletingPlan] = useState(false);
+  const [txToDelete, setTxToDelete] = useState<{ id: string; description: string } | null>(null);
+  const [isDeletingTx, setIsDeletingTx] = useState(false);
+
+  const executeDeleteTx = async () => {
+    if (!txToDelete) return;
+    setIsDeletingTx(true);
+    try {
+      await deleteTransaction(txToDelete.id);
+      haptic.medium();
+      setTxToDelete(null);
+    } catch (err) {
+      console.error('Error deleting transaction:', err);
+    } finally {
+      setIsDeletingTx(false);
+    }
+  };
 
   const handleDeleteSingle = async () => {
     if (!planToDelete) return;
@@ -743,9 +761,11 @@ export const History: React.FC = () => {
                                 isVirtual: Boolean(t.isVirtualInstallment || t.parentPlanId)
                               });
                             } else {
-                              if (window.confirm('¿Estás seguro de que deseas eliminar esta transacción?')) {
-                                deleteTransaction(t.id);
-                              }
+                              haptic.medium();
+                              setTxToDelete({
+                                id: t.id,
+                                description: t.description || 'esta transacción'
+                              });
                             }
                           }}
                           className="p-1.5 sm:p-2 text-on-surface-variant/30 hover:text-rose-600 hover:bg-rose-500/10 rounded-lg transition-all opacity-80 sm:opacity-0 sm:group-hover:opacity-100 shrink-0"
@@ -863,6 +883,20 @@ export const History: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Confirm Delete Modal for Single Transactions */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(txToDelete)}
+        onClose={() => setTxToDelete(null)}
+        onConfirm={executeDeleteTx}
+        isDeleting={isDeletingTx}
+        title="¿Eliminar transacción?"
+        description={
+          txToDelete
+            ? `¿Estás seguro de que deseas eliminar permanentemente "${txToDelete.description}"? Esta acción no se puede deshacer.`
+            : ''
+        }
+      />
     </div>
   );
 };

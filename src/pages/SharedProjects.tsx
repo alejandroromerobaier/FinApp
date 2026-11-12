@@ -9,6 +9,8 @@ import { createProject, updateProject, deleteProject, removeMemberFromProject, i
 import { PROJECT_COLOR_OPTIONS, PROJECT_ICONS, getProjectIcon, getProjectGradient } from '../lib/constants';
 import { PageHeader } from '../components/PageHeader';
 import { CustomSelect } from '../components/CustomSelect';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
+import { haptic } from '../lib/haptics';
 
 export const isProjectOwner = (project: any, userId?: string): boolean => {
   if (!userId || !project) return false;
@@ -224,15 +226,47 @@ export const SharedProjects: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('¿Estás seguro de que deseas eliminar este proyecto? Se perderá el acceso para todos los colaboradores.')) {
-      await deleteProject(id);
+  const [projectToDelete, setProjectToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [projectToLeave, setProjectToLeave] = useState<{ id: string; name: string } | null>(null);
+  const [isDeletingProject, setIsDeletingProject] = useState(false);
+
+  const handleDelete = (id: string) => {
+    haptic.medium();
+    const p = projects.find(proj => proj.id === id);
+    setProjectToDelete({ id, name: p?.name || 'este proyecto' });
+  };
+
+  const handleLeave = (id: string) => {
+    haptic.medium();
+    const p = projects.find(proj => proj.id === id);
+    setProjectToLeave({ id, name: p?.name || 'este proyecto' });
+  };
+
+  const executeDeleteProject = async () => {
+    if (!projectToDelete) return;
+    setIsDeletingProject(true);
+    try {
+      await deleteProject(projectToDelete.id);
+      haptic.medium();
+      setProjectToDelete(null);
+    } catch (error) {
+      console.error('Error deleting project:', error);
+    } finally {
+      setIsDeletingProject(false);
     }
   };
 
-  const handleLeave = async (id: string) => {
-    if (window.confirm('¿Estás seguro de que deseas salir de este proyecto?')) {
-      await removeMemberFromProject(id, user!.uid);
+  const executeLeaveProject = async () => {
+    if (!projectToLeave || !user) return;
+    setIsDeletingProject(true);
+    try {
+      await removeMemberFromProject(projectToLeave.id, user.uid);
+      haptic.medium();
+      setProjectToLeave(null);
+    } catch (error) {
+      console.error('Error leaving project:', error);
+    } finally {
+      setIsDeletingProject(false);
     }
   };
 
@@ -744,6 +778,37 @@ export const SharedProjects: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Delete Project Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(projectToDelete)}
+        onClose={() => setProjectToDelete(null)}
+        onConfirm={executeDeleteProject}
+        isDeleting={isDeletingProject}
+        title="¿Eliminar proyecto?"
+        confirmText="Eliminar Proyecto"
+        description={
+          projectToDelete
+            ? `¿Estás seguro de que deseas eliminar permanentemente "${projectToDelete.name}"? Se perderá el acceso y todos los registros compartidos para todos los colaboradores.`
+            : ''
+        }
+      />
+
+      {/* Leave Project Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(projectToLeave)}
+        onClose={() => setProjectToLeave(null)}
+        onConfirm={executeLeaveProject}
+        isDeleting={isDeletingProject}
+        variant="warning"
+        title="¿Salir del proyecto?"
+        confirmText="Sí, salir"
+        description={
+          projectToLeave
+            ? `¿Estás seguro de que deseas salir de "${projectToLeave.name}"? Ya no podrás ver ni registrar gastos compartidos en esta bóveda.`
+            : ''
+        }
+      />
     </div>
   );
 };

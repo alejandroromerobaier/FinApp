@@ -11,6 +11,8 @@ import { getLocalMonth } from '../lib/dateUtils';
 
 import { getCategoryIcon } from '../lib/categoryIcons';
 import { getProjectIcon, getProjectGradient } from '../lib/constants';
+import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
+import { haptic } from '../lib/haptics';
 
 const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => {
   const Icon = getCategoryIcon(name);
@@ -238,9 +240,26 @@ export const ProjectDetail: React.FC = () => {
     }
   };
 
-  const handleRemoveMember = async (userId: string) => {
-    if (window.confirm('¿Estás seguro de que deseas eliminar a este colaborador?')) {
-      await removeMemberFromProject(id!, userId);
+  const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string } | null>(null);
+  const [isRemovingMember, setIsRemovingMember] = useState(false);
+
+  const handleRemoveMember = (userId: string, name?: string) => {
+    haptic.medium();
+    const m = members.find(mem => mem.id === userId);
+    setMemberToRemove({ id: userId, name: name || m?.name || 'este colaborador' });
+  };
+
+  const executeRemoveMember = async () => {
+    if (!memberToRemove || !id) return;
+    setIsRemovingMember(true);
+    try {
+      await removeMemberFromProject(id, memberToRemove.id);
+      haptic.medium();
+      setMemberToRemove(null);
+    } catch (error) {
+      console.error('Error removing member:', error);
+    } finally {
+      setIsRemovingMember(false);
     }
   };
 
@@ -367,8 +386,8 @@ export const ProjectDetail: React.FC = () => {
                     <p className="font-black text-on-surface">{formatCurrency(m.amount, project.currency)}</p>
                     {isOwner && m.id !== currentUser?.uid && (
                       <button 
-                        onClick={() => handleRemoveMember(m.id)}
-                        className="text-[10px] text-rose-500 font-bold hover:underline"
+                        onClick={() => handleRemoveMember(m.id, m.name)}
+                        className="text-[10px] text-rose-500 font-bold hover:underline cursor-pointer"
                       >
                         Eliminar
                       </button>
@@ -864,6 +883,22 @@ export const ProjectDetail: React.FC = () => {
       >
         <Plus size={32} />
       </Link>
+
+      {/* Confirm Remove Member Modal */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(memberToRemove)}
+        onClose={() => setMemberToRemove(null)}
+        onConfirm={executeRemoveMember}
+        isDeleting={isRemovingMember}
+        variant="warning"
+        title="¿Quitar colaborador?"
+        confirmText="Quitar Colaborador"
+        description={
+          memberToRemove
+            ? `¿Estás seguro de que deseas quitar a "${memberToRemove.name}" de este proyecto? Ya no tendrá acceso a los gastos de esta bóveda.`
+            : ''
+        }
+      />
     </div>
   );
 };
