@@ -511,6 +511,20 @@ export const AddExpense: React.FC = () => {
               {destination === 'shared' ? 'Gasto Compartido' : 'Gasto Personal'}
             </p>
           </div>
+          {id && isAuthor && (
+            <button
+              type="button"
+              onClick={() => {
+                haptic.medium();
+                setShowDeleteModal(true);
+              }}
+              disabled={isDeleting || isSaving}
+              className="p-2.5 rounded-2xl text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 transition-all active:scale-90 flex items-center justify-center shrink-0 cursor-pointer"
+              title="Eliminar transacción"
+            >
+              <Trash2 size={18} />
+            </button>
+          )}
         </div>
       </header>
 
@@ -1257,7 +1271,7 @@ export const AddExpense: React.FC = () => {
 
       {/* Fixed Bottom Action Dock (Thumb Zone) */}
       <div className="fixed bottom-0 left-0 right-0 z-40 p-3 sm:p-4 bg-surface/90 backdrop-blur-xl border-t border-on-surface/10 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shadow-[0_-4px_24px_rgba(0,0,0,0.08)]">
-        <div className="max-w-2xl mx-auto flex items-center gap-2.5 sm:gap-3">
+        <div className="max-w-2xl mx-auto flex items-center gap-3">
           <button
             type="button"
             onClick={() => navigate(-1)}
@@ -1271,21 +1285,6 @@ export const AddExpense: React.FC = () => {
             <ArrowLeft size={16} />
             <span>Volver</span>
           </button>
-
-          {id && isAuthor && (
-            <button
-              type="button"
-              onClick={() => {
-                haptic.medium();
-                setShowDeleteModal(true);
-              }}
-              disabled={isDeleting || isSaving}
-              className="p-3.5 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 transition-all active:scale-95 flex items-center justify-center shrink-0 cursor-pointer"
-              title="Eliminar transacción"
-            >
-              {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
-            </button>
-          )}
 
           {isAuthor && (
             <button
