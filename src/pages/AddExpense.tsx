@@ -49,7 +49,7 @@ import {
   createInstallmentExpense,
   CreditCard as CreditCardType
 } from '../services/firestoreService';
-import { getLocalToday, formatDisplayDate, formatLocalYYYYMMDD, parseLocalYYYYMMDD } from '../lib/dateUtils';
+import { getLocalToday, getLocalYesterday, formatDisplayDate, formatLocalYYYYMMDD, parseLocalYYYYMMDD } from '../lib/dateUtils';
 import { trackEvent } from '../lib/analytics';
 
 const formatMonthLabel = (dateStr: string): string => {
@@ -122,7 +122,7 @@ export const AddExpense: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { user, profile } = useAuth();
-  const { categories: allCategories, projects, cards, loading: dataLoading } = useData();
+  const { categories: allCategories, projects, cards, transactions, loading: dataLoading } = useData();
   const { toast } = useToast();
   const amountInputRef = React.useRef<HTMLInputElement>(null);
   
@@ -351,6 +351,56 @@ export const AddExpense: React.FC = () => {
     ? (parsedInstallments > 0 ? Math.round((parsedAmount / parsedInstallments) * 100) / 100 : parsedAmount) 
     : parsedAmount;
 
+  const currencySymbol = useMemo(() => {
+    if (activeCurrency === 'USD') return 'US$';
+    if (activeCurrency === 'ARS') return '$';
+    return activeCurrency;
+  }, [activeCurrency]);
+
+  const quickAddAmounts = useMemo(() => {
+    return activeCurrency === 'USD' ? [10, 50, 100, 200] : [1000, 5000, 10000, 20000];
+  }, [activeCurrency]);
+
+  const handleQuickAdd = (addVal: number) => {
+    haptic.light();
+    const current = parsedAmount || 0;
+    const next = current + addVal;
+    setAmount(formatAmountForDisplay(next));
+    if (amountInputRef.current) {
+      amountInputRef.current.focus();
+    }
+  };
+
+  const handleClearAmount = () => {
+    haptic.light();
+    setAmount('');
+    if (amountInputRef.current) {
+      amountInputRef.current.focus();
+    }
+  };
+
+  const frequentCategories = useMemo(() => {
+    if (!categories.length) return [];
+    const counts: Record<string, number> = {};
+    if (transactions && transactions.length > 0) {
+      transactions.forEach(t => {
+        if (t.type === type && t.categoryId) {
+          counts[t.categoryId] = (counts[t.categoryId] || 0) + 1;
+        }
+      });
+    }
+    const sorted = [...categories].sort((a, b) => {
+      const countA = counts[a.id] || 0;
+      const countB = counts[b.id] || 0;
+      return countB - countA;
+    });
+    return sorted.slice(0, 5);
+  }, [categories, transactions, type]);
+
+  const isToday = date === getLocalToday();
+  const isYesterday = date === getLocalYesterday();
+  const isCustomDate = !isToday && !isYesterday;
+
   const handleSave = async () => {
     if (!isValidAmount || !selectedCategory) return;
     if (destination === 'shared' && !selectedProjectId) {
@@ -526,7 +576,7 @@ export const AddExpense: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex-1 pt-[calc(4.5rem+env(safe-area-inset-top,0px))] max-w-2xl mx-auto w-full px-6 flex flex-col gap-8">
+      <main className="flex-1 pt-[calc(4.5rem+env(safe-area-inset-top,0px))] max-w-2xl mx-auto w-full px-6 flex flex-col gap-8 pb-32 sm:pb-12">
         {!isAuthor && (
           <div className="bg-amber-500/10 border border-amber-500/10 p-4 rounded-2xl flex items-center gap-3 text-amber-700">
             <ShieldCheck size={20} />
@@ -575,9 +625,11 @@ export const AddExpense: React.FC = () => {
           </p>
           <div className={cn("flex items-center justify-center gap-2", !isAuthor && "pointer-events-none")}>
             <span className={cn(
-              "text-3xl sm:text-4xl font-black font-headline opacity-40",
-              type === 'expense' ? "text-rose-600" : "text-emerald-600"
-            )}>{destination === 'shared' ? projects.find(p => p.id === selectedProjectId)?.currency || 'ARS' : (profile?.currency || 'ARS')}</span>
+              "text-3xl sm:text-5xl font-black font-headline select-none",
+              type === 'expense' ? "text-rose-600/70 dark:text-rose-400/80" : "text-emerald-600/70 dark:text-emerald-400/80"
+            )}>
+              {currencySymbol}
+            </span>
             <input 
               ref={amountInputRef}
               type="text"
@@ -593,6 +645,33 @@ export const AddExpense: React.FC = () => {
               autoFocus={isAuthor}
             />
           </div>
+
+          {/* Quick Amount Presets & Clear */}
+          {isAuthor && (
+            <div className="flex items-center justify-center gap-2 flex-wrap pt-3">
+              {quickAddAmounts.map((val) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => handleQuickAdd(val)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-black bg-surface-container-low hover:bg-surface-container text-on-surface border border-on-surface/5 transition-all active:scale-95 shadow-2xs cursor-pointer"
+                >
+                  +{activeCurrency === 'USD' ? `U$S ${val}` : `$${val.toLocaleString('es-AR')}`}
+                </button>
+              ))}
+              {amount && (
+                <button
+                  type="button"
+                  onClick={handleClearAmount}
+                  className="px-3 py-1.5 rounded-xl text-xs font-black bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 transition-all active:scale-95 flex items-center gap-1 cursor-pointer"
+                  title="Borrar monto"
+                >
+                  <X size={13} strokeWidth={3} />
+                  <span>Borrar</span>
+                </button>
+              )}
+            </div>
+          )}
         </section>
 
         {/* Form Sections */}
@@ -611,64 +690,166 @@ export const AddExpense: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Date Selector */}
+            {/* Date Selector with Quick Pills */}
             <div 
-              onClick={(e) => {
-                const input = e.currentTarget.querySelector('input');
-                if (input && 'showPicker' in input) {
-                  (input as any).showPicker();
-                } else if (input) {
-                  input.click();
-                }
-              }}
-              className="relative bg-surface-container-lowest p-6 rounded-3xl border border-on-surface/5 shadow-sm flex items-center justify-between group cursor-pointer hover:bg-on-surface/5 transition-colors overflow-hidden"
+              className="date-container relative bg-surface-container-lowest p-5 sm:p-6 rounded-3xl border border-on-surface/5 shadow-sm flex flex-col justify-between group overflow-hidden"
             >
               <input 
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                className="absolute inset-0 opacity-0 cursor-pointer"
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                title="Elegir fecha"
               />
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70 mb-2">Fecha</label>
-                <div className="flex items-center gap-3 text-on-surface font-extrabold">
-                  <Calendar size={20} className="text-primary" />
-                  <span>{formatDateDisplay(date)}</span>
-                </div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70">Fecha</label>
+                <ChevronRight size={18} className="text-on-surface-variant/30" />
               </div>
-              <ChevronRight size={20} className="text-on-surface-variant/40" />
+              <div className="flex items-center gap-3 text-on-surface font-extrabold mb-3">
+                <Calendar size={20} className="text-primary" />
+                <span className="text-base sm:text-lg">{formatDateDisplay(date)}</span>
+              </div>
+
+              {/* Quick Date Pills */}
+              <div className="flex items-center gap-1.5 pt-2 border-t border-on-surface/5 z-10">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    haptic.selection();
+                    setDate(getLocalToday());
+                  }}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer",
+                    isToday
+                      ? "bg-primary text-white shadow-xs"
+                      : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
+                  )}
+                >
+                  Hoy
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    haptic.selection();
+                    setDate(getLocalYesterday());
+                  }}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer",
+                    isYesterday
+                      ? "bg-primary text-white shadow-xs"
+                      : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
+                  )}
+                >
+                  Ayer
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const input = e.currentTarget.closest('.date-container')?.querySelector('input[type="date"]') as HTMLInputElement;
+                    if (input && 'showPicker' in input) {
+                      input.showPicker();
+                    } else if (input) {
+                      input.click();
+                    }
+                  }}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 active:scale-95 cursor-pointer",
+                    isCustomDate
+                      ? "bg-primary text-white shadow-xs"
+                      : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
+                  )}
+                >
+                  <Calendar size={12} />
+                  <span>{isCustomDate ? 'Otro día' : 'Calendario'}</span>
+                </button>
+              </div>
             </div>
 
-            <button 
-              type="button"
-              disabled={!isAuthor}
-              onClick={() => setShowCategorySheet(true)}
-              className={cn(
-                "bg-surface-container-lowest p-6 rounded-3xl border border-on-surface/5 shadow-sm flex items-center justify-between group transition-colors text-left",
-                isAuthor ? "hover:bg-on-surface/5 cursor-pointer" : "opacity-60 cursor-default"
-              )}
-            >
+            {/* Category Selector with Quick Chips */}
+            <div className="bg-surface-container-lowest p-5 sm:p-6 rounded-3xl border border-on-surface/5 shadow-sm flex flex-col justify-between">
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70 mb-2">Categoría</label>
-                <div className="flex items-center gap-3 text-on-surface font-extrabold">
-                  {selectedCategory ? (
-                    <>
-                      <div className={cn(
-                        "w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-sm",
-                        selectedCategory.color
-                      )}>
-                        <IconComponent name={selectedCategory.icon} size={18} />
-                      </div>
-                      <span>{selectedCategory.name}</span>
-                    </>
-                  ) : (
-                    <span className="text-on-surface-variant/40">Seleccionar...</span>
+                <div 
+                  onClick={() => isAuthor && setShowCategorySheet(true)}
+                  className={cn(
+                    "flex items-center justify-between transition-colors",
+                    isAuthor ? "cursor-pointer group" : "opacity-60 cursor-default"
+                  )}
+                >
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/70 mb-1.5">Categoría</label>
+                    <div className="flex items-center gap-3 text-on-surface font-extrabold">
+                      {selectedCategory ? (
+                        <>
+                          <div className={cn(
+                            "w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-sm shrink-0",
+                            selectedCategory.color
+                          )}>
+                            <IconComponent name={selectedCategory.icon} size={18} />
+                          </div>
+                          <span className="text-base sm:text-lg truncate max-w-[150px] sm:max-w-none">{selectedCategory.name}</span>
+                        </>
+                      ) : (
+                        <span className="text-on-surface-variant/40">Seleccionar...</span>
+                      )}
+                    </div>
+                  </div>
+                  {isAuthor && (
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-primary bg-primary/10 px-2.5 py-1.5 rounded-xl group-hover:bg-primary/20 transition-colors">
+                      <span>Todas</span>
+                      <ChevronDown size={14} />
+                    </div>
                   )}
                 </div>
               </div>
-              {isAuthor && <ChevronDown size={20} className="text-on-surface-variant/40" />}
-            </button>
+
+              {/* Quick Frequent Category Chips */}
+              {frequentCategories.length > 0 && isAuthor && (
+                <div className="pt-2 border-t border-on-surface/5 mt-3">
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                    {frequentCategories.map((cat) => {
+                      const isSelected = selectedCategory?.id === cat.id;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            haptic.selection();
+                            setSelectedCategory(cat);
+                          }}
+                          className={cn(
+                            "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 border active:scale-95 cursor-pointer",
+                            isSelected
+                              ? "bg-primary text-white border-primary shadow-xs ring-2 ring-primary/25"
+                              : "bg-surface-container-low text-on-surface border-transparent hover:bg-surface-container"
+                          )}
+                        >
+                          <div className={cn("w-4 h-4 rounded-md flex items-center justify-center text-white text-[10px]", cat.color)}>
+                            <IconComponent name={cat.icon} size={10} />
+                          </div>
+                          <span className="truncate max-w-[110px]">{cat.name}</span>
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        haptic.light();
+                        setShowCategorySheet(true);
+                      }}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-on-surface-variant bg-surface-container-low hover:bg-surface-container transition-all shrink-0 border border-transparent cursor-pointer"
+                    >
+                      <Plus size={12} />
+                      <span>Más...</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Destination Selector */}
@@ -1201,11 +1382,51 @@ export const AddExpense: React.FC = () => {
           type="button"
           onClick={() => navigate(-1)}
           disabled={isSaving || isDeleting}
-          className="w-full py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider text-on-surface-variant/70 hover:text-on-surface hover:bg-on-surface/5 transition-all active:scale-95 flex items-center justify-center gap-2"
+          className="w-full py-3.5 rounded-2xl font-bold text-xs uppercase tracking-wider text-on-surface-variant/70 hover:text-on-surface hover:bg-on-surface/5 transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
         >
           Descartar y volver atrás
         </button>
       </main>
+
+      {/* Sticky Mobile Confirm Bar */}
+      {isAuthor && (
+        <div className="fixed bottom-0 left-0 right-0 z-30 p-3 sm:hidden bg-surface/90 backdrop-blur-xl border-t border-on-surface/10 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] transition-all shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+          <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1 pl-1">
+              <p className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/60 truncate">
+                {type === 'expense' ? 'Total Gasto' : 'Total Ingreso'}
+              </p>
+              <p className={cn(
+                "text-lg font-black font-headline truncate leading-tight",
+                type === 'expense' ? "text-on-surface" : "text-emerald-600 dark:text-emerald-400"
+              )}>
+                {isValidAmount ? formatCurrency(currentTotalAmount, activeCurrency) : `${currencySymbol} 0,00`}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={!isValidAmount || isSaving}
+              className={cn(
+                "px-5 py-3 rounded-2xl font-black text-sm shadow-lg transition-all active:scale-95 flex items-center gap-2 shrink-0 cursor-pointer",
+                (!isValidAmount || isSaving)
+                  ? "bg-on-surface/10 text-on-surface-variant/40 cursor-not-allowed shadow-none"
+                  : type === 'expense'
+                    ? "bg-primary text-white shadow-primary/25"
+                    : "bg-emerald-600 text-white shadow-emerald-600/25"
+              )}
+            >
+              {isSaving ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Check size={16} strokeWidth={3} />
+              )}
+              <span>{id ? 'Actualizar' : 'Confirmar'}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Category Selection Sheet */}
       <AnimatePresence>

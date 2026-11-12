@@ -10,6 +10,18 @@ export const getLocalToday = (): string => {
   return `${year}-${month}-${day}`;
 };
 
+/**
+ * Returns yesterday's date in YYYY-MM-DD format based on local time.
+ */
+export const getLocalYesterday = (): string => {
+  const now = new Date();
+  now.setDate(now.getDate() - 1);
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export const getLocalMonth = (date = new Date()): string => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
