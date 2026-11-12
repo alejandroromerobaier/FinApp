@@ -14,6 +14,8 @@ import {
   deleteCard 
 } from '../services/firestoreService';
 import { PROJECT_COLOR_OPTIONS } from '../lib/constants';
+import { PageHeader } from '../components/PageHeader';
+import { CustomSelect } from '../components/CustomSelect';
 
 export const ManageCards: React.FC = () => {
   const navigate = useNavigate();
@@ -125,41 +127,30 @@ export const ManageCards: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/settings')}
-            className="p-2.5 hover:bg-surface-container rounded-2xl text-on-surface-variant hover:text-on-surface transition-colors border border-on-surface/5"
-            title="Volver"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <div>
-            <h1 className="text-2xl font-black text-on-surface tracking-tight">Tarjetas de Crédito</h1>
-            <p className="text-sm text-on-surface-variant font-medium">
-              Administrá tus tarjetas, cierres y vencimientos para proyectar tus cuotas.
-            </p>
+      <PageHeader
+        backTo="/settings"
+        categoryTag="Medios de Pago"
+        title="Tarjetas de Crédito"
+        subtitle="Administrá tus tarjetas, cierres y vencimientos para proyectar tus cuotas."
+        rightAction={
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/credit-cards')}
+              className="flex items-center gap-1.5 px-3 py-2 bg-surface-container rounded-xl text-on-surface font-bold text-xs border border-on-surface/10 hover:bg-surface-container-high transition-all cursor-pointer"
+            >
+              <Layers size={14} className="text-primary dark:text-blue-400" />
+              <span className="hidden sm:inline">Ver Cuotas</span>
+            </button>
+            <button
+              onClick={openAddModal}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-primary text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-primary/20 hover:bg-primary/90 active:scale-95 transition-all cursor-pointer"
+            >
+              <Plus size={16} />
+              <span>Nueva Tarjeta</span>
+            </button>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => navigate('/credit-cards')}
-            className="flex items-center gap-1.5 px-3 py-2 bg-surface-container rounded-xl text-on-surface font-bold text-xs border border-on-surface/10 hover:bg-surface-container-high transition-all"
-          >
-            <Layers size={14} className="text-primary dark:text-blue-400" />
-            <span className="hidden sm:inline">Ver Cuotas & Previsión</span>
-            <span className="sm:hidden">Cuotas</span>
-          </button>
-          <button
-            onClick={openAddModal}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-primary text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-primary/20 hover:bg-primary/90 active:scale-95 transition-all"
-          >
-            <Plus size={16} />
-            <span>Nueva Tarjeta</span>
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* Cards Grid */}
       {cards.length === 0 ? (
@@ -446,17 +437,16 @@ export const ManageCards: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">
-                      Moneda
-                    </label>
-                    <select
+                    <CustomSelect
+                      label="Moneda"
                       value={currency}
-                      onChange={(e) => setCurrency(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-2xl bg-surface-container-low border border-on-surface/10 text-on-surface text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/40"
-                    >
-                      <option value="ARS">ARS ($)</option>
-                      <option value="USD">USD (U$S)</option>
-                    </select>
+                      onChange={(val) => setCurrency(val as string)}
+                      options={[
+                        { value: 'ARS', label: 'ARS ($)' },
+                        { value: 'USD', label: 'USD (U$S)' }
+                      ]}
+                      size="sm"
+                    />
                   </div>
                 </div>
 

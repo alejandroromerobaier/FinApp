@@ -7,6 +7,8 @@ import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { createProject, updateProject, deleteProject, removeMemberFromProject, inviteUserToProjectByEmail, updateUserProfile, getUsersByIds } from '../services/firestoreService';
 import { PROJECT_COLOR_OPTIONS, PROJECT_ICONS, getProjectIcon, getProjectGradient } from '../lib/constants';
+import { PageHeader } from '../components/PageHeader';
+import { CustomSelect } from '../components/CustomSelect';
 
 export const isProjectOwner = (project: any, userId?: string): boolean => {
   if (!userId || !project) return false;
@@ -283,29 +285,22 @@ export const SharedProjects: React.FC = () => {
   return (
     <div className="px-6 max-w-5xl mx-auto py-8 pb-32">
       {/* Section Header */}
-      <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="flex items-start gap-4">
+      <PageHeader
+        backTo="/settings"
+        categoryTag="Colaboración"
+        title="Bóvedas Compartidas"
+        subtitle="Administra tus espacios compartidos, invita a colaboradores y controla los gastos en conjunto."
+        rightAction={
           <button 
-            onClick={() => navigate('/settings')}
-            className="w-11 h-11 rounded-2xl bg-surface-container-low hover:bg-surface-container-high border border-on-surface/5 flex items-center justify-center text-on-surface transition-all active:scale-95 shrink-0 mt-1 shadow-sm"
-            title="Volver a Ajustes"
+            onClick={() => handleOpenModal()}
+            className="bg-primary hover:opacity-90 text-white px-5 py-3 rounded-2xl flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-primary/20 shrink-0 font-bold text-xs sm:text-sm cursor-pointer"
           >
-            <ArrowLeft size={22} />
+            <PlusCircle size={18} />
+            <span>Crear Proyecto</span>
           </button>
-          <div>
-            <span className="text-[0.75rem] font-bold uppercase tracking-[0.1em] text-on-surface-variant/60 mb-2 block">Colaboración</span>
-            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-on-surface font-headline">Bóvedas Compartidas</h1>
-            <p className="text-on-surface-variant mt-2 max-w-md text-sm sm:text-base">Administra tus espacios compartidos, invita a colaboradores y controla los gastos en conjunto.</p>
-          </div>
-        </div>
-        <button 
-          onClick={() => handleOpenModal()}
-          className="bg-primary hover:opacity-90 text-white px-6 py-3.5 rounded-2xl flex items-center gap-2 transition-all active:scale-95 shadow-xl shadow-primary/10 shrink-0 self-start md:self-auto"
-        >
-          <PlusCircle size={20} />
-          <span className="font-bold">Crear Nuevo Proyecto</span>
-        </button>
-      </div>
+        }
+        className="mb-8"
+      />
 
       {/* Status Tabs */}
       <div className="flex bg-surface-container-low p-1.5 rounded-2xl border border-on-surface/5 mb-8 max-w-md">
@@ -481,21 +476,21 @@ export const SharedProjects: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2 ml-1">Preferencia de Moneda</label>
-                      <select 
+                      <CustomSelect
+                        label="Preferencia de Moneda"
                         value={formData.currency}
-                        onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                        className="w-full bg-surface-container-low border border-on-surface/10 rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer text-on-surface outline-none"
-                      >
-                        <option value="ARS">Peso Argentino (ARS)</option>
-                        <option value="USD">Dólar (USD)</option>
-                        <option value="EUR">Euro (EUR)</option>
-                        <option value="BRL">Real (BRL)</option>
-                        <option value="CLP">Peso Chileno (CLP)</option>
-                        <option value="UYU">Peso Uruguayo (UYU)</option>
-                        <option value="COP">Peso Colombiano (COP)</option>
-                        <option value="MXN">Peso Mexicano (MXN)</option>
-                      </select>
+                        onChange={(val) => setFormData({ ...formData, currency: val as string })}
+                        options={[
+                          { value: 'ARS', label: 'Peso Argentino (ARS)' },
+                          { value: 'USD', label: 'Dólar (USD)' },
+                          { value: 'EUR', label: 'Euro (EUR)' },
+                          { value: 'BRL', label: 'Real (BRL)' },
+                          { value: 'CLP', label: 'Peso Chileno (CLP)' },
+                          { value: 'UYU', label: 'Peso Uruguayo (UYU)' },
+                          { value: 'COP', label: 'Peso Colombiano (COP)' },
+                          { value: 'MXN', label: 'Peso Mexicano (MXN)' },
+                        ]}
+                      />
                     </div>
 
                     <div>
@@ -521,21 +516,21 @@ export const SharedProjects: React.FC = () => {
                   </>
                 ) : (
                   <div>
-                    <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2 ml-1">Preferencia de Moneda (Personal)</label>
-                    <select 
+                    <CustomSelect
+                      label="Preferencia de Moneda (Personal)"
                       value={formData.currency}
-                      onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                      className="w-full bg-surface-container-low border border-on-surface/10 rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer text-on-surface outline-none"
-                    >
-                      <option value="ARS">Peso Argentino (ARS)</option>
-                      <option value="USD">Dólar (USD)</option>
-                      <option value="EUR">Euro (EUR)</option>
-                      <option value="BRL">Real (BRL)</option>
-                      <option value="CLP">Peso Chileno (CLP)</option>
-                      <option value="UYU">Peso Uruguayo (UYU)</option>
-                      <option value="COP">Peso Colombiano (COP)</option>
-                      <option value="MXN">Peso Mexicano (MXN)</option>
-                    </select>
+                      onChange={(val) => setFormData({ ...formData, currency: val as string })}
+                      options={[
+                        { value: 'ARS', label: 'Peso Argentino (ARS)' },
+                        { value: 'USD', label: 'Dólar (USD)' },
+                        { value: 'EUR', label: 'Euro (EUR)' },
+                        { value: 'BRL', label: 'Real (BRL)' },
+                        { value: 'CLP', label: 'Peso Chileno (CLP)' },
+                        { value: 'UYU', label: 'Peso Uruguayo (UYU)' },
+                        { value: 'COP', label: 'Peso Colombiano (COP)' },
+                        { value: 'MXN', label: 'Peso Mexicano (MXN)' },
+                      ]}
+                    />
                   </div>
                 )}
 
@@ -652,16 +647,15 @@ export const SharedProjects: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2 ml-1">Posición en la Home</label>
-                    <select 
+                    <CustomSelect
+                      label="Posición en la Home"
                       value={formData.homeOrder}
-                      onChange={(e) => setFormData({ ...formData, homeOrder: parseInt(e.target.value) })}
-                      className="w-full bg-surface-container-low border border-on-surface/10 rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer text-on-surface outline-none"
-                    >
-                      {Array.from({ length: editingProject ? projectsCount : projectsCount + 1 }, (_, i) => i + 1).map(num => (
-                        <option key={num} value={num}>{num}ª Posición</option>
-                      ))}
-                    </select>
+                      onChange={(val) => setFormData({ ...formData, homeOrder: Number(val) })}
+                      options={Array.from({ length: editingProject ? projectsCount : projectsCount + 1 }, (_, i) => i + 1).map(num => ({
+                        value: num,
+                        label: `${num}ª Posición`
+                      }))}
+                    />
                   </div>
                 </div>
               </form>

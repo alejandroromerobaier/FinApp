@@ -13,6 +13,8 @@ import { cn, formatCurrency } from '@/src/lib/utils';
 import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { createShortcut, updateShortcut, deleteShortcut, updateShortcutOrders, Shortcut } from '../services/firestoreService';
+import { PageHeader } from '../components/PageHeader';
+import { CustomSelect } from '../components/CustomSelect';
 
 export const SHORTCUT_ICONS: Record<string, any> = {
   Coffee,
@@ -336,32 +338,23 @@ export const ManageShortcuts: React.FC = () => {
   return (
     <div className="px-4 sm:px-6 max-w-4xl mx-auto py-6 sm:py-8 pb-32">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-3">
+      <PageHeader
+        backTo="/settings"
+        categoryTag="Accesos Rápidos"
+        icon={<Zap className="text-amber-500 fill-amber-500/20" size={26} />}
+        title="Atajos de Gastos"
+        subtitle="Crea accesos rápidos y arrastra para ordenar cómo se ven en el Inicio."
+        rightAction={
           <button 
-            onClick={() => navigate('/settings')}
-            className="p-2.5 bg-surface-container-low hover:bg-on-surface/5 rounded-2xl transition-all text-on-surface-variant shrink-0 border border-on-surface/5"
+            onClick={() => handleOpenModal()}
+            className="bg-primary hover:opacity-90 text-white px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl flex items-center gap-2 font-bold text-xs sm:text-sm transition-all active:scale-95 shadow-lg shadow-primary/20 shrink-0 cursor-pointer"
           >
-            <ArrowLeft size={20} />
+            <PlusCircle size={18} />
+            <span>Crear Atajo</span>
           </button>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-on-surface font-headline flex items-center gap-2">
-              <Zap className="text-amber-500 fill-amber-500/20" size={26} />
-              Atajos de Gastos
-            </h1>
-            <p className="text-xs sm:text-sm text-on-surface-variant mt-0.5">
-              Crea accesos rápidos y arrastra para ordenar cómo se ven en el Inicio.
-            </p>
-          </div>
-        </div>
-        <button 
-          onClick={() => handleOpenModal()}
-          className="bg-primary hover:opacity-90 text-white px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl flex items-center gap-2 font-bold text-xs sm:text-sm transition-all active:scale-95 shadow-lg shadow-primary/20 shrink-0"
-        >
-          <PlusCircle size={18} />
-          <span>Crear Atajo</span>
-        </button>
-      </div>
+        }
+        className="mb-8"
+      />
 
       {/* Shortcuts Reorderable List */}
       {items.length === 0 ? (
@@ -529,21 +522,18 @@ export const ManageShortcuts: React.FC = () => {
 
                 {/* Proyecto */}
                 <div>
-                  <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-widest mb-2 ml-1">
-                    Asignar a Proyecto
-                  </label>
-                  <select 
+                  <CustomSelect
+                    label="Asignar a Proyecto"
                     value={projectId}
-                    onChange={(e) => setProjectId(e.target.value)}
-                    className="w-full bg-surface-container-low border-none rounded-2xl p-4 text-base font-bold focus:ring-2 focus:ring-primary/20 transition-all appearance-none cursor-pointer text-on-surface"
-                  >
-                    <option value="personal">Personal (Billetera principal)</option>
-                    {projects.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.currency || 'ARS'})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setProjectId(val as string)}
+                    options={[
+                      { value: 'personal', label: 'Personal (Billetera principal)' },
+                      ...projects.map(p => ({
+                        value: p.id,
+                        label: `${p.name} (${p.currency || 'ARS'})`
+                      }))
+                    ]}
+                  />
                 </div>
 
                 {/* Método de Pago */}

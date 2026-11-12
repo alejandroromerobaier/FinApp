@@ -46,6 +46,7 @@ import { auth } from '../lib/firebase';
 import { getAppVersionInfo } from '../lib/version';
 import { getLocalMonth } from '../lib/dateUtils';
 import { haptic } from '../lib/haptics';
+import { CustomSelect } from '../components/CustomSelect';
 
 const CURRENCIES = [
   { code: 'ARS', label: 'ARS (Pesos Argentinos)', symbol: '$' },
@@ -236,8 +237,7 @@ export const Settings: React.FC = () => {
     toast.success(`${labels[newTheme]} activado`);
   };
 
-  const handleCurrencyChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newCurrency = e.target.value;
+  const handleCurrencyChange = async (newCurrency: string) => {
     if (!user) return;
     haptic.selection();
     try {
@@ -248,8 +248,7 @@ export const Settings: React.FC = () => {
     }
   };
 
-  const handleDefaultProjectChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const defaultProjectId = e.target.value;
+  const handleDefaultProjectChange = async (defaultProjectId: string) => {
     if (!user) return;
     haptic.selection();
     try {
@@ -719,18 +718,19 @@ export const Settings: React.FC = () => {
                 <span className="text-xs text-on-surface-variant">Registros personales</span>
               </div>
             </div>
-            <select
-              aria-label="Moneda Base"
-              value={activeCurrency}
-              onChange={handleCurrencyChange}
-              className="bg-surface-container-low text-on-surface text-xs font-bold py-2 px-3 rounded-xl border border-on-surface/10 focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer shrink-0"
-            >
-              {CURRENCIES.map(curr => (
-                <option key={curr.code} value={curr.code}>
-                  {curr.code} ({curr.symbol})
-                </option>
-              ))}
-            </select>
+            <div className="w-40 shrink-0">
+              <CustomSelect
+                ariaLabel="Moneda Base"
+                value={activeCurrency}
+                onChange={(val) => handleCurrencyChange(val as string)}
+                options={CURRENCIES.map(curr => ({
+                  value: curr.code,
+                  label: `${curr.code} (${curr.symbol})`
+                }))}
+                size="sm"
+                align="right"
+              />
+            </div>
           </div>
         )}
 
@@ -746,17 +746,22 @@ export const Settings: React.FC = () => {
                 <span className="text-xs text-on-surface-variant">Selección inicial en + Gasto</span>
               </div>
             </div>
-            <select
-              aria-label="Bóveda predeterminada"
-              value={profile?.defaultProjectId || 'personal'}
-              onChange={handleDefaultProjectChange}
-              className="max-w-[165px] truncate bg-surface-container-low text-on-surface text-xs font-bold py-2 px-3 rounded-xl border border-on-surface/10 focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer shrink-0"
-            >
-              <option value="personal">Gastos Personales</option>
-              {activeProjects.map(proj => (
-                <option key={proj.id} value={proj.id}>{proj.name}</option>
-              ))}
-            </select>
+            <div className="w-44 shrink-0">
+              <CustomSelect
+                ariaLabel="Bóveda predeterminada"
+                value={profile?.defaultProjectId || 'personal'}
+                onChange={(val) => handleDefaultProjectChange(val as string)}
+                options={[
+                  { value: 'personal', label: 'Gastos Personales' },
+                  ...activeProjects.map(proj => ({
+                    value: proj.id,
+                    label: proj.name
+                  }))
+                ]}
+                size="sm"
+                align="right"
+              />
+            </div>
           </div>
         )}
 

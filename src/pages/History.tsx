@@ -42,6 +42,7 @@ import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { formatDisplayDate, parseLocalYYYYMMDD } from '../lib/dateUtils';
+import { PageHeader } from '../components/PageHeader';
 
 import { getCategoryIcon } from '../lib/categoryIcons';
 
@@ -301,36 +302,31 @@ export const History: React.FC = () => {
   return (
     <div className="px-4 sm:px-6 max-w-4xl mx-auto py-6 sm:py-8 pb-32">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 sm:mb-8">
-        <div className="flex items-center gap-3 sm:gap-4">
+      <PageHeader
+        categoryTag="Movimientos"
+        title="Historial de Gastos"
+        subtitle={
+          filteredTransactions.length === 0 ? '0 movimientos registrados' : (
+            hasMore 
+              ? `Mostrando ${paginatedTransactions.length} de ${filteredTransactions.length} movimientos`
+              : `${filteredTransactions.length} movimiento${filteredTransactions.length > 1 ? 's' : ''}`
+          )
+        }
+        rightAction={
           <button 
-            onClick={() => navigate(-1)}
-            className="p-2.5 bg-surface-container-low rounded-xl text-on-surface-variant hover:bg-on-surface/5 transition-colors"
+            type="button"
+            onClick={() => setShowFilters(!showFilters)}
+            className={cn(
+              "px-3.5 py-2.5 rounded-2xl transition-all flex items-center gap-2 font-bold text-xs sm:text-sm cursor-pointer border border-on-surface/10",
+              showFilters ? "bg-primary text-white shadow-md shadow-primary/20" : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
+            )}
           >
-            <ChevronLeft size={24} />
+            <Filter size={18} />
+            <span className="hidden sm:inline">Filtros</span>
           </button>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-on-surface font-headline leading-tight">Historial</h1>
-            <p className="text-[11px] font-bold text-on-surface-variant/70">
-              {filteredTransactions.length === 0 ? '0 movimientos' : (
-                hasMore 
-                  ? `Mostrando ${paginatedTransactions.length} de ${filteredTransactions.length} movimientos`
-                  : `${filteredTransactions.length} movimiento${filteredTransactions.length > 1 ? 's' : ''}`
-              )}
-            </p>
-          </div>
-        </div>
-        <button 
-          onClick={() => setShowFilters(!showFilters)}
-          className={cn(
-            "p-2.5 rounded-xl transition-all flex items-center gap-2 font-bold text-sm",
-            showFilters ? "bg-on-surface text-surface-container-lowest" : "bg-surface-container-low text-on-surface-variant hover:bg-on-surface/5"
-          )}
-        >
-          <Filter size={20} />
-          <span className="hidden sm:inline">Filtros</span>
-        </button>
-      </div>
+        }
+        className="mb-6 sm:mb-8"
+      />
 
       {/* Period Selector */}
       <section className="space-y-6 mb-8">

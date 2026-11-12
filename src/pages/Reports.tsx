@@ -56,6 +56,7 @@ import { generateProfessionalPDF } from '../services/pdfService';
 import { generateProfessionalCSV, downloadCSV } from '../services/csvService';
 import { getBudgetsOnce } from '../services/firestoreService';
 import { getLocalMonth } from '../lib/dateUtils';
+import { PageHeader } from '../components/PageHeader';
 
 export const Reports: React.FC = () => {
   const navigate = useNavigate();
@@ -509,38 +510,35 @@ export const Reports: React.FC = () => {
   return (
     <div className="min-h-screen bg-surface pb-20">
       {/* Header */}
-      <header className="sticky top-0 w-full z-40 flex items-center justify-between px-4 sm:px-6 h-16 sm:h-20 glass-header">
-        <div className="flex items-center gap-3 sm:gap-4">
-          <button 
-            onClick={() => navigate(-1)} 
-            className="text-on-surface p-2 sm:p-2.5 bg-on-surface/5 hover:bg-on-surface/10 rounded-2xl transition-all active:scale-90 cursor-pointer"
-            title="Volver"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <div className="flex flex-col">
-            <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em] opacity-70 leading-none mb-1">Análisis Financiero</span>
-            <span className="text-lg sm:text-xl font-black tracking-tight text-on-surface font-headline">Reporte de Estado</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button 
-             onClick={() => setShowEmailModal(true)}
-             className="px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer font-bold text-xs"
-             title="Compartir reporte"
-          >
-            <Mail size={16} />
-            <span className="hidden sm:inline">Compartir</span>
-          </button>
-          <button 
-             onClick={() => setShowExportModal(true)}
-             disabled={isGenerating}
-             className="px-3.5 py-2 bg-primary text-white rounded-xl hover:bg-primary/95 transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer font-bold text-xs shadow-sm shadow-primary/20"
-             title="Exportar reporte"
-          >
-            <Download size={16} />
-            <span>Exportar</span>
-          </button>
+      <header className="sticky top-0 w-full z-40 px-4 sm:px-6 py-3.5 glass-header">
+        <div className="max-w-4xl mx-auto">
+          <PageHeader
+            backTo="/settings"
+            categoryTag="Análisis Financiero"
+            title="Reporte de Estado"
+            className="pb-0 space-y-0"
+            rightAction={
+              <div className="flex items-center gap-2">
+                <button 
+                   onClick={() => setShowEmailModal(true)}
+                   className="px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer font-bold text-xs"
+                   title="Compartir reporte"
+                >
+                  <Mail size={16} />
+                  <span className="hidden sm:inline">Compartir</span>
+                </button>
+                <button 
+                   onClick={() => setShowExportModal(true)}
+                   disabled={isGenerating}
+                   className="px-3.5 py-2 bg-primary text-white rounded-xl hover:bg-primary/95 transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer font-bold text-xs shadow-sm shadow-primary/20"
+                   title="Exportar reporte"
+                >
+                  <Download size={16} />
+                  <span>Exportar</span>
+                </button>
+              </div>
+            }
+          />
         </div>
       </header>
 

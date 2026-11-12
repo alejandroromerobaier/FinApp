@@ -28,6 +28,7 @@ import { useData } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { formatCurrency, cn } from '../lib/utils';
 import { getLocalToday, getLocalMonth, formatDisplayDate, formatLocalYYYYMMDD, parseLocalMonth } from '../lib/dateUtils';
+import { PageHeader } from '../components/PageHeader';
 import { deleteInstallmentPlan, deleteSingleVirtualInstallment } from '../services/firestoreService';
 
 export type ScopeFilter = 'all' | 'personal' | 'shared_mine' | 'shared_all';
@@ -265,43 +266,31 @@ export const CreditCards: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 pb-32 space-y-8">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2.5 hover:bg-surface-container rounded-2xl text-on-surface-variant hover:text-on-surface transition-colors border border-on-surface/5"
-            title="Volver"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-black text-on-surface tracking-tight font-headline flex items-center gap-2">
-              <span>Compromisos & Cuotas</span>
-              <Layers size={22} className="text-primary" />
-            </h1>
-            <p className="text-xs sm:text-sm text-on-surface-variant font-medium">
-              Cronograma de pagos, previsión mensual y seguimiento de compras financiadas.
-            </p>
+      <PageHeader
+        backTo="/settings"
+        categoryTag="Financiamiento"
+        icon={<Layers size={22} className="text-primary" />}
+        title="Compromisos & Cuotas"
+        subtitle="Cronograma de pagos, previsión mensual y seguimiento de compras financiadas."
+        rightAction={
+          <div className="flex items-center gap-2">
+            <Link
+              to="/cards"
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-surface-container text-on-surface font-bold text-xs border border-on-surface/10 hover:bg-surface-container-high transition-all"
+            >
+              <CreditCardIcon size={14} />
+              <span>Mis Tarjetas</span>
+            </Link>
+            <Link
+              to="/add"
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-primary text-white font-bold text-xs shadow-md shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
+            >
+              <Plus size={15} />
+              <span>Nueva Compra</span>
+            </Link>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Link
-            to="/cards"
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface-container text-on-surface font-bold text-xs border border-on-surface/10 hover:bg-surface-container-high transition-all"
-          >
-            <CreditCardIcon size={14} />
-            <span>Mis Tarjetas</span>
-          </Link>
-          <Link
-            to="/add"
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-white font-bold text-xs shadow-md shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
-          >
-            <Plus size={15} />
-            <span>Nueva Compra</span>
-          </Link>
-        </div>
-      </div>
+        }
+      />
 
       {/* Scope Filter Tabs (Personal vs Proyectos vs Todo) */}
       {projects.length > 0 && (

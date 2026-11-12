@@ -11,6 +11,7 @@ import { useAuth } from '../lib/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { deleteCategory, addCategory, updateCategory, reassignTransactions } from '../services/firestoreService';
 import { getCategoryIcon, CATEGORY_ICON_GROUPS, CATEGORY_ICON_MAP } from '../lib/categoryIcons';
+import { PageHeader } from '../components/PageHeader';
 
 const COLORS = [
   'bg-rose-500', 'bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 
@@ -153,34 +154,22 @@ export const ManageCategories: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-surface pb-32 sm:pb-20">
-      {/* Header */}
-      <header className="sticky top-0 w-full z-40 flex items-center justify-between px-4 sm:px-6 h-14 sm:h-16 glass-header">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <button 
-            onClick={() => navigate(-1)} 
-            className="text-on-surface-variant p-2 hover:bg-on-surface/5 rounded-full transition-colors active:scale-90"
-            title="Volver"
-          >
-            <ArrowLeft size={22} className="sm:w-[24px] sm:h-[24px]" />
-          </button>
-          <span className="text-lg sm:text-xl font-extrabold tracking-tight text-on-surface font-headline">
-            Categorías
-          </span>
-        </div>
-        <button 
-          onClick={openNewCategory}
-          className="bg-primary text-white px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl shadow-lg shadow-primary/20 active:scale-95 transition-transform flex items-center gap-2 font-bold text-xs uppercase tracking-wider cursor-pointer"
-        >
-          <Plus size={18} />
-          <span>Nueva Categoría</span>
-        </button>
-      </header>
-
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8">
-        <section className="mb-6 sm:mb-8">
-          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-on-surface font-headline mb-1 sm:mb-2">Tus Categorías</h2>
-          <p className="text-on-surface-variant text-xs sm:text-sm font-medium">Organiza y personaliza las etiquetas de tus movimientos.</p>
-        </section>
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+        <PageHeader
+          backTo="/settings"
+          categoryTag="Catálogo"
+          title="Gestión de Categorías"
+          subtitle="Organiza y personaliza las etiquetas y colores de tus movimientos."
+          rightAction={
+            <button 
+              onClick={openNewCategory}
+              className="bg-primary text-white px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-2xl shadow-lg shadow-primary/20 active:scale-95 transition-transform flex items-center gap-2 font-bold text-xs uppercase tracking-wider cursor-pointer"
+            >
+              <Plus size={18} />
+              <span>Nueva Categoría</span>
+            </button>
+          }
+        />
 
         {/* Search Bar */}
         <div className="relative mb-6">

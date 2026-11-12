@@ -14,6 +14,7 @@ import { haptic } from '../lib/haptics';
 import { updateBudget, deleteBudget, getBudgetsOnce } from '../services/firestoreService';
 import { getLocalMonth, parseLocalMonth } from '../lib/dateUtils';
 import { formatCurrency, cn, formatCurrencyInput, formatAmountForDisplay, parseFormattedAmount } from '../lib/utils';
+import { PageHeader } from '../components/PageHeader';
 
 import { getCategoryIcon } from '../lib/categoryIcons';
 
@@ -229,31 +230,26 @@ export const Budgets: React.FC = () => {
   };
 
   return (
-    <div className="px-4 sm:px-6 max-w-2xl mx-auto py-6 sm:py-8 space-y-6 sm:space-y-8">
+    <div className="px-4 sm:px-6 max-w-4xl mx-auto py-6 sm:py-8 space-y-6 sm:space-y-8">
       {/* Header */}
-      <header className="flex items-center gap-4">
-        <button 
-          onClick={() => navigate(-1)}
-          className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface hover:bg-surface-container-high transition-colors active:scale-95"
-          title="Volver"
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-on-surface font-headline uppercase leading-none">Presupuestos</h1>
-          <div className="flex items-center gap-2 mt-1">
-            <p className={cn(
-              "text-[10px] font-black uppercase tracking-[0.2em] transition-colors",
-              isCurrentMonth ? "text-primary" : "text-on-surface-variant/40"
+      <PageHeader
+        backTo="/settings"
+        categoryTag="Control de Gastos"
+        title="Presupuestos"
+        subtitle="Establece límites mensuales por categoría para mantener tus finanzas bajo control."
+        badge={
+          <div className="flex items-center gap-2">
+            <span className={cn(
+              "text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border",
+              isCurrentMonth
+                ? "bg-primary/10 text-primary border-primary/20"
+                : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
             )}>
-              {currentMonthDisplay}
-            </p>
-            {!isCurrentMonth && (
-              <span className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter">Histórico</span>
-            )}
+              {currentMonthDisplay} {!isCurrentMonth && '• Histórico'}
+            </span>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       {/* Month Navigator */}
       <section className="flex items-center justify-between bg-surface-container-low p-2 rounded-2xl border border-on-surface/5 shadow-xs">
