@@ -133,17 +133,17 @@ export const ManageCards: React.FC = () => {
         title="Tarjetas de Crédito"
         subtitle="Administrá tus tarjetas, cierres y vencimientos para proyectar tus cuotas."
         rightAction={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={() => navigate('/credit-cards')}
-              className="flex items-center gap-1.5 px-3 py-2 bg-surface-container rounded-xl text-on-surface font-bold text-xs border border-on-surface/10 hover:bg-surface-container-high transition-all cursor-pointer"
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-surface-container rounded-xl text-on-surface font-bold text-xs border border-on-surface/10 hover:bg-surface-container-high transition-all cursor-pointer whitespace-nowrap"
             >
               <Layers size={14} className="text-primary dark:text-blue-400" />
-              <span className="hidden sm:inline">Ver Cuotas</span>
+              <span>Ver Cuotas</span>
             </button>
             <button
               onClick={openAddModal}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-primary text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-primary/20 hover:bg-primary/90 active:scale-95 transition-all cursor-pointer"
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-primary text-white font-bold text-xs sm:text-sm rounded-xl shadow-md shadow-primary/20 hover:bg-primary/90 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
             >
               <Plus size={16} />
               <span>Nueva Tarjeta</span>

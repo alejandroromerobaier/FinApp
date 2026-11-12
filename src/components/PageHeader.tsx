@@ -16,6 +16,8 @@ export interface PageHeaderProps {
   rightAction?: React.ReactNode;
   className?: string;
   children?: React.ReactNode;
+  breakpoint?: 'sm' | 'md';
+  align?: 'start' | 'center';
 }
 
 export const PageHeader: React.FC<PageHeaderProps> = ({
@@ -29,7 +31,9 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   hideBack = false,
   rightAction,
   className,
-  children
+  children,
+  breakpoint = 'md',
+  align = 'center'
 }) => {
   const navigate = useNavigate();
 
@@ -44,9 +48,19 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
     }
   };
 
+  const isMd = breakpoint === 'md';
+
   return (
     <header className={cn("space-y-4 pb-2", className)}>
-      <div className="flex items-start justify-between gap-4">
+      <div
+        className={cn(
+          "flex justify-between gap-4 sm:gap-6",
+          isMd ? "flex-col md:flex-row" : "flex-col sm:flex-row",
+          align === 'center'
+            ? (isMd ? "md:items-center" : "sm:items-center")
+            : (isMd ? "md:items-start" : "sm:items-start")
+        )}
+      >
         <div className="flex items-start gap-3.5 sm:gap-4 min-w-0 flex-1">
           {!hideBack && (
             <button
@@ -84,7 +98,12 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
         </div>
 
         {rightAction && (
-          <div className="shrink-0 flex items-center gap-2 mt-0.5">
+          <div
+            className={cn(
+              "flex items-center gap-2 shrink-0",
+              isMd ? "w-full md:w-auto" : "w-full sm:w-auto"
+            )}
+          >
             {rightAction}
           </div>
         )}

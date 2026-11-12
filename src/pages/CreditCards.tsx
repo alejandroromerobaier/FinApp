@@ -273,17 +273,17 @@ export const CreditCards: React.FC = () => {
         title="Compromisos & Cuotas"
         subtitle="Cronograma de pagos, previsión mensual y seguimiento de compras financiadas."
         rightAction={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Link
               to="/cards"
-              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-surface-container text-on-surface font-bold text-xs border border-on-surface/10 hover:bg-surface-container-high transition-all"
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-surface-container text-on-surface font-bold text-xs border border-on-surface/10 hover:bg-surface-container-high transition-all active:scale-95 whitespace-nowrap"
             >
               <CreditCardIcon size={14} />
               <span>Mis Tarjetas</span>
             </Link>
             <Link
               to="/add"
-              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-primary text-white font-bold text-xs shadow-md shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-primary text-white font-bold text-xs shadow-md shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95 whitespace-nowrap"
             >
               <Plus size={15} />
               <span>Nueva Compra</span>
