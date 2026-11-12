@@ -503,9 +503,9 @@ export const AddExpense: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-surface flex flex-col pb-10">
-      {/* Header (Sticky, clean & minimal) */}
-      <header className="sticky top-0 w-full z-40 glass-header bg-surface/95 backdrop-blur-xl border-b border-on-surface/5">
-        <div className="flex items-center justify-between px-6 h-14 max-w-2xl mx-auto w-full">
+      {/* Header (Sticky, clean & minimal with safe-area support) */}
+      <header className="sticky top-0 w-full z-40 glass-header bg-surface/95 backdrop-blur-xl border-b border-on-surface/5 pt-safe-top">
+        <div className="flex items-center justify-between px-6 h-14 sm:h-16 max-w-2xl mx-auto w-full">
           <div>
             <h1 className="text-base sm:text-lg font-black tracking-tight text-on-surface font-headline">
               {id ? 'Editar Transacción' : 'Nueva Transacción'}
@@ -514,17 +514,6 @@ export const AddExpense: React.FC = () => {
               {destination === 'shared' ? 'Gasto Compartido' : 'Gasto Personal'}
             </p>
           </div>
-          {id && isAuthor && (
-            <button 
-              type="button"
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="p-2 text-rose-600 hover:bg-rose-500/10 rounded-xl transition-colors active:scale-90 cursor-pointer"
-              title="Eliminar transacción"
-            >
-              {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
-            </button>
-          )}
         </div>
       </header>
 
@@ -1283,7 +1272,7 @@ export const AddExpense: React.FC = () => {
 
       {/* Fixed Bottom Action Dock (Thumb Zone) */}
       <div className="fixed bottom-0 left-0 right-0 z-40 p-3 sm:p-4 bg-surface/90 backdrop-blur-xl border-t border-on-surface/10 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shadow-[0_-4px_24px_rgba(0,0,0,0.08)]">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
+        <div className="max-w-2xl mx-auto flex items-center gap-2.5 sm:gap-3">
           <button
             type="button"
             onClick={() => navigate(-1)}
@@ -1297,6 +1286,18 @@ export const AddExpense: React.FC = () => {
             <ArrowLeft size={16} />
             <span>Volver</span>
           </button>
+
+          {id && isAuthor && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={isDeleting || isSaving}
+              className="p-3.5 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 border border-rose-500/20 transition-all active:scale-95 flex items-center justify-center shrink-0 cursor-pointer"
+              title="Eliminar transacción"
+            >
+              {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+            </button>
+          )}
 
           {isAuthor && (
             <button
