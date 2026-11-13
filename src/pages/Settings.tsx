@@ -34,7 +34,8 @@ import {
   Copy,
   Check,
   Sparkles,
-  Share2
+  Share2,
+  ExternalLink
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { cn, formatCurrency } from '../lib/utils';
@@ -888,9 +889,16 @@ Abrí el link en Safari o Chrome y tocá *"Agregar a pantalla de inicio"*. Se in
             <span className="block font-bold text-sm text-on-surface leading-tight font-headline">
               Invitar amigos o pareja
             </span>
-            <span className="text-xs text-on-surface-variant">
+            <span className="text-xs text-on-surface-variant block">
               Copia el mensaje con el link de bienvenida y guía PWA
             </span>
+            <Link
+              to="/bienvenida"
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline mt-1 cursor-pointer"
+            >
+              <span>Ver vista previa de bienvenida</span>
+              <ExternalLink size={11} />
+            </Link>
           </div>
         </div>
         <button
