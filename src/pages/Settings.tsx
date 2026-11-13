@@ -32,7 +32,8 @@ import {
   EyeOff,
   FolderKanban,
   Copy,
-  Check
+  Check,
+  Sparkles
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { cn, formatCurrency } from '../lib/utils';
@@ -486,6 +487,15 @@ export const Settings: React.FC = () => {
       countBadge: `${shortcuts.length} atajo${shortcuts.length === 1 ? '' : 's'}`,
       iconColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
       keywords: ['atajos', 'rápidos', 'shortcuts', 'gasto rápido']
+    },
+    {
+      to: '/bienvenida',
+      icon: <Sparkles size={19} />,
+      title: 'Guía de Inicio & Cómo Instalar',
+      subtitle: 'Instructivo interactivo e invitación para compartir',
+      countBadge: 'PWA',
+      iconColor: 'bg-primary/10 text-primary',
+      keywords: ['guia', 'inicio', 'bienvenida', 'tutorial', 'instalar', 'pwa', 'compartir', 'invitar', 'whatsapp']
     }
   ].filter(item => matchesQuery(item.title, item.subtitle, ...item.keywords));
 

@@ -323,9 +323,19 @@ export const Login: React.FC = () => {
           <span>Iniciar sesión con Google</span>
         </button>
 
-        <p className="text-center text-xs text-on-surface-variant/60 pt-2">
-          Al continuar, aceptas nuestros <button className="underline">Términos de Servicio</button> y <button className="underline">Política de Privacidad</button>.
-        </p>
+        <div className="pt-2 flex flex-col items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate('/bienvenida')}
+            className="text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+          >
+            <span>¿Primera vez en FinApp? Ver cómo instalarla y cómo funciona</span>
+            <ArrowRight size={13} />
+          </button>
+          <p className="text-center text-xs text-on-surface-variant/60">
+            Al continuar, aceptas nuestros <button className="underline">Términos de Servicio</button> y <button className="underline">Política de Privacidad</button>.
+          </p>
+        </div>
       </motion.div>
 
       {/* Password Reset Modal */}

@@ -21,6 +21,7 @@ import { Budgets } from './pages/Budgets';
 import { ManageShortcuts } from './pages/ManageShortcuts';
 import { ManageCards } from './pages/ManageCards';
 import { CreditCards } from './pages/CreditCards';
+import { WelcomeOnboarding } from './pages/WelcomeOnboarding';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
@@ -47,6 +48,8 @@ function AppContent() {
       <UpdatePrompt />
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/bienvenida" element={<WelcomeOnboarding />} />
+        <Route path="/inicio" element={<WelcomeOnboarding />} />
         <Route
           path="/*"
           element={
