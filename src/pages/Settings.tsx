@@ -273,7 +273,8 @@ export const Settings: React.FC = () => {
 
   const handleShareWhatsApp = async () => {
     haptic.selection();
-    const shareUrl = `${window.location.origin}/bienvenida`;
+    const isQA = versionInfo.isQA;
+    const shareUrl = isQA ? 'https://finapp-qa.web.app/bienvenida' : 'https://finapp-vbeta.web.app/bienvenida';
     const message = 
 `👋 ¡Hola! Te comparto *FinApp* para llevar las cuentas y gastos juntos en tiempo real:
 
@@ -292,19 +293,19 @@ Abrí el link en Safari o Chrome y tocá *"Agregar a pantalla de inicio"*. Se in
         toast.success('¡Enlace de invitación compartido!');
       } catch {
         // Fallback to clipboard if user cancels or errors
-        copyInviteFallback(message);
+        copyInviteFallback(message, shareUrl);
       }
     } else {
-      copyInviteFallback(message);
+      copyInviteFallback(message, shareUrl);
     }
   };
 
-  const copyInviteFallback = async (text: string) => {
+  const copyInviteFallback = async (text: string, shareUrl: string) => {
     try {
       await navigator.clipboard.writeText(text);
       toast.success('¡Mensaje copiado para enviar por WhatsApp! 📲');
     } catch {
-      toast.info(`Copiá este enlace: ${window.location.origin}/bienvenida`);
+      toast.info(`Copiá este enlace: ${shareUrl}`);
     }
   };
 

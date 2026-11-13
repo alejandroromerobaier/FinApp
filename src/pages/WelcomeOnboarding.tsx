@@ -76,7 +76,8 @@ export const WelcomeOnboarding: React.FC = () => {
   };
 
   const handleShareWhatsApp = () => {
-    const shareUrl = `${window.location.origin}/bienvenida`;
+    const isQA = window.location.hostname.includes('finapp-qa');
+    const shareUrl = isQA ? 'https://finapp-qa.web.app/bienvenida' : 'https://finapp-vbeta.web.app/bienvenida';
     const message = 
 `👋 ¡Hola! Te comparto *FinApp* para llevar las cuentas y gastos juntos en tiempo real:
 
