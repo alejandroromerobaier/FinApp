@@ -120,10 +120,9 @@ Abrí el link en Safari o Chrome y tocá *"Agregar a pantalla de inicio"*. Se in
         
         {/* Top Header */}
         <header className="px-5 pt-4 pb-3 flex items-center justify-between border-b border-on-surface/5 sticky top-0 bg-surface-container-lowest/80 backdrop-blur-md z-30">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-primary flex items-center justify-center text-white font-black text-lg shadow-md shadow-primary/20 overflow-hidden">
-              <img src={logo} alt="FinApp" className="w-6 h-6 object-contain brightness-0 invert" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-              <span className="font-headline font-black text-white text-base">F</span>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white rounded-2xl shadow-md border border-black/5 flex items-center justify-center p-1.5 shrink-0">
+              <img src={logo} alt="FinApp Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <span className="font-extrabold text-base tracking-tight text-on-surface block leading-tight font-headline">

@@ -33,7 +33,8 @@ import {
   FolderKanban,
   Copy,
   Check,
-  Sparkles
+  Sparkles,
+  Share2
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { cn, formatCurrency } from '../lib/utils';
@@ -269,6 +270,43 @@ export const Settings: React.FC = () => {
     toast.info(showBalances ? 'Saldos ocultos por privacidad' : 'Saldos visibles nuevamente');
   };
 
+  const handleShareWhatsApp = async () => {
+    haptic.selection();
+    const shareUrl = `${window.location.origin}/bienvenida`;
+    const message = 
+`👋 ¡Hola! Te comparto *FinApp* para llevar las cuentas y gastos juntos en tiempo real:
+
+📲 *Ingresá acá:* ${shareUrl}
+
+💡 *Para tenerla en la pantalla de inicio:*
+Abrí el link en Safari o Chrome y tocá *"Agregar a pantalla de inicio"*. Se instala como app nativa al instante sin descargar nada del Store.`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'FinApp - Bóvedas Compartidas',
+          text: message,
+          url: shareUrl,
+        });
+        toast.success('¡Enlace de invitación compartido!');
+      } catch {
+        // Fallback to clipboard if user cancels or errors
+        copyInviteFallback(message);
+      }
+    } else {
+      copyInviteFallback(message);
+    }
+  };
+
+  const copyInviteFallback = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('¡Mensaje copiado para enviar por WhatsApp! 📲');
+    } catch {
+      toast.info(`Copiá este enlace: ${window.location.origin}/bienvenida`);
+    }
+  };
+
   const handleCopyVersion = async () => {
     const text = `FinApp v${versionInfo.version} (${versionInfo.env}) • Build #${versionInfo.commit} • ${versionInfo.formattedDate}`;
     try {
@@ -487,15 +525,6 @@ export const Settings: React.FC = () => {
       countBadge: `${shortcuts.length} atajo${shortcuts.length === 1 ? '' : 's'}`,
       iconColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
       keywords: ['atajos', 'rápidos', 'shortcuts', 'gasto rápido']
-    },
-    {
-      to: '/bienvenida',
-      icon: <Sparkles size={19} />,
-      title: 'Guía de Inicio & Cómo Instalar',
-      subtitle: 'Instructivo interactivo e invitación para compartir',
-      countBadge: 'PWA',
-      iconColor: 'bg-primary/10 text-primary',
-      keywords: ['guia', 'inicio', 'bienvenida', 'tutorial', 'instalar', 'pwa', 'compartir', 'invitar', 'whatsapp']
     }
   ].filter(item => matchesQuery(item.title, item.subtitle, ...item.keywords));
 
@@ -846,6 +875,31 @@ export const Settings: React.FC = () => {
             </div>
           </div>
           <ChevronRight size={17} className="text-rose-500/40 group-hover:translate-x-0.5 transition-transform shrink-0" />
+        </button>
+      </div>
+
+      {/* Direct WhatsApp Share / Invite Button */}
+      <div className="bg-surface-container-lowest rounded-3xl p-4 sm:p-5 border border-on-surface/5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+            <Share2 size={20} />
+          </div>
+          <div>
+            <span className="block font-bold text-sm text-on-surface leading-tight font-headline">
+              Invitar amigos o pareja
+            </span>
+            <span className="text-xs text-on-surface-variant">
+              Copia el mensaje con el link de bienvenida y guía PWA
+            </span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleShareWhatsApp}
+          className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer shrink-0"
+        >
+          <Share2 size={14} />
+          <span>Enviar por WhatsApp</span>
         </button>
       </div>
 
