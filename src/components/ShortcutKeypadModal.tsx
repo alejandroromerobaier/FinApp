@@ -102,23 +102,23 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-6">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
         {/* Backdrop */}
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm"
         />
 
-        {/* Modal Container (Bottom sheet on mobile, centered on desktop) */}
+        {/* Modal Container (Centered floating card) */}
         <motion.div 
-          initial={{ y: 40, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 40, opacity: 0 }}
+          initial={{ scale: 0.95, opacity: 0, y: 15 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.95, opacity: 0, y: 15 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="bg-surface w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl relative z-10 flex flex-col overflow-hidden border border-on-surface/10 max-h-[90vh] pb-safe"
+          className="bg-surface w-full max-w-md rounded-[2.5rem] shadow-2xl relative z-10 flex flex-col overflow-hidden border border-on-surface/10 max-h-[85dvh]"
         >
           {/* Header */}
           <div className="flex justify-between items-center px-5 py-4 border-b border-on-surface/5 bg-surface shrink-0">
@@ -242,6 +242,7 @@ export const ShortcutKeypadModal: React.FC<ShortcutKeypadModalProps> = ({ shortc
                     });
                   }}
                   placeholder="0,00"
+                  enterKeyHint="done"
                   className="w-full bg-surface-container-low border-2 border-transparent focus:border-primary/30 rounded-2xl py-4 pl-12 pr-4 text-3xl font-black font-headline text-center text-on-surface focus:ring-0 transition-all placeholder:text-on-surface-variant/20 shadow-inner"
                 />
               </div>

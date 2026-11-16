@@ -613,6 +613,15 @@ export const AddExpense: React.FC = () => {
               className="w-full bg-transparent border-none p-0 focus:ring-0 text-xl font-bold placeholder:text-on-surface-variant/30 text-on-surface"
               placeholder={type === 'expense' ? "¿En qué gastaste?" : "¿De dónde viene el dinero?"}
               type="text"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="done"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.currentTarget.blur();
+                }
+              }}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
