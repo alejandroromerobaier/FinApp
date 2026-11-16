@@ -34,7 +34,8 @@ import {
   Layers,
   AlertTriangle,
   CheckCircle2,
-  User
+  User,
+  RotateCcw
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/src/lib/utils';
 import { getGlobalTransactions, deleteTransaction, deleteInstallmentPlan, deleteSingleVirtualInstallment } from '../services/firestoreService';
@@ -195,6 +196,44 @@ export const History: React.FC = () => {
     return `${start.toLocaleDateString('es-ES', { month: 'short' })} - ${end.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })}`;
   }, [selectedPeriod, currentDate]);
 
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (filterType !== 'all') count++;
+    if (filterCategory !== 'all') count++;
+    if (filterProject !== 'all') count++;
+    if (filterAuthor !== 'all') count++;
+    if (filterClassification !== 'all') count++;
+    return count;
+  }, [filterType, filterCategory, filterProject, filterAuthor, filterClassification]);
+
+  const handleClearFilters = useCallback(() => {
+    haptic.light();
+    setFilterType('all');
+    setFilterCategory('all');
+    setFilterProject('all');
+    setFilterAuthor('all');
+    setFilterClassification('all');
+  }, []);
+
+  const activeCategoryName = useMemo(() => {
+    if (filterCategory === 'all') return null;
+    const cat = dynamicCategories.find(c => c.id === filterCategory) || categories.find(c => c.id === filterCategory);
+    return cat?.name || 'Categoría';
+  }, [filterCategory, dynamicCategories, categories]);
+
+  const activeProjectName = useMemo(() => {
+    if (filterProject === 'all') return null;
+    if (filterProject === 'personal') return 'Solo Personales';
+    const proj = projects.find(p => p.id === filterProject);
+    return proj?.name || 'Proyecto';
+  }, [filterProject, projects]);
+
+  const activeAuthorName = useMemo(() => {
+    if (filterAuthor === 'all') return null;
+    const author = projectAuthors.find(a => a.id === filterAuthor);
+    return author?.name || 'Colaborador';
+  }, [filterAuthor, projectAuthors]);
+
   const changeMonth = (delta: number) => {
     const next = new Date(currentDate);
     next.setMonth(next.getMonth() + delta);
@@ -333,14 +372,28 @@ export const History: React.FC = () => {
         rightAction={
           <button 
             type="button"
-            onClick={() => setShowFilters(!showFilters)}
+            onClick={() => {
+              haptic.light();
+              setShowFilters(!showFilters);
+            }}
             className={cn(
-              "px-3.5 py-2.5 rounded-2xl transition-all flex items-center gap-2 font-bold text-xs sm:text-sm cursor-pointer border border-on-surface/10",
-              showFilters ? "bg-primary text-white shadow-md shadow-primary/20" : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
+              "px-3.5 py-2.5 rounded-2xl transition-all flex items-center gap-2 font-bold text-xs sm:text-sm cursor-pointer border",
+              (showFilters || activeFiltersCount > 0)
+                ? "bg-primary text-white border-primary shadow-md shadow-primary/20" 
+                : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container border-on-surface/10"
             )}
+            title={showFilters ? "Ocultar filtros" : "Mostrar filtros"}
           >
             <Filter size={18} />
             <span className="hidden sm:inline">Filtros</span>
+            {activeFiltersCount > 0 && (
+              <span className={cn(
+                "min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 shadow-xs",
+                (showFilters || activeFiltersCount > 0) ? "bg-white text-primary" : "bg-primary text-white"
+              )}>
+                {activeFiltersCount}
+              </span>
+            )}
           </button>
         }
         className="mb-6 sm:mb-8"
@@ -446,25 +499,135 @@ export const History: React.FC = () => {
         </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative mb-8">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40" size={20} />
-        <input 
-          type="text"
-          placeholder="Buscar transacciones o categorías..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-surface-container-lowest border border-on-surface/5 rounded-2xl py-4 pl-12 pr-4 text-on-surface font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm text-sm sm:text-base"
-        />
-        {searchQuery && (
-          <button 
-            onClick={() => setSearchQuery('')}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40 hover:text-on-surface transition-colors"
-          >
-            <X size={18} />
-          </button>
-        )}
+      {/* Search Bar + Filter Toggle */}
+      <div className="flex items-center gap-2.5 mb-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40" size={18} />
+          <input 
+            type="text"
+            placeholder="Buscar por concepto o categoría..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-surface-container-lowest border border-on-surface/10 rounded-2xl py-3.5 pl-11 pr-10 text-on-surface font-medium focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-xs text-sm"
+          />
+          {searchQuery && (
+            <button 
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40 hover:text-on-surface p-1"
+              title="Borrar búsqueda"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+
+        <button 
+          type="button"
+          onClick={() => {
+            haptic.light();
+            setShowFilters(!showFilters);
+          }}
+          className={cn(
+            "h-[48px] px-3.5 sm:px-4 rounded-2xl transition-all flex items-center gap-2 font-bold text-xs sm:text-sm cursor-pointer border shrink-0",
+            (showFilters || activeFiltersCount > 0)
+              ? "bg-primary text-white border-primary shadow-md shadow-primary/20" 
+              : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low border-on-surface/10 shadow-xs"
+          )}
+          title={showFilters ? "Ocultar filtros" : "Abrir filtros avanzados"}
+        >
+          <Filter size={18} />
+          <span className="hidden sm:inline">Filtros</span>
+          {activeFiltersCount > 0 && (
+            <span className={cn(
+              "min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 shadow-xs",
+              (showFilters || activeFiltersCount > 0) ? "bg-white text-primary" : "bg-primary text-white"
+            )}>
+              {activeFiltersCount}
+            </span>
+          )}
+        </button>
       </div>
+
+      {/* Active Filter Chips */}
+      {(activeFiltersCount > 0 || searchQuery.trim().length > 0) && (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none mb-6 text-xs">
+          <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/50 shrink-0 mr-1">
+            Filtros:
+          </span>
+
+          {searchQuery.trim().length > 0 && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary/10 text-primary border border-primary/20 font-bold shrink-0 hover:bg-primary/20 transition-colors"
+            >
+              <span>"{searchQuery}"</span>
+              <X size={12} />
+            </button>
+          )}
+
+          {filterType !== 'all' && (
+            <button
+              onClick={() => setFilterType('all')}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary/10 text-primary border border-primary/20 font-bold shrink-0 hover:bg-primary/20 transition-colors"
+            >
+              <span>{filterType === 'expense' ? 'Gastos' : 'Ingresos'}</span>
+              <X size={12} />
+            </button>
+          )}
+
+          {filterCategory !== 'all' && (
+            <button
+              onClick={() => setFilterCategory('all')}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary/10 text-primary border border-primary/20 font-bold shrink-0 hover:bg-primary/20 transition-colors"
+            >
+              <span>{activeCategoryName}</span>
+              <X size={12} />
+            </button>
+          )}
+
+          {filterProject !== 'all' && (
+            <button
+              onClick={() => setFilterProject('all')}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary/10 text-primary border border-primary/20 font-bold shrink-0 hover:bg-primary/20 transition-colors"
+            >
+              <span>{activeProjectName}</span>
+              <X size={12} />
+            </button>
+          )}
+
+          {filterAuthor !== 'all' && (
+            <button
+              onClick={() => setFilterAuthor('all')}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary/10 text-primary border border-primary/20 font-bold shrink-0 hover:bg-primary/20 transition-colors"
+            >
+              <span>{activeAuthorName}</span>
+              <X size={12} />
+            </button>
+          )}
+
+          {filterClassification !== 'all' && (
+            <button
+              onClick={() => setFilterClassification('all')}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary/10 text-primary border border-primary/20 font-bold shrink-0 hover:bg-primary/20 transition-colors"
+            >
+              <span>{filterClassification === 'fixed' ? 'Fijo' : 'Variable'}</span>
+              <X size={12} />
+            </button>
+          )}
+
+          <button
+            onClick={() => {
+              handleClearFilters();
+              setSearchQuery('');
+            }}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 font-bold shrink-0 hover:bg-rose-500/20 transition-colors ml-auto"
+            title="Quitar todos los filtros"
+          >
+            <RotateCcw size={11} />
+            <span>Limpiar</span>
+          </button>
+        </div>
+      )}
 
       {/* Filter Options (Expandable) */}
       <AnimatePresence>
@@ -475,7 +638,40 @@ export const History: React.FC = () => {
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden mb-8 space-y-6"
           >
-            <div className="bg-surface-container-lowest rounded-3xl p-4 sm:p-6 border border-on-surface/5 shadow-sm space-y-6">
+            <div className="bg-surface-container-lowest rounded-3xl p-4 sm:p-6 border border-on-surface/10 shadow-md space-y-6">
+              {/* Filter Panel Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-on-surface/5">
+                <div className="flex items-center gap-2">
+                  <Filter size={18} className="text-primary" />
+                  <h3 className="font-extrabold text-sm sm:text-base text-on-surface">Filtros Avanzados</h3>
+                  {activeFiltersCount > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-black border border-primary/20">
+                      {activeFiltersCount} activo{activeFiltersCount === 1 ? '' : 's'}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {activeFiltersCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearFilters}
+                      className="text-xs font-bold text-rose-500 hover:text-rose-600 flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-rose-500/10 transition-colors"
+                    >
+                      <RotateCcw size={12} />
+                      <span>Limpiar todo</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowFilters(false)}
+                    className="p-1.5 rounded-xl hover:bg-on-surface/5 text-on-surface-variant transition-colors"
+                    title="Cerrar panel"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
               {/* Type Filter */}
               <div>
                 <p className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-[0.2em] mb-3 ml-1">Tipo de Transacción</p>
@@ -618,6 +814,23 @@ export const History: React.FC = () => {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Panel Footer / Apply Button */}
+              <div className="pt-3 border-t border-on-surface/5 flex items-center justify-between gap-3">
+                <span className="text-xs font-bold text-on-surface-variant/70">
+                  {filteredTransactions.length} resultado{filteredTransactions.length === 1 ? '' : 's'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptic.light();
+                    setShowFilters(false);
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-primary text-white font-bold text-xs hover:opacity-90 active:scale-95 transition-all shadow-sm cursor-pointer"
+                >
+                  Ver resultados
+                </button>
               </div>
             </div>
           </motion.div>
