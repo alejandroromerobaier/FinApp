@@ -489,6 +489,13 @@ export const AddExpense: React.FC = () => {
     }
   };
 
+  const handleDismissKeyboard = () => {
+    const active = document.activeElement;
+    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') && active instanceof HTMLElement) {
+      active.blur();
+    }
+  };
+
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
   if (dataLoading || initialLoading) {
@@ -500,7 +507,11 @@ export const AddExpense: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col pb-10">
+    <div 
+      className="min-h-screen bg-surface flex flex-col pb-10"
+      onTouchMove={handleDismissKeyboard}
+      onScroll={handleDismissKeyboard}
+    >
       {/* Header (Sticky, clean & minimal with safe-area support) */}
       <header className="sticky top-0 w-full z-40 glass-header bg-surface/95 backdrop-blur-xl border-b border-on-surface/5 pt-safe-top">
         <div className="flex items-center justify-between px-6 h-14 sm:h-16 max-w-2xl mx-auto w-full">
@@ -529,7 +540,10 @@ export const AddExpense: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex-1 py-6 max-w-2xl mx-auto w-full px-6 flex flex-col gap-8 pb-32 sm:pb-36">
+      <main 
+        className="flex-1 py-6 max-w-2xl mx-auto w-full px-6 flex flex-col gap-8 pb-32 sm:pb-36"
+        onTouchMove={handleDismissKeyboard}
+      >
         {!isAuthor && (
           <div className="bg-amber-500/10 border border-amber-500/10 p-4 rounded-2xl flex items-center gap-3 text-amber-700">
             <ShieldCheck size={20} />
