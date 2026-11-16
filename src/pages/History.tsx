@@ -82,6 +82,7 @@ export const History: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterProject, setFilterProject] = useState<string>('all');
   const [filterAuthor, setFilterAuthor] = useState<string>('all');
+  const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>('all');
   const [filterClassification, setFilterClassification] = useState<'all' | 'fixed' | 'variable'>('all');
   const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'all'>('monthly');
   const [timeScope, setTimeScope] = useState<TimeScope>('real_only');
@@ -196,15 +197,46 @@ export const History: React.FC = () => {
     return `${start.toLocaleDateString('es-ES', { month: 'short' })} - ${end.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })}`;
   }, [selectedPeriod, currentDate]);
 
+  const availablePaymentMethods = useMemo(() => {
+    const methods = new Map<string, { id: string; name: string; type: 'general' | 'card' }>();
+    const baseMethods = ['Efectivo', 'Débito', 'Tarjeta de Crédito', 'Transferencia'];
+
+    transactions.forEach(t => {
+      if (t.cardName) {
+        methods.set(`card:${t.cardName}`, { id: `card:${t.cardName}`, name: t.cardName, type: 'card' });
+      } else if (t.paymentMethod) {
+        methods.set(t.paymentMethod, { id: t.paymentMethod, name: t.paymentMethod, type: 'general' });
+      }
+    });
+
+    baseMethods.forEach(bm => {
+      const exists = transactions.some(t => t.paymentMethod === bm || (bm === 'Tarjeta de Crédito' && (t.paymentMethod === 'Tarjeta' || t.isInstallment)));
+      if (exists && !methods.has(bm)) {
+        methods.set(bm, { id: bm, name: bm, type: 'general' });
+      }
+    });
+
+    return Array.from(methods.values());
+  }, [transactions]);
+
+  const activePaymentMethodName = useMemo(() => {
+    if (filterPaymentMethod === 'all') return null;
+    if (filterPaymentMethod.startsWith('card:')) {
+      return filterPaymentMethod.replace('card:', '');
+    }
+    return filterPaymentMethod;
+  }, [filterPaymentMethod]);
+
   const activeFiltersCount = useMemo(() => {
     let count = 0;
     if (filterType !== 'all') count++;
     if (filterCategory !== 'all') count++;
     if (filterProject !== 'all') count++;
     if (filterAuthor !== 'all') count++;
+    if (filterPaymentMethod !== 'all') count++;
     if (filterClassification !== 'all') count++;
     return count;
-  }, [filterType, filterCategory, filterProject, filterAuthor, filterClassification]);
+  }, [filterType, filterCategory, filterProject, filterAuthor, filterPaymentMethod, filterClassification]);
 
   const handleClearFilters = useCallback(() => {
     haptic.light();
@@ -212,6 +244,7 @@ export const History: React.FC = () => {
     setFilterCategory('all');
     setFilterProject('all');
     setFilterAuthor('all');
+    setFilterPaymentMethod('all');
     setFilterClassification('all');
   }, []);
 
@@ -257,6 +290,18 @@ export const History: React.FC = () => {
       const matchesAuthor = filterAuthor === 'all' || t.authorId === filterAuthor;
       const matchesClassification = filterClassification === 'all' || t.classification === filterClassification;
       
+      let matchesPaymentMethod = true;
+      if (filterPaymentMethod !== 'all') {
+        if (filterPaymentMethod.startsWith('card:')) {
+          const cardName = filterPaymentMethod.replace('card:', '');
+          matchesPaymentMethod = t.cardName === cardName;
+        } else if (filterPaymentMethod === 'Tarjeta de Crédito') {
+          matchesPaymentMethod = t.paymentMethod === 'Tarjeta de Crédito' || t.paymentMethod === 'Tarjeta' || Boolean(t.isInstallment) || Boolean(t.cardId);
+        } else {
+          matchesPaymentMethod = t.paymentMethod === filterPaymentMethod;
+        }
+      }
+
       const tDate = t.date instanceof Date ? t.date : new Date(t.date);
       const isFuture = tDate > endOfToday;
 
@@ -280,7 +325,7 @@ export const History: React.FC = () => {
         matchesPeriod = tDate >= start && tDate <= end;
       }
 
-      return matchesSearch && matchesType && matchesCategory && matchesProject && matchesAuthor && matchesClassification && matchesPeriod && matchesTimeScope;
+      return matchesSearch && matchesType && matchesCategory && matchesProject && matchesAuthor && matchesPaymentMethod && matchesClassification && matchesPeriod && matchesTimeScope;
     });
 
     if (timeScope === 'future_only') {
@@ -289,7 +334,7 @@ export const History: React.FC = () => {
     }
 
     return [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, searchQuery, filterType, filterCategory, filterProject, filterAuthor, filterClassification, selectedPeriod, currentDate, timeScope]);
+  }, [transactions, searchQuery, filterType, filterCategory, filterProject, filterAuthor, filterPaymentMethod, filterClassification, selectedPeriod, currentDate, timeScope]);
 
   const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -298,7 +343,7 @@ export const History: React.FC = () => {
   // Reset pagination limit when any filter or search changes
   useEffect(() => {
     setVisibleLimit(PAGE_SIZE);
-  }, [searchQuery, filterType, filterCategory, filterProject, filterAuthor, filterClassification, selectedPeriod, currentDate, timeScope]);
+  }, [searchQuery, filterType, filterCategory, filterProject, filterAuthor, filterPaymentMethod, filterClassification, selectedPeriod, currentDate, timeScope]);
 
   const hasMore = visibleLimit < filteredTransactions.length;
 
@@ -605,6 +650,16 @@ export const History: React.FC = () => {
             </button>
           )}
 
+          {filterPaymentMethod !== 'all' && (
+            <button
+              onClick={() => setFilterPaymentMethod('all')}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary/10 text-primary border border-primary/20 font-bold shrink-0 hover:bg-primary/20 transition-colors"
+            >
+              <span>{activePaymentMethodName}</span>
+              <X size={12} />
+            </button>
+          )}
+
           {filterClassification !== 'all' && (
             <button
               onClick={() => setFilterClassification('all')}
@@ -629,26 +684,47 @@ export const History: React.FC = () => {
         </div>
       )}
 
-      {/* Filter Options (Expandable) */}
+      {/* Modern Filter Bottom Sheet / Modal Drawer */}
       <AnimatePresence>
         {showFilters && (
-          <motion.div 
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden mb-8 space-y-6"
-          >
-            <div className="bg-surface-container-lowest rounded-3xl p-4 sm:p-6 border border-on-surface/10 shadow-md space-y-6">
-              {/* Filter Panel Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-on-surface/5">
-                <div className="flex items-center gap-2">
-                  <Filter size={18} className="text-primary" />
-                  <h3 className="font-extrabold text-sm sm:text-base text-on-surface">Filtros Avanzados</h3>
-                  {activeFiltersCount > 0 && (
-                    <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-black border border-primary/20">
-                      {activeFiltersCount} activo{activeFiltersCount === 1 ? '' : 's'}
-                    </span>
-                  )}
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+            {/* Backdrop */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => {
+                haptic.light();
+                setShowFilters(false);
+              }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm cursor-pointer"
+            />
+
+            {/* Sheet / Modal Container */}
+            <motion.div 
+              initial={{ y: '100%', opacity: 0.5 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-xl bg-surface-container-lowest border-t sm:border border-on-surface/10 rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl max-h-[88vh] sm:max-h-[82vh] flex flex-col overflow-hidden z-10"
+            >
+              {/* Drag Handle on mobile */}
+              <div className="w-12 h-1.5 rounded-full bg-on-surface/20 mx-auto mt-3 sm:hidden shrink-0" />
+
+              {/* Sheet Header */}
+              <div className="flex items-center justify-between px-6 pt-4 pb-4 border-b border-on-surface/5 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <Filter size={16} />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-base text-on-surface leading-tight font-headline">Filtros Avanzados</h3>
+                    <p className="text-[11px] text-on-surface-variant/70 font-medium">
+                      {activeFiltersCount === 0 ? 'Sin filtros aplicados' : `${activeFiltersCount} filtro${activeFiltersCount === 1 ? '' : 's'} activo${activeFiltersCount === 1 ? '' : 's'}`}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -656,184 +732,322 @@ export const History: React.FC = () => {
                     <button
                       type="button"
                       onClick={handleClearFilters}
-                      className="text-xs font-bold text-rose-500 hover:text-rose-600 flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-rose-500/10 transition-colors"
+                      className="text-xs font-bold text-rose-500 hover:text-rose-600 flex items-center gap-1 px-2.5 py-1.5 rounded-xl hover:bg-rose-500/10 transition-colors cursor-pointer"
                     >
                       <RotateCcw size={12} />
-                      <span>Limpiar todo</span>
+                      <span>Limpiar</span>
                     </button>
                   )}
                   <button
                     type="button"
-                    onClick={() => setShowFilters(false)}
-                    className="p-1.5 rounded-xl hover:bg-on-surface/5 text-on-surface-variant transition-colors"
-                    title="Cerrar panel"
+                    onClick={() => {
+                      haptic.light();
+                      setShowFilters(false);
+                    }}
+                    className="p-2 rounded-full hover:bg-on-surface/5 text-on-surface-variant transition-colors cursor-pointer"
+                    title="Cerrar filtros"
                   >
                     <X size={18} />
                   </button>
                 </div>
               </div>
-              {/* Type Filter */}
-              <div>
-                <p className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-[0.2em] mb-3 ml-1">Tipo de Transacción</p>
-                <div className="flex gap-2">
-                  {(['all', 'expense', 'income'] as const).map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setFilterType(tab)}
-                      className={cn(
-                        "flex-1 py-3 rounded-xl font-bold text-xs sm:text-sm transition-all border min-w-0 truncate",
-                        filterType === tab 
-                          ? "bg-on-surface text-surface-container-lowest border-on-surface" 
-                          : "bg-surface-container-low text-on-surface-variant/60 border-transparent hover:border-on-surface/10"
-                      )}
-                    >
-                      {tab === 'all' ? 'Todas' : tab === 'expense' ? 'Gastos' : 'Ingresos'}
-                    </button>
-                  ))}
-                </div>
-              </div>
 
-              {/* Project Filter */}
-              <div>
-                <p className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-[0.2em] mb-3 ml-1">Origen / Proyecto</p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setFilterProject('all')}
-                    className={cn(
-                      "px-3.5 py-2 rounded-lg font-bold text-xs transition-all border",
-                      filterProject === 'all' ? "bg-primary text-white border-primary" : "bg-surface-container-low text-on-surface-variant/60 border-transparent"
-                    )}
-                  >
-                    Todos
-                  </button>
-                  <button
-                    onClick={() => setFilterProject('personal')}
-                    className={cn(
-                      "px-3.5 py-2 rounded-lg font-bold text-xs transition-all border",
-                      filterProject === 'personal' ? "bg-primary text-white border-primary" : "bg-surface-container-low text-on-surface-variant/60 border-transparent"
-                    )}
-                  >
-                    Solo Personales
-                  </button>
-                  {projects.map((proj) => (
-                    <button
-                      key={proj.id}
-                      onClick={() => setFilterProject(proj.id)}
-                      className={cn(
-                        "px-3.5 py-2 rounded-lg font-bold text-xs transition-all border flex items-center gap-2",
-                        filterProject === proj.id ? "bg-primary text-white border-primary" : "bg-surface-container-low text-on-surface-variant/60 border-transparent"
-                      )}
-                    >
-                      <Briefcase size={12} />
-                      {proj.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Member / Author Filter */}
-              {projectAuthors.length > 1 && (
+              {/* Scrollable Filters Body */}
+              <div className="overflow-y-auto px-6 py-5 space-y-6 flex-1 scrollbar-thin">
+                
+                {/* 1. Tipo de Movimiento (Segmented Control) */}
                 <div>
-                  <p className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-[0.2em] mb-3 ml-1">Colaborador / Miembro</p>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setFilterAuthor('all')}
-                      className={cn(
-                        "px-3.5 py-2 rounded-lg font-bold text-xs transition-all border",
-                        filterAuthor === 'all' ? "bg-primary text-white border-primary" : "bg-surface-container-low text-on-surface-variant/60 border-transparent"
-                      )}
-                    >
-                      Todos
-                    </button>
-                    {projectAuthors.map((author) => (
+                  <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/60 mb-2.5">
+                    Tipo de Movimiento
+                  </label>
+                  <div className="grid grid-cols-3 bg-surface-container-low p-1 rounded-2xl border border-on-surface/5 gap-1">
+                    {(['all', 'expense', 'income'] as const).map((tab) => (
                       <button
-                        key={author.id}
-                        onClick={() => setFilterAuthor(author.id)}
+                        key={tab}
+                        type="button"
+                        onClick={() => {
+                          haptic.selection();
+                          setFilterType(tab);
+                        }}
                         className={cn(
-                          "px-3.5 py-2 rounded-lg font-bold text-xs transition-all border flex items-center gap-1.5",
-                          filterAuthor === author.id ? "bg-primary text-white border-primary" : "bg-surface-container-low text-on-surface-variant/60 border-transparent"
+                          "py-2.5 px-3 rounded-xl font-bold text-xs transition-all text-center truncate",
+                          filterType === tab
+                            ? "bg-surface-container-lowest text-primary shadow-xs font-black"
+                            : "text-on-surface-variant/70 hover:text-on-surface"
                         )}
                       >
-                        <User size={12} />
-                        <span>{author.name}</span>
+                        {tab === 'all' ? 'Todos' : tab === 'expense' ? 'Gastos' : 'Ingresos'}
                       </button>
                     ))}
                   </div>
                 </div>
-              )}
 
-              {/* Category Filter */}
-              <div>
-                <p className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-[0.2em] mb-3 ml-1">Categoría</p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setFilterCategory('all')}
-                    className={cn(
-                      "px-3.5 py-2 rounded-lg font-bold text-xs transition-all border",
-                      filterCategory === 'all' 
-                        ? "bg-primary/10 text-primary border-primary/20" 
-                        : "bg-surface-container-low text-on-surface-variant/60 border-transparent hover:border-on-surface/10"
+                {/* 2. Medio de Pago / Tarjeta */}
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/60 mb-2.5">
+                    Medio de Pago / Tarjeta
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptic.selection();
+                        setFilterPaymentMethod('all');
+                      }}
+                      className={cn(
+                        "px-3.5 py-2 rounded-xl text-xs font-bold transition-all border",
+                        filterPaymentMethod === 'all'
+                          ? "bg-primary text-white border-primary shadow-xs"
+                          : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:border-on-surface/10"
+                      )}
+                    >
+                      Todos
+                    </button>
+                    {availablePaymentMethods.map((pm) => (
+                      <button
+                        key={pm.id}
+                        type="button"
+                        onClick={() => {
+                          haptic.selection();
+                          setFilterPaymentMethod(pm.id);
+                        }}
+                        className={cn(
+                          "px-3.5 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5",
+                          filterPaymentMethod === pm.id
+                            ? "bg-primary text-white border-primary shadow-xs"
+                            : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:border-on-surface/10"
+                        )}
+                      >
+                        {pm.type === 'card' ? (
+                          <CreditCard size={13} className="shrink-0" />
+                        ) : pm.name === 'Efectivo' ? (
+                          <Wallet size={13} className="shrink-0" />
+                        ) : (
+                          <CreditCard size={13} className="shrink-0" />
+                        )}
+                        <span>{pm.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3. Origen / Bóveda */}
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/60 mb-2.5">
+                    Origen / Proyecto
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptic.selection();
+                        setFilterProject('all');
+                      }}
+                      className={cn(
+                        "px-3.5 py-2 rounded-xl text-xs font-bold transition-all border",
+                        filterProject === 'all'
+                          ? "bg-primary text-white border-primary shadow-xs"
+                          : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:border-on-surface/10"
+                      )}
+                    >
+                      Todos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptic.selection();
+                        setFilterProject('personal');
+                      }}
+                      className={cn(
+                        "px-3.5 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5",
+                        filterProject === 'personal'
+                          ? "bg-primary text-white border-primary shadow-xs"
+                          : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:border-on-surface/10"
+                      )}
+                    >
+                      <User size={13} />
+                      <span>Solo Personales</span>
+                    </button>
+                    {projects.map((proj) => (
+                      <button
+                        key={proj.id}
+                        type="button"
+                        onClick={() => {
+                          haptic.selection();
+                          setFilterProject(proj.id);
+                        }}
+                        className={cn(
+                          "px-3.5 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5",
+                          filterProject === proj.id
+                            ? "bg-primary text-white border-primary shadow-xs"
+                            : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:border-on-surface/10"
+                        )}
+                      >
+                        <Briefcase size={13} />
+                        <span>{proj.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 4. Colaborador / Miembro */}
+                {projectAuthors.length > 1 && (
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/60 mb-2.5">
+                      Registrado por
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          haptic.selection();
+                          setFilterAuthor('all');
+                        }}
+                        className={cn(
+                          "px-3.5 py-2 rounded-xl text-xs font-bold transition-all border",
+                          filterAuthor === 'all'
+                            ? "bg-primary text-white border-primary shadow-xs"
+                            : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:border-on-surface/10"
+                        )}
+                      >
+                        Todos
+                      </button>
+                      {projectAuthors.map((author) => (
+                        <button
+                          key={author.id}
+                          type="button"
+                          onClick={() => {
+                            haptic.selection();
+                            setFilterAuthor(author.id);
+                          }}
+                          className={cn(
+                            "px-3.5 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5",
+                            filterAuthor === author.id
+                              ? "bg-primary text-white border-primary shadow-xs"
+                              : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:border-on-surface/10"
+                          )}
+                        >
+                          <User size={13} />
+                          <span>{author.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. Categoría */}
+                <div>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <label className="text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/60">
+                      Categoría
+                    </label>
+                    {filterCategory !== 'all' && (
+                      <button
+                        type="button"
+                        onClick={() => setFilterCategory('all')}
+                        className="text-[11px] font-bold text-primary hover:underline cursor-pointer"
+                      >
+                        Quitar categoría
+                      </button>
                     )}
-                  >
-                    Todas
-                  </button>
-                  {dynamicCategories.map((cat) => (
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     <button
-                      key={cat.id}
-                      onClick={() => setFilterCategory(cat.id)}
+                      type="button"
+                      onClick={() => {
+                        haptic.selection();
+                        setFilterCategory('all');
+                      }}
                       className={cn(
-                        "px-3.5 py-2 rounded-lg font-bold text-xs transition-all border flex items-center gap-2",
-                        filterCategory === cat.id 
-                          ? "bg-primary/10 text-primary border-primary/20" 
-                          : "bg-surface-container-low text-on-surface-variant/60 border-transparent hover:border-on-surface/10"
+                        "p-2.5 rounded-2xl text-xs font-bold transition-all border flex items-center gap-2 text-left truncate cursor-pointer",
+                        filterCategory === 'all'
+                          ? "bg-primary text-white border-primary shadow-xs"
+                          : "bg-surface-container-low text-on-surface-variant/70 border-transparent hover:border-on-surface/10"
                       )}
                     >
-                      <IconComponent name={cat.icon} size={14} />
-                      {cat.name}
+                      <div className="w-6 h-6 rounded-lg bg-on-surface/10 flex items-center justify-center shrink-0">
+                        <Tag size={12} />
+                      </div>
+                      <span className="truncate">Todas</span>
                     </button>
-                  ))}
+                    {dynamicCategories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          haptic.selection();
+                          setFilterCategory(cat.id);
+                        }}
+                        className={cn(
+                          "p-2.5 rounded-2xl text-xs font-bold transition-all border flex items-center gap-2 text-left truncate cursor-pointer",
+                          filterCategory === cat.id
+                            ? "bg-primary text-white border-primary shadow-xs"
+                            : "bg-surface-container-low text-on-surface-variant/80 border-transparent hover:border-on-surface/10"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-6 h-6 rounded-lg flex items-center justify-center text-white shrink-0 text-[10px]",
+                          filterCategory === cat.id ? "bg-white/20" : (cat.color || 'bg-slate-500')
+                        )}>
+                          <IconComponent name={cat.icon} size={12} />
+                        </div>
+                        <span className="truncate">{cat.name}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                {/* 6. Clasificación (Segmented Control) */}
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-[0.15em] text-on-surface-variant/60 mb-2.5">
+                    Clasificación de Gasto
+                  </label>
+                  <div className="grid grid-cols-3 bg-surface-container-low p-1 rounded-2xl border border-on-surface/5 gap-1">
+                    {(['all', 'fixed', 'variable'] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => {
+                          haptic.selection();
+                          setFilterClassification(tab);
+                        }}
+                        className={cn(
+                          "py-2.5 px-3 rounded-xl font-bold text-xs transition-all text-center truncate",
+                          filterClassification === tab
+                            ? "bg-surface-container-lowest text-primary shadow-xs font-black"
+                            : "text-on-surface-variant/70 hover:text-on-surface"
+                        )}
+                      >
+                        {tab === 'all' ? 'Todas' : tab === 'fixed' ? 'Fijas' : 'Variables'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
               </div>
 
-              {/* Classification Filter */}
-              <div>
-                <p className="text-[10px] font-black text-on-surface-variant/50 uppercase tracking-[0.2em] mb-3 ml-1">Clasificación</p>
-                <div className="flex gap-2">
-                  {(['all', 'variable', 'fixed'] as const).map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setFilterClassification(tab)}
-                      className={cn(
-                        "flex-1 py-3 rounded-xl font-bold text-xs transition-all border min-w-0 truncate text-center",
-                        filterClassification === tab 
-                          ? "bg-primary text-white border-primary" 
-                          : "bg-surface-container-low text-on-surface-variant/60 border-transparent hover:border-on-surface/10"
-                      )}
-                    >
-                      {tab === 'all' ? 'Todas' : tab === 'fixed' ? 'Fijas' : 'Variables'}
-                    </button>
-                  ))}
+              {/* Sheet Sticky Footer */}
+              <div className="p-4 sm:p-5 border-t border-on-surface/10 bg-surface-container-lowest flex items-center justify-between gap-4 shrink-0">
+                <div className="min-w-0">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-on-surface-variant/60 block">Resultados</span>
+                  <p className="text-sm font-extrabold text-on-surface truncate">
+                    {filteredTransactions.length} movimiento{filteredTransactions.length === 1 ? '' : 's'}
+                  </p>
                 </div>
-              </div>
-
-              {/* Panel Footer / Apply Button */}
-              <div className="pt-3 border-t border-on-surface/5 flex items-center justify-between gap-3">
-                <span className="text-xs font-bold text-on-surface-variant/70">
-                  {filteredTransactions.length} resultado{filteredTransactions.length === 1 ? '' : 's'}
-                </span>
                 <button
                   type="button"
                   onClick={() => {
-                    haptic.light();
+                    haptic.success();
                     setShowFilters(false);
                   }}
-                  className="px-5 py-2.5 rounded-xl bg-primary text-white font-bold text-xs hover:opacity-90 active:scale-95 transition-all shadow-sm cursor-pointer"
+                  className="px-6 py-3 rounded-2xl bg-primary text-white font-extrabold text-xs sm:text-sm hover:opacity-95 active:scale-95 transition-all shadow-md shadow-primary/20 cursor-pointer"
                 >
-                  Ver resultados
+                  Aplicar Filtros
                 </button>
               </div>
-            </div>
-          </motion.div>
+
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
