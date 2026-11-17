@@ -939,66 +939,95 @@ export const Budgets: React.FC = () => {
         )}
       </div>
 
-      {/* Category Breakdown Bottom Sheet Drawer */}
+      {/* Category Breakdown Centered Modal */}
       <AnimatePresence>
         {breakdownCategory && (
-          <>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setBreakdownCategory(null)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 transition-opacity"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
             />
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-              className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] flex flex-col bg-surface-container-lowest rounded-t-[2.5rem] border-t border-on-surface/10 shadow-2xl overflow-hidden max-w-xl mx-auto"
-            >
-              {/* Drawer Handle */}
-              <div className="flex justify-center pt-3 pb-1">
-                <div className="w-10 h-1 rounded-full bg-on-surface/20" />
-              </div>
 
-              {/* Drawer header */}
-              <div className="px-5 py-3 border-b border-on-surface/5 flex items-center justify-between">
+            {/* Centered Modal Card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+              className="relative w-full max-w-lg bg-surface-container-lowest rounded-[2rem] border border-on-surface/10 shadow-2xl overflow-hidden flex flex-col max-h-[85vh] z-10 my-auto"
+            >
+              {/* Header */}
+              <div className="p-4 sm:p-5 border-b border-on-surface/5 flex items-center justify-between">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm", breakdownCategory.color)}>
-                    <IconComponent name={breakdownCategory.icon} size={20} />
+                  <div className={cn(
+                    "w-11 h-11 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-xs", 
+                    breakdownCategory.color
+                  )}>
+                    <IconComponent name={breakdownCategory.icon} size={22} />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="font-black text-on-surface text-base uppercase tracking-tight truncate">
+                    <h3 className="font-black text-on-surface text-base sm:text-lg uppercase tracking-tight truncate">
                       {breakdownCategory.name}
                     </h3>
-                    <p className="text-xs text-on-surface-variant/60 font-medium">
+                    <p className="text-xs text-on-surface-variant/60 font-semibold">
                       {currentMonthDisplay} • {breakdownTransactions.length} {breakdownTransactions.length === 1 ? 'movimiento' : 'movimientos'}
                     </p>
                   </div>
                 </div>
+
                 <button
                   onClick={() => setBreakdownCategory(null)}
-                  className="w-9 h-9 rounded-full bg-on-surface/5 hover:bg-on-surface/10 flex items-center justify-center text-on-surface-variant transition-colors"
+                  className="w-9 h-9 rounded-full bg-on-surface/5 hover:bg-on-surface/10 flex items-center justify-center text-on-surface-variant transition-colors active:scale-95 shrink-0"
+                  title="Cerrar"
                 >
                   <X size={18} />
                 </button>
               </div>
 
-              {/* Total spending summary in modal */}
-              <div className="px-5 py-3 bg-surface-container-low/50 flex items-center justify-between border-b border-on-surface/5">
-                <span className="text-xs font-bold text-on-surface-variant/70 uppercase tracking-wider">Total consumido</span>
-                <span className="text-base font-black text-on-surface font-headline">
-                  {formatCurrency(categorySpentMap[breakdownCategory.id] || 0, activeCurrency)}
-                </span>
+              {/* Total spending summary banner */}
+              <div className="px-5 py-3.5 bg-surface-container-low/60 flex items-center justify-between border-b border-on-surface/5">
+                <div>
+                  <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-wider block">
+                    Total gastado en el mes
+                  </span>
+                  <span className="text-lg font-black text-on-surface font-headline">
+                    {formatCurrency(categorySpentMap[breakdownCategory.id] || 0, activeCurrency)}
+                  </span>
+                </div>
+
+                {/* Show budget vs spent comparison if set */}
+                {(() => {
+                  const currentAmount = localBudgets[breakdownCategory.id] || 0;
+                  const bVal = typeof currentAmount === 'string' ? parseFormattedAmount(currentAmount) : Number(currentAmount || 0);
+                  const cSpent = categorySpentMap[breakdownCategory.id] || 0;
+                  if (bVal <= 0) return null;
+                  const isOver = cSpent > bVal;
+                  return (
+                    <div className="text-right">
+                      <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-wider block">
+                        Presupuesto
+                      </span>
+                      <span className={cn(
+                        "text-xs font-black px-2 py-0.5 rounded-full inline-block",
+                        isOver ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                      )}>
+                        {isOver ? `+${formatCurrency(cSpent - bVal, activeCurrency)} excedido` : `${formatCurrency(bVal - cSpent, activeCurrency)} restante`}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Transactions list */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
                 {breakdownTransactions.length === 0 ? (
-                  <div className="text-center py-10 text-on-surface-variant/40 space-y-2">
-                    <Receipt size={32} className="mx-auto opacity-50" />
-                    <p className="text-xs font-bold uppercase tracking-wider">No hay movimientos en este mes</p>
+                  <div className="text-center py-12 text-on-surface-variant/40 space-y-2">
+                    <Receipt size={36} className="mx-auto opacity-40" />
+                    <p className="text-xs font-bold uppercase tracking-wider">No hay movimientos registrados en este mes</p>
                   </div>
                 ) : (
                   breakdownTransactions.map(t => {
@@ -1009,7 +1038,7 @@ export const Budgets: React.FC = () => {
                     return (
                       <div 
                         key={t.id}
-                        className="flex items-center justify-between p-3 rounded-xl bg-surface-container-low/60 hover:bg-surface-container-high/60 transition-colors border border-on-surface/5"
+                        className="flex items-center justify-between p-3 rounded-2xl bg-surface-container-low/50 hover:bg-surface-container-high/60 transition-colors border border-on-surface/5"
                       >
                         <div className="min-w-0 flex-1 pr-3">
                           <p className="text-xs font-extrabold text-on-surface truncate">
@@ -1025,7 +1054,7 @@ export const Budgets: React.FC = () => {
                           </p>
                         </div>
                         <div className="text-right shrink-0">
-                          <span className="text-xs font-black text-on-surface font-headline">
+                          <span className="text-xs sm:text-sm font-black text-on-surface font-headline">
                             -{formatCurrency(t.amount, activeCurrency)}
                           </span>
                         </div>
@@ -1035,7 +1064,7 @@ export const Budgets: React.FC = () => {
                 )}
               </div>
             </motion.div>
-          </>
+          </div>
         )}
       </AnimatePresence>
 
