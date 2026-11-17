@@ -1,13 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   ArrowLeft, Target, Save, Check, AlertCircle, ChevronLeft, ChevronRight, Copy,
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
   Landmark, Tag, Gift, Briefcase, Home as HomeIcon, Plane, Coffee, Zap, Smartphone, ShieldCheck,
-  ShoppingCart, Hotel, CheckCircle2, TrendingUp, AlertTriangle
+  ShoppingCart, Hotel, CheckCircle2, TrendingUp, AlertTriangle, Sparkles, Receipt, X
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useData } from '../lib/DataContext';
+import { useData, Category } from '../lib/DataContext';
 import { useAuth } from '../lib/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { haptic } from '../lib/haptics';
@@ -23,6 +23,8 @@ const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => 
   return <Icon size={size} />;
 };
 
+type BudgetFilter = 'all' | 'alerts' | 'active' | 'top_spent';
+
 export const Budgets: React.FC = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
@@ -33,6 +35,8 @@ export const Budgets: React.FC = () => {
   const [localBudgets, setLocalBudgets] = useState<Record<string, string>>({});
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [copying, setCopying] = useState(false);
+  const [budgetFilter, setBudgetFilter] = useState<BudgetFilter>('all');
+  const [breakdownCategory, setBreakdownCategory] = useState<Category | null>(null);
 
   // Filter expense categories and omit system categories
   const expenseCategories = useMemo(() => {
@@ -110,6 +114,68 @@ export const Budgets: React.FC = () => {
     return map;
   }, [transactions, selectedProjectId, activeMonth, activeYear]);
 
+  // Days remaining in current month for daily safe-to-spend calculation
+  const daysRemainingInMonth = useMemo(() => {
+    if (!isCurrentMonth) return 0;
+    const now = new Date();
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const currentDay = now.getDate();
+    return Math.max(1, lastDay - currentDay + 1);
+  }, [isCurrentMonth]);
+
+  // Previous month spending for suggested budget calculation
+  const prevMonthSpentMap = useMemo(() => {
+    const d = parseLocalMonth(budgetMonth);
+    d.setMonth(d.getMonth() - 1);
+    const prevMonth = d.getMonth();
+    const prevYear = d.getFullYear();
+
+    const map: Record<string, number> = {};
+    transactions.forEach(t => {
+      if (t.type !== 'expense') return;
+
+      const isPersonalScope = selectedProjectId === null;
+      const matchesProject = isPersonalScope 
+        ? (!t.projectId || t.projectId === 'personal') 
+        : t.projectId === selectedProjectId;
+        
+      if (!matchesProject) return;
+
+      const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+      if (isNaN(tDate.getTime())) return;
+      if (tDate.getMonth() !== prevMonth || tDate.getFullYear() !== prevYear) return;
+
+      if (t.categoryId) {
+        map[t.categoryId] = (map[t.categoryId] || 0) + (t.amount || 0);
+      }
+    });
+    return map;
+  }, [transactions, selectedProjectId, budgetMonth]);
+
+  // Transactions list for Category Breakdown Drawer
+  const breakdownTransactions = useMemo(() => {
+    if (!breakdownCategory) return [];
+    return transactions
+      .filter(t => {
+        if (t.type !== 'expense') return false;
+        const isPersonalScope = selectedProjectId === null;
+        const matchesProject = isPersonalScope 
+          ? (!t.projectId || t.projectId === 'personal') 
+          : t.projectId === selectedProjectId;
+        if (!matchesProject) return false;
+        if (t.categoryId !== breakdownCategory.id) return false;
+
+        const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+        if (isNaN(tDate.getTime())) return false;
+        return tDate.getMonth() === activeMonth && tDate.getFullYear() === activeYear;
+      })
+      .sort((a, b) => {
+        const da = a.date instanceof Date ? a.date.getTime() : new Date(a.date).getTime();
+        const db = b.date instanceof Date ? b.date.getTime() : new Date(b.date).getTime();
+        return db - da;
+      });
+  }, [breakdownCategory, transactions, selectedProjectId, activeMonth, activeYear]);
+
   // Global Budget Execution Summary
   const budgetSummary = useMemo(() => {
     let totalBudget = 0;
@@ -151,6 +217,54 @@ export const Budgets: React.FC = () => {
     };
   }, [budgets, expenseCategories, selectedProjectId, categorySpentMap]);
 
+  // Count of categories currently with alert (spent >= 80% or exceeded)
+  const alertCategoriesCount = useMemo(() => {
+    return expenseCategories.filter(cat => {
+      const budgetObj = budgets.find(b => 
+        b.categoryId === cat.id && 
+        (!b.month || b.month === budgetMonth) &&
+        ((selectedProjectId === null && (!b.projectId || b.projectId === 'personal' || b.projectId === null)) || 
+         (selectedProjectId !== null && b.projectId === selectedProjectId))
+      );
+      if (!budgetObj || budgetObj.amount <= 0) return false;
+      const spent = categorySpentMap[cat.id] || 0;
+      return spent >= budgetObj.amount * 0.8;
+    }).length;
+  }, [expenseCategories, budgets, budgetMonth, selectedProjectId, categorySpentMap]);
+
+  // Filtered and sorted category list for display
+  const displayedCategories = useMemo(() => {
+    let list = [...expenseCategories];
+
+    if (budgetFilter === 'alerts') {
+      list = list.filter(cat => {
+        const budgetObj = budgets.find(b => 
+          b.categoryId === cat.id && 
+          (!b.month || b.month === budgetMonth) &&
+          ((selectedProjectId === null && (!b.projectId || b.projectId === 'personal' || b.projectId === null)) || 
+           (selectedProjectId !== null && b.projectId === selectedProjectId))
+        );
+        if (!budgetObj || budgetObj.amount <= 0) return false;
+        const spent = categorySpentMap[cat.id] || 0;
+        return spent >= budgetObj.amount * 0.8;
+      });
+    } else if (budgetFilter === 'active') {
+      list = list.filter(cat => {
+        return budgets.some(b => 
+          b.categoryId === cat.id && 
+          (!b.month || b.month === budgetMonth) &&
+          ((selectedProjectId === null && (!b.projectId || b.projectId === 'personal' || b.projectId === null)) || 
+           (selectedProjectId !== null && b.projectId === selectedProjectId)) &&
+          b.amount > 0
+        );
+      });
+    } else if (budgetFilter === 'top_spent') {
+      list.sort((a, b) => (categorySpentMap[b.id] || 0) - (categorySpentMap[a.id] || 0));
+    }
+
+    return list;
+  }, [expenseCategories, budgetFilter, budgets, budgetMonth, selectedProjectId, categorySpentMap]);
+
   const handleSave = async (categoryId: string, rawAmount: number | string, isDelete: boolean = false) => {
     setSavingMap(prev => ({ ...prev, [categoryId]: true }));
     const amount = typeof rawAmount === 'string' ? parseFormattedAmount(rawAmount) : rawAmount;
@@ -175,6 +289,21 @@ export const Budgets: React.FC = () => {
       toast.error('Error al procesar el presupuesto');
     } finally {
       setSavingMap(prev => ({ ...prev, [categoryId]: false }));
+    }
+  };
+
+  const handleAutoSave = (categoryId: string) => {
+    if (!isCurrentMonth) return;
+    const currentVal = parseFormattedAmount(localBudgets[categoryId] || '');
+    const existingBudget = budgets.find(b => 
+      b.categoryId === categoryId && 
+      (!b.month || b.month === budgetMonth) &&
+      ((selectedProjectId === null && (!b.projectId || b.projectId === 'personal' || b.projectId === null)) || 
+       (selectedProjectId !== null && b.projectId === selectedProjectId))
+    );
+    const oldAmount = existingBudget?.amount || 0;
+    if (currentVal !== oldAmount) {
+      handleSave(categoryId, currentVal);
     }
   };
 
@@ -458,15 +587,95 @@ export const Budgets: React.FC = () => {
         )}
       </section>
 
+      {/* Quick Filters */}
+      <section className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
+        <button
+          onClick={() => {
+            haptic.selection();
+            setBudgetFilter('all');
+          }}
+          className={cn(
+            "px-3.5 py-1.5 rounded-xl font-bold uppercase tracking-wider whitespace-nowrap transition-all shrink-0 active:scale-95",
+            budgetFilter === 'all'
+              ? "bg-on-surface text-surface shadow-xs font-black"
+              : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
+          )}
+        >
+          Todas ({expenseCategories.length})
+        </button>
+        <button
+          onClick={() => {
+            haptic.selection();
+            setBudgetFilter('alerts');
+          }}
+          className={cn(
+            "px-3.5 py-1.5 rounded-xl font-bold uppercase tracking-wider whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 active:scale-95",
+            budgetFilter === 'alerts'
+              ? "bg-rose-500 text-white shadow-xs font-black"
+              : "bg-surface-container-low text-rose-600 dark:text-rose-400 hover:bg-surface-container-high"
+          )}
+        >
+          <AlertTriangle size={13} />
+          En Alerta ({alertCategoriesCount})
+        </button>
+        <button
+          onClick={() => {
+            haptic.selection();
+            setBudgetFilter('active');
+          }}
+          className={cn(
+            "px-3.5 py-1.5 rounded-xl font-bold uppercase tracking-wider whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 active:scale-95",
+            budgetFilter === 'active'
+              ? "bg-primary text-white shadow-xs font-black"
+              : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
+          )}
+        >
+          <Target size={13} />
+          Solo Activos ({budgetSummary.activeBudgetsCount})
+        </button>
+        <button
+          onClick={() => {
+            haptic.selection();
+            setBudgetFilter('top_spent');
+          }}
+          className={cn(
+            "px-3.5 py-1.5 rounded-xl font-bold uppercase tracking-wider whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 active:scale-95",
+            budgetFilter === 'top_spent'
+              ? "bg-amber-500 text-white shadow-xs font-black"
+              : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
+          )}
+        >
+          <TrendingUp size={13} />
+          Mayor Gasto
+        </button>
+      </section>
+
       {/* Categories Budget List */}
       <div className="space-y-3">
-        {expenseCategories.length === 0 ? (
-          <div className="text-center py-12 space-y-3 opacity-40">
-            <AlertCircle size={40} className="mx-auto" />
-            <p className="text-sm font-bold uppercase tracking-widest">No hay categorías de gasto</p>
+        {displayedCategories.length === 0 ? (
+          <div className="text-center py-12 space-y-3 opacity-60 bg-surface-container-lowest rounded-2xl border border-on-surface/5">
+            <AlertCircle size={36} className="mx-auto text-on-surface-variant" />
+            <p className="text-sm font-bold uppercase tracking-wider text-on-surface">
+              {budgetFilter === 'alerts' 
+                ? '¡Excelente! No hay categorías en alerta'
+                : budgetFilter === 'active' 
+                ? 'No hay objetivos activos para este mes' 
+                : 'No hay categorías de gasto'}
+            </p>
+            {budgetFilter !== 'all' && (
+              <button
+                onClick={() => {
+                  haptic.selection();
+                  setBudgetFilter('all');
+                }}
+                className="text-xs font-bold text-primary hover:underline"
+              >
+                Ver todas las categorías
+              </button>
+            )}
           </div>
         ) : (
-          expenseCategories.map((category) => {
+          displayedCategories.map((category) => {
             const currentAmount = localBudgets[category.id] || 0;
             const isSaving = savingMap[category.id];
             const isSuccess = successMap[category.id];
@@ -479,10 +688,14 @@ export const Budgets: React.FC = () => {
             );
 
             const spent = categorySpentMap[category.id] || 0;
+            const prevSpent = prevMonthSpentMap[category.id] || 0;
             const budgetVal = typeof currentAmount === 'string' ? parseFormattedAmount(currentAmount) : Number(currentAmount || 0);
             const percent = budgetVal > 0 ? (spent / budgetVal) * 100 : 0;
             const isOver = isEnabled && budgetVal > 0 && spent > budgetVal;
             const remainingCat = budgetVal - spent;
+            const safeDaily = (remainingCat > 0 && daysRemainingInMonth > 0) 
+              ? Math.floor(remainingCat / daysRemainingInMonth) 
+              : 0;
             
             return (
               <motion.div 
@@ -501,14 +714,32 @@ export const Budgets: React.FC = () => {
                   {/* Category Header: Icon & Full Name */}
                   <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto min-w-0">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className={cn(
-                        "w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm transition-all shrink-0", 
-                        isEnabled ? category.color : "bg-on-surface/10 text-on-surface/40"
-                      )}>
+                      <div 
+                        onClick={() => {
+                          haptic.light();
+                          setBreakdownCategory(category);
+                        }}
+                        className={cn(
+                          "w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm transition-all shrink-0 cursor-pointer active:scale-95", 
+                          isEnabled ? category.color : "bg-on-surface/10 text-on-surface/40"
+                        )}
+                        title="Ver detalle de gastos"
+                      >
                         <IconComponent name={category.icon} size={20} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h4 className="font-extrabold text-on-surface text-sm uppercase tracking-tight break-words">{category.name}</h4>
+                        <div className="flex items-center gap-1.5">
+                          <h4 
+                            onClick={() => {
+                              haptic.light();
+                              setBreakdownCategory(category);
+                            }}
+                            className="font-extrabold text-on-surface text-sm uppercase tracking-tight break-words cursor-pointer hover:text-primary transition-colors flex items-center gap-1.5"
+                          >
+                            <span>{category.name}</span>
+                            <Receipt size={13} className="text-on-surface-variant/40 hover:text-primary shrink-0" />
+                          </h4>
+                        </div>
                         <p className="text-[10px] text-on-surface-variant/50 font-black uppercase tracking-wider">
                           {isEnabled ? (isOver ? 'Límite superado' : 'Objetivo Activo') : 'Sin Objetivo'}
                         </p>
@@ -591,10 +822,16 @@ export const Budgets: React.FC = () => {
 
                               requestAnimationFrame(() => {
                                 if (input && document.activeElement === input) {
-                                  const newCursor = Math.max(0, display.length - charsFromRight);
+                                   const newCursor = Math.max(0, display.length - charsFromRight);
                                   input.setSelectionRange(newCursor, newCursor);
                                 }
                               });
+                            }}
+                            onBlur={() => handleAutoSave(category.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                (e.target as HTMLInputElement).blur();
+                              }
                             }}
                             placeholder="0"
                             className={cn(
@@ -625,6 +862,29 @@ export const Budgets: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Suggested budget chip if not configured but had spending last month */}
+                {isCurrentMonth && isEnabled && budgetVal === 0 && prevSpent > 0 && (
+                  <div className="mt-2.5 pt-2 border-t border-on-surface/5 flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptic.selection();
+                        const display = formatAmountForDisplay(prevSpent);
+                        setLocalBudgets(prev => ({ ...prev, [category.id]: display }));
+                        handleSave(category.id, prevSpent);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-bold transition-all active:scale-95 border border-primary/20"
+                      title="Usar el gasto total del mes anterior como presupuesto"
+                    >
+                      <Sparkles size={12} className="text-primary animate-pulse" />
+                      <span>Sugerido (Mes ant.): <strong>{formatCurrency(prevSpent, activeCurrency)}</strong></span>
+                      <span className="text-[9px] uppercase font-black bg-primary text-white px-1.5 py-0.5 rounded-md ml-1 shadow-xs">
+                        Aplicar
+                      </span>
+                    </button>
+                  </div>
+                )}
+
                 {/* Progress Bar & Spending Indicator */}
                 {isEnabled && budgetVal > 0 && (
                   <div className="mt-3 pt-3 border-t border-on-surface/5 space-y-2">
@@ -644,6 +904,15 @@ export const Budgets: React.FC = () => {
                       </div>
 
                       <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
+                        {isCurrentMonth && remainingCat > 0 && daysRemainingInMonth > 0 && (
+                          <span 
+                            className="text-[10px] font-bold text-primary/90 bg-primary/10 px-2 py-0.5 rounded-md inline-flex items-center gap-1"
+                            title={`Presupuesto diario recomendado para los ${daysRemainingInMonth} días restantes del mes`}
+                          >
+                            <Zap size={10} className="text-primary" />
+                            ~{formatCurrency(safeDaily, activeCurrency)}/día
+                          </span>
+                        )}
                         <span className={cn(
                           "text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md inline-block whitespace-nowrap",
                           isOver 
@@ -684,6 +953,106 @@ export const Budgets: React.FC = () => {
           })
         )}
       </div>
+
+      {/* Category Breakdown Bottom Sheet Drawer */}
+      <AnimatePresence>
+        {breakdownCategory && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setBreakdownCategory(null)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 transition-opacity"
+            />
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] flex flex-col bg-surface-container-lowest rounded-t-[2.5rem] border-t border-on-surface/10 shadow-2xl overflow-hidden max-w-xl mx-auto"
+            >
+              {/* Drawer Handle */}
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 rounded-full bg-on-surface/20" />
+              </div>
+
+              {/* Drawer header */}
+              <div className="px-5 py-3 border-b border-on-surface/5 flex items-center justify-between">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-sm", breakdownCategory.color)}>
+                    <IconComponent name={breakdownCategory.icon} size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-black text-on-surface text-base uppercase tracking-tight truncate">
+                      {breakdownCategory.name}
+                    </h3>
+                    <p className="text-xs text-on-surface-variant/60 font-medium">
+                      {currentMonthDisplay} • {breakdownTransactions.length} {breakdownTransactions.length === 1 ? 'movimiento' : 'movimientos'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setBreakdownCategory(null)}
+                  className="w-9 h-9 rounded-full bg-on-surface/5 hover:bg-on-surface/10 flex items-center justify-center text-on-surface-variant transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Total spending summary in modal */}
+              <div className="px-5 py-3 bg-surface-container-low/50 flex items-center justify-between border-b border-on-surface/5">
+                <span className="text-xs font-bold text-on-surface-variant/70 uppercase tracking-wider">Total consumido</span>
+                <span className="text-base font-black text-on-surface font-headline">
+                  {formatCurrency(categorySpentMap[breakdownCategory.id] || 0, activeCurrency)}
+                </span>
+              </div>
+
+              {/* Transactions list */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                {breakdownTransactions.length === 0 ? (
+                  <div className="text-center py-10 text-on-surface-variant/40 space-y-2">
+                    <Receipt size={32} className="mx-auto opacity-50" />
+                    <p className="text-xs font-bold uppercase tracking-wider">No hay movimientos en este mes</p>
+                  </div>
+                ) : (
+                  breakdownTransactions.map(t => {
+                    const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+                    const formattedDate = !isNaN(tDate.getTime()) 
+                      ? tDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
+                      : '';
+                    return (
+                      <div 
+                        key={t.id}
+                        className="flex items-center justify-between p-3 rounded-xl bg-surface-container-low/60 hover:bg-surface-container-high/60 transition-colors border border-on-surface/5"
+                      >
+                        <div className="min-w-0 flex-1 pr-3">
+                          <p className="text-xs font-extrabold text-on-surface truncate">
+                            {t.description || 'Gasto sin descripción'}
+                          </p>
+                          <p className="text-[10px] text-on-surface-variant/60 font-semibold flex items-center gap-1.5 mt-0.5">
+                            <span>{formattedDate}</span>
+                            {(t as any).installmentNumber && (
+                              <span className="px-1.5 py-0.2 rounded bg-primary/10 text-primary text-[9px] font-bold">
+                                Cuota {(t as any).installmentNumber}/{(t as any).installmentTotal}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-xs font-black text-on-surface font-headline">
+                            -{formatCurrency(t.amount, activeCurrency)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       <footer className="pt-8 text-center">
         <p className="text-[10px] font-black text-on-surface-variant/20 uppercase tracking-[0.3em]">FinApp Budgeting Engine v2.1</p>
