@@ -587,18 +587,18 @@ export const Budgets: React.FC = () => {
         )}
       </section>
 
-      {/* Quick Filters */}
-      <section className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
+      {/* Quick Filters (Modern Fintech Segmented Bar) */}
+      <section className="bg-surface-container-low/70 p-1 rounded-2xl border border-on-surface/5 flex items-center gap-1 overflow-x-auto no-scrollbar shadow-2xs">
         <button
           onClick={() => {
             haptic.selection();
             setBudgetFilter('all');
           }}
           className={cn(
-            "px-3.5 py-1.5 rounded-xl font-bold uppercase tracking-wider whitespace-nowrap transition-all shrink-0 active:scale-95",
+            "px-3.5 py-1.5 rounded-xl font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all shrink-0 active:scale-95",
             budgetFilter === 'all'
-              ? "bg-on-surface text-surface shadow-xs font-black"
-              : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
+              ? "bg-surface-container-lowest text-on-surface shadow-xs font-black"
+              : "text-on-surface-variant/70 hover:text-on-surface hover:bg-surface-container-high/40"
           )}
         >
           Todas ({expenseCategories.length})
@@ -609,10 +609,10 @@ export const Budgets: React.FC = () => {
             setBudgetFilter('alerts');
           }}
           className={cn(
-            "px-3.5 py-1.5 rounded-xl font-bold uppercase tracking-wider whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 active:scale-95",
+            "px-3.5 py-1.5 rounded-xl font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 active:scale-95",
             budgetFilter === 'alerts'
               ? "bg-rose-500 text-white shadow-xs font-black"
-              : "bg-surface-container-low text-rose-600 dark:text-rose-400 hover:bg-surface-container-high"
+              : "text-rose-600 dark:text-rose-400 hover:bg-rose-500/10"
           )}
         >
           <AlertTriangle size={13} />
@@ -624,14 +624,14 @@ export const Budgets: React.FC = () => {
             setBudgetFilter('active');
           }}
           className={cn(
-            "px-3.5 py-1.5 rounded-xl font-bold uppercase tracking-wider whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 active:scale-95",
+            "px-3.5 py-1.5 rounded-xl font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 active:scale-95",
             budgetFilter === 'active'
-              ? "bg-primary text-white shadow-xs font-black"
-              : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
+              ? "bg-surface-container-lowest text-primary shadow-xs font-black"
+              : "text-on-surface-variant/70 hover:text-primary hover:bg-surface-container-high/40"
           )}
         >
           <Target size={13} />
-          Solo Activos ({budgetSummary.activeBudgetsCount})
+          Solo Activas ({budgetSummary.activeBudgetsCount})
         </button>
         <button
           onClick={() => {
@@ -639,10 +639,10 @@ export const Budgets: React.FC = () => {
             setBudgetFilter('top_spent');
           }}
           className={cn(
-            "px-3.5 py-1.5 rounded-xl font-bold uppercase tracking-wider whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 active:scale-95",
+            "px-3.5 py-1.5 rounded-xl font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 active:scale-95",
             budgetFilter === 'top_spent'
-              ? "bg-amber-500 text-white shadow-xs font-black"
-              : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
+              ? "bg-surface-container-lowest text-amber-600 dark:text-amber-400 shadow-xs font-black"
+              : "text-on-surface-variant/70 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-surface-container-high/40"
           )}
         >
           <TrendingUp size={13} />
@@ -650,8 +650,8 @@ export const Budgets: React.FC = () => {
         </button>
       </section>
 
-      {/* Categories Budget List */}
-      <div className="space-y-3">
+      {/* Categories Budget List (Fintech Cards) */}
+      <div className="space-y-2.5">
         {displayedCategories.length === 0 ? (
           <div className="text-center py-12 space-y-3 opacity-60 bg-surface-container-lowest rounded-2xl border border-on-surface/5">
             <AlertCircle size={36} className="mx-auto text-on-surface-variant" />
@@ -698,114 +698,97 @@ export const Budgets: React.FC = () => {
               : 0;
             
             return (
-              <motion.div 
+              <div 
                 key={`${category.id}-${selectedProjectId}`}
-                layout
                 className={cn(
-                  "bg-surface-container-lowest border p-4 sm:p-5 rounded-2xl shadow-sm transition-all",
+                  "group bg-surface-container-lowest border rounded-2xl p-3.5 sm:p-4 transition-all duration-150 shadow-2xs",
                   isOver 
-                    ? "border-rose-500/30 bg-rose-500/[0.02]" 
-                    : "border-on-surface/5",
-                  (!isEnabled && isCurrentMonth) && "opacity-70",
-                  (!isEnabled && !isCurrentMonth) && "hidden" // Hide disabled budgets in history
+                    ? "border-rose-500/25 bg-rose-500/[0.015]" 
+                    : "border-on-surface/5 hover:border-on-surface/15",
+                  (!isEnabled && isCurrentMonth) && "opacity-75 bg-surface-container-lowest/60",
+                  (!isEnabled && !isCurrentMonth) && "hidden"
                 )}
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  {/* Category Header: Icon & Full Name */}
-                  <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto min-w-0">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div 
-                        onClick={() => {
-                          haptic.light();
-                          setBreakdownCategory(category);
-                        }}
-                        className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm transition-all shrink-0 cursor-pointer active:scale-95", 
-                          isEnabled ? category.color : "bg-on-surface/10 text-on-surface/40"
-                        )}
-                        title="Ver detalle de gastos"
-                      >
-                        <IconComponent name={category.icon} size={20} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <h4 
-                            onClick={() => {
-                              haptic.light();
-                              setBreakdownCategory(category);
-                            }}
-                            className="font-extrabold text-on-surface text-sm uppercase tracking-tight break-words cursor-pointer hover:text-primary transition-colors flex items-center gap-1.5"
-                          >
-                            <span>{category.name}</span>
-                            <Receipt size={13} className="text-on-surface-variant/40 hover:text-primary shrink-0" />
-                          </h4>
-                        </div>
-                        <p className="text-[10px] text-on-surface-variant/50 font-black uppercase tracking-wider">
-                          {isEnabled ? (isOver ? 'Límite superado' : 'Objetivo Activo') : 'Sin Objetivo'}
-                        </p>
-                      </div>
+                {/* Header Row: Category Details + Inline Editor */}
+                <div className="flex items-center justify-between gap-3">
+                  {/* Category Info (Clickable for transactions drawer) */}
+                  <div 
+                    onClick={() => {
+                      haptic.light();
+                      setBreakdownCategory(category);
+                    }}
+                    className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer select-none"
+                    title="Toca para ver el detalle de movimientos"
+                  >
+                    <div className={cn(
+                      "w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-2xs shrink-0 transition-transform group-hover:scale-105", 
+                      isEnabled ? category.color : "bg-on-surface/10 text-on-surface/40"
+                    )}>
+                      <IconComponent name={category.icon} size={20} />
                     </div>
 
-                    {/* Toggle Switch on mobile stays on the top row right */}
-                    <div className="sm:hidden shrink-0">
-                      {isCurrentMonth && (
-                        <button
-                          onClick={async () => {
-                            if (isEnabled) {
-                              await handleSave(category.id, 0, true);
-                            } else {
-                              await handleSave(category.id, 0);
-                            }
-                          }}
-                          className={cn(
-                            "w-12 h-6 rounded-full relative transition-all duration-300 flex items-center px-1",
-                            isEnabled ? "bg-primary" : "bg-on-surface/10"
-                          )}
-                          title={isEnabled ? "Desactivar objetivo" : "Activar objetivo"}
-                        >
-                          <motion.div 
-                            animate={{ x: isEnabled ? 24 : 0 }}
-                            className="w-4 h-4 bg-white rounded-full shadow-sm"
-                          />
-                        </button>
-                      )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-extrabold text-on-surface text-sm tracking-tight truncate group-hover:text-primary transition-colors">
+                          {category.name}
+                        </h4>
+                        {isOver && (
+                          <span className="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase tracking-wider shrink-0 flex items-center gap-1">
+                            <AlertTriangle size={11} /> Excedido
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-on-surface-variant/60 font-semibold truncate mt-0.5">
+                        {isEnabled && budgetVal > 0 ? (
+                          <>
+                            <span className="font-extrabold text-on-surface">{formatCurrency(spent, activeCurrency)}</span>
+                            <span className="text-on-surface-variant/40 font-normal"> de </span>
+                            <span>{formatCurrency(budgetVal, activeCurrency)}</span>
+                            <span className="text-on-surface-variant/40"> • </span>
+                            <span className={cn(
+                              "font-black",
+                              isOver ? "text-rose-500" : percent >= 80 ? "text-amber-500" : "text-emerald-500"
+                            )}>
+                              {percent.toFixed(0)}%
+                            </span>
+                          </>
+                        ) : isEnabled ? (
+                          <span className="text-primary font-bold">Límite sin definir</span>
+                        ) : (
+                          <span className="text-on-surface-variant/40">Sin objetivo activo</span>
+                        )}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Controls: Desktop Toggle & Input / Save */}
-                  <div className={cn(
-                    "flex items-center gap-3 shrink-0",
-                    isEnabled ? "justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-on-surface/5 w-full sm:w-auto" : "hidden sm:flex"
-                  )}>
-                    {/* Toggle Switch on desktop */}
-                    <div className="hidden sm:block">
-                      {isCurrentMonth && (
+                  {/* Inline Value Input or Activation Button (Fintech Style) */}
+                  <div className="shrink-0 flex items-center gap-1.5">
+                    {!isEnabled ? (
+                      isCurrentMonth && (
                         <button
                           onClick={async () => {
-                            if (isEnabled) {
-                              await handleSave(category.id, 0, true);
-                            } else {
-                              await handleSave(category.id, 0);
+                            haptic.light();
+                            const targetVal = prevSpent > 0 ? prevSpent : 0;
+                            if (prevSpent > 0) {
+                              const display = formatAmountForDisplay(prevSpent);
+                              setLocalBudgets(prev => ({ ...prev, [category.id]: display }));
                             }
+                            await handleSave(category.id, targetVal);
                           }}
-                          className={cn(
-                            "w-12 h-6 rounded-full relative transition-all duration-300 flex items-center px-1",
-                            isEnabled ? "bg-primary" : "bg-on-surface/10"
-                          )}
-                          title={isEnabled ? "Desactivar objetivo" : "Activar objetivo"}
+                          className="px-3 py-1.5 rounded-xl bg-surface-container-low hover:bg-primary/10 text-on-surface-variant hover:text-primary border border-on-surface/5 text-xs font-bold transition-all active:scale-95 flex items-center gap-1"
+                          title="Establecer límite para esta categoría"
                         >
-                          <motion.div 
-                            animate={{ x: isEnabled ? 24 : 0 }}
-                            className="w-4 h-4 bg-white rounded-full shadow-sm"
-                          />
+                          <span>+ Fijar Meta</span>
                         </button>
-                      )}
-                    </div>
-
-                    {isEnabled && (
-                      <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                        <div className="relative flex-1 sm:flex-initial">
-                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-black text-on-surface-variant/40 uppercase tracking-tighter">{activeCurrency}</span>
+                      )
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        {/* Modern Pill Input */}
+                        <div className="relative flex items-center">
+                          <span className="absolute left-2.5 text-[10px] font-black text-on-surface-variant/40 uppercase tracking-tighter pointer-events-none">
+                            {activeCurrency}
+                          </span>
                           <input 
                             type="text"
                             inputMode="decimal"
@@ -822,7 +805,7 @@ export const Budgets: React.FC = () => {
 
                               requestAnimationFrame(() => {
                                 if (input && document.activeElement === input) {
-                                   const newCursor = Math.max(0, display.length - charsFromRight);
+                                  const newCursor = Math.max(0, display.length - charsFromRight);
                                   input.setSelectionRange(newCursor, newCursor);
                                 }
                               });
@@ -835,36 +818,47 @@ export const Budgets: React.FC = () => {
                             }}
                             placeholder="0"
                             className={cn(
-                              "w-full sm:w-32 pl-9 sm:pl-10 pr-2.5 sm:pr-3 py-2 bg-on-surface/5 border-none rounded-xl text-sm font-bold text-on-surface transition-all text-right focus:ring-2 focus:ring-primary/20",
-                              !isCurrentMonth && "opacity-80 bg-transparent text-base pr-0"
+                              "w-28 sm:w-32 pl-9 pr-3 py-1.5 rounded-xl text-right font-headline font-black text-sm text-on-surface transition-all",
+                              "bg-surface-container-low hover:bg-surface-container-high focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/25",
+                              !isCurrentMonth && "opacity-80 bg-transparent pr-0"
                             )}
                           />
                         </div>
-                        {isCurrentMonth && (
-                          <button 
-                            onClick={() => handleSave(category.id, currentAmount)}
-                            disabled={isSaving}
-                            className={cn(
-                              "w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 shadow-sm relative shrink-0",
-                              isSuccess ? "bg-emerald-500 text-white" : "bg-primary text-white hover:bg-primary-dark"
-                            )}
-                            title="Guardar objetivo"
-                          >
-                            {isSaving ? (
-                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            ) : (
-                              isSuccess ? <Check size={18} /> : <Save size={18} />
-                            )}
-                          </button>
+
+                        {/* Status feedback (saving spinner or checkmark or deactivation cross) */}
+                        {isSaving ? (
+                          <div className="w-6 h-6 flex items-center justify-center">
+                            <div className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                          </div>
+                        ) : isSuccess ? (
+                          <div className="w-6 h-6 flex items-center justify-center text-emerald-500 animate-in fade-in zoom-in duration-200">
+                            <Check size={16} />
+                          </div>
+                        ) : (
+                          isCurrentMonth && (
+                            <button
+                              onClick={async () => {
+                                haptic.light();
+                                await handleSave(category.id, 0, true);
+                              }}
+                              className="w-7 h-7 rounded-lg hover:bg-on-surface/5 flex items-center justify-center text-on-surface-variant/30 hover:text-rose-500 transition-colors"
+                              title="Desactivar objetivo"
+                            >
+                              <X size={14} />
+                            </button>
+                          )
                         )}
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Suggested budget chip if not configured but had spending last month */}
+                {/* Suggested Budget Micro-chip if unconfigured & spent last month */}
                 {isCurrentMonth && isEnabled && budgetVal === 0 && prevSpent > 0 && (
-                  <div className="mt-2.5 pt-2 border-t border-on-surface/5 flex items-center">
+                  <div className="mt-2.5 pt-2 border-t border-on-surface/5 flex items-center justify-between">
+                    <span className="text-[11px] text-on-surface-variant/60 font-medium">
+                      Gastaste <strong>{formatCurrency(prevSpent, activeCurrency)}</strong> el mes anterior
+                    </span>
                     <button
                       type="button"
                       onClick={() => {
@@ -873,82 +867,73 @@ export const Budgets: React.FC = () => {
                         setLocalBudgets(prev => ({ ...prev, [category.id]: display }));
                         handleSave(category.id, prevSpent);
                       }}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-bold transition-all active:scale-95 border border-primary/20"
-                      title="Usar el gasto total del mes anterior como presupuesto"
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-bold transition-all active:scale-95"
                     >
-                      <Sparkles size={12} className="text-primary animate-pulse" />
-                      <span>Sugerido (Mes ant.): <strong>{formatCurrency(prevSpent, activeCurrency)}</strong></span>
-                      <span className="text-[9px] uppercase font-black bg-primary text-white px-1.5 py-0.5 rounded-md ml-1 shadow-xs">
-                        Aplicar
-                      </span>
+                      <Sparkles size={11} />
+                      <span>Fijar como meta</span>
                     </button>
                   </div>
                 )}
 
-                {/* Progress Bar & Spending Indicator */}
+                {/* Progress Bar & Modern Fintech Footer */}
                 {isEnabled && budgetVal > 0 && (
-                  <div className="mt-3 pt-3 border-t border-on-surface/5 space-y-2">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
-                      <div className="flex items-center gap-1.5 min-w-0 font-mono text-[11px] sm:text-xs">
-                        <span className="text-on-surface-variant/60 font-sans font-medium">Gastado:</span>
-                        <span className={cn(
-                          "whitespace-nowrap font-black",
-                          isOver ? "text-rose-600 dark:text-rose-400" : "text-on-surface"
-                        )}>
-                          {formatCurrency(spent, activeCurrency)}
-                        </span>
-                        <span className="text-on-surface-variant/40 font-sans">de</span>
-                        <span className="text-on-surface-variant/70 whitespace-nowrap font-bold">
-                          {formatCurrency(budgetVal, activeCurrency)}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
-                        {isCurrentMonth && remainingCat > 0 && daysRemainingInMonth > 0 && (
-                          <span 
-                            className="text-[10px] font-bold text-primary/90 bg-primary/10 px-2 py-0.5 rounded-md inline-flex items-center gap-1"
-                            title={`Presupuesto diario recomendado para los ${daysRemainingInMonth} días restantes del mes`}
-                          >
-                            <Zap size={10} className="text-primary" />
-                            ~{formatCurrency(safeDaily, activeCurrency)}/día
-                          </span>
-                        )}
-                        <span className={cn(
-                          "text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md inline-block whitespace-nowrap",
-                          isOver 
-                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" 
-                            : percent >= 80 
-                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" 
-                            : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                        )}>
-                          {isOver 
-                            ? `+${formatCurrency(spent - budgetVal, activeCurrency)} excedido` 
-                            : `${formatCurrency(remainingCat, activeCurrency)} disponible`}
-                        </span>
-                        <span className="text-[10px] font-bold text-on-surface-variant/50 sm:hidden">
-                          {percent.toFixed(0)}%
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="relative h-2 w-full bg-on-surface/5 rounded-full overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(percent, 100)}%` }}
-                        transition={{ duration: 0.8, ease: 'easeOut' }}
+                  <div className="mt-2.5 pt-2 border-t border-on-surface/5 space-y-1.5">
+                    {/* Slim Progress Bar */}
+                    <div className="relative h-1.5 w-full bg-on-surface/5 rounded-full overflow-hidden">
+                      <div
+                        style={{ width: `${Math.min(percent, 100)}%` }}
                         className={cn(
                           "h-full rounded-full transition-all duration-300",
                           isOver 
-                            ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]" 
+                            ? "bg-rose-500" 
                             : percent >= 80 
-                            ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.3)]" 
-                            : "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]"
+                            ? "bg-amber-500" 
+                            : "bg-emerald-500"
                         )}
                       />
                     </div>
+
+                    {/* Concise Metrics */}
+                    <div className="flex items-center justify-between text-xs pt-0.5">
+                      <div>
+                        {isOver ? (
+                          <span className="text-rose-600 dark:text-rose-400 font-black text-[11px]">
+                            +{formatCurrency(spent - budgetVal, activeCurrency)} excedido
+                          </span>
+                        ) : (
+                          <span className="text-on-surface-variant/70 text-[11px] font-medium">
+                            Disponible: <strong className="text-on-surface font-black">{formatCurrency(remainingCat, activeCurrency)}</strong>
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {isCurrentMonth && remainingCat > 0 && daysRemainingInMonth > 0 && (
+                          <span 
+                            className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full inline-flex items-center gap-1"
+                            title={`Gasto diario recomendado (${daysRemainingInMonth} días restantes)`}
+                          >
+                            <Zap size={10} />
+                            ~{formatCurrency(safeDaily, activeCurrency)}/día
+                          </span>
+                        )}
+
+                        <button 
+                          onClick={() => {
+                            haptic.light();
+                            setBreakdownCategory(category);
+                          }}
+                          className="flex items-center gap-0.5 text-[11px] font-bold text-on-surface-variant/40 hover:text-primary transition-colors"
+                          title="Ver movimientos"
+                        >
+                          <span>Ver</span>
+                          <ChevronRight size={13} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
-              </motion.div>
+              </div>
             );
           })
         )}
