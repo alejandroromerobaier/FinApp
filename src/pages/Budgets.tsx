@@ -4,7 +4,8 @@ import {
   ArrowLeft, Target, Save, Check, AlertCircle, ChevronLeft, ChevronRight, Copy,
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
   Landmark, Tag, Gift, Briefcase, Home as HomeIcon, Plane, Coffee, Zap, Smartphone, ShieldCheck,
-  ShoppingCart, Hotel, CheckCircle2, TrendingUp, AlertTriangle, Sparkles, Receipt, X, Search
+  ShoppingCart, Hotel, CheckCircle2, TrendingUp, AlertTriangle, Sparkles, Receipt, X, Search,
+  Flame, CreditCard as CardIcon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useData, Category } from '../lib/DataContext';
@@ -29,7 +30,7 @@ export const Budgets: React.FC = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { toast } = useToast();
-  const { categories, budgets, projects, budgetMonth, setBudgetMonth, transactions } = useData();
+  const { categories, budgets, projects, budgetMonth, setBudgetMonth, transactions, cards } = useData();
   const [savingMap, setSavingMap] = useState<Record<string, boolean>>({});
   const [successMap, setSuccessMap] = useState<Record<string, boolean>>({});
   const [localBudgets, setLocalBudgets] = useState<Record<string, string>>({});
@@ -57,6 +58,12 @@ export const Budgets: React.FC = () => {
   const activeYear = activeDate.getFullYear();
   const currentMonthDisplay = activeDate.toLocaleString('es-ES', { month: 'long', year: 'numeric' });
   const isCurrentMonth = budgetMonth === getLocalMonth();
+
+  // Day & month elapsed ratio for pacing analysis
+  const now = new Date();
+  const currentDay = now.getDate();
+  const daysInActiveMonth = new Date(activeYear, activeMonth + 1, 0).getDate();
+  const monthElapsedRatio = isCurrentMonth ? Math.min(1, currentDay / daysInActiveMonth) : 1;
 
   // Initialize local budgets from store
   useEffect(() => {
@@ -241,6 +248,48 @@ export const Budgets: React.FC = () => {
       hasBudgets: activeBudgetsCount > 0
     };
   }, [budgets, expenseCategories, selectedProjectId, categorySpentMap]);
+
+  // Top budget categories share distribution for modern segmented bar
+  const topBudgetShares = useMemo(() => {
+    if (budgetSummary.totalBudget <= 0) return [];
+    const shares: { id: string; name: string; color: string; amount: number; pct: number }[] = [];
+    expenseCategories.forEach(cat => {
+      const budgetObj = budgets.find(b => 
+        b.categoryId === cat.id && 
+        (!b.month || b.month === budgetMonth) &&
+        ((selectedProjectId === null && (!b.projectId || b.projectId === 'personal' || b.projectId === null)) || 
+         (selectedProjectId !== null && b.projectId === selectedProjectId))
+      );
+      if (budgetObj && budgetObj.amount > 0) {
+        shares.push({
+          id: cat.id,
+          name: cat.name,
+          color: cat.color,
+          amount: budgetObj.amount,
+          pct: (budgetObj.amount / budgetSummary.totalBudget) * 100
+        });
+      }
+    });
+    return shares.sort((a, b) => b.amount - a.amount).slice(0, 5);
+  }, [expenseCategories, budgets, budgetMonth, selectedProjectId, budgetSummary.totalBudget]);
+
+  // Helper for enriched transaction payment method in modal
+  const getPaymentMethodInfo = (t: any) => {
+    if (t.cardId && cards && cards.length > 0) {
+      const card = cards.find(c => c.id === t.cardId);
+      if (card) {
+        return {
+          label: card.name ? `${card.name}${card.last4Digits ? ` •••• ${card.last4Digits}` : ''}` : 'Tarjeta',
+          isCard: true
+        };
+      }
+    }
+    if (t.paymentMethod === 'credit_card') return { label: 'Crédito', isCard: true };
+    if (t.paymentMethod === 'debit_card') return { label: 'Débito', isCard: true };
+    if (t.paymentMethod === 'cash') return { label: 'Efectivo', isCard: false };
+    if (t.paymentMethod === 'bank_transfer') return { label: 'Transferencia', isCard: false };
+    return { label: '', isCard: false };
+  };
 
   // Count of categories currently with alert (spent >= 80% or exceeded)
   const alertCategoriesCount = useMemo(() => {
@@ -480,7 +529,7 @@ export const Budgets: React.FC = () => {
 
       {/* Hero: Global Budget Execution Summary Card */}
       {budgetSummary.hasBudgets && (
-        <section className="bg-gradient-to-br from-surface-container-lowest via-surface-container-low to-surface-container-low p-5 sm:p-6 rounded-[2rem] border border-on-surface/10 shadow-sm relative overflow-hidden">
+        <section className="isolate bg-gradient-to-br from-surface-container-lowest via-surface-container-low to-surface-container-low p-5 sm:p-6 rounded-[2rem] border border-on-surface/10 shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 w-44 h-44 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
           
           <div className="flex items-center justify-between mb-4">
@@ -581,6 +630,35 @@ export const Budgets: React.FC = () => {
               />
             </div>
           </div>
+
+          {/* Category Share Distribution Bar (Revolut Style) */}
+          {topBudgetShares.length > 1 && (
+            <div className="mt-4 pt-3 border-t border-on-surface/5 space-y-2">
+              <div className="flex items-center justify-between text-[10px] font-black text-on-surface-variant/60 uppercase tracking-wider">
+                <span>Distribución del Presupuesto</span>
+                <span>Top {topBudgetShares.length} categorías</span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-on-surface/5 flex overflow-hidden gap-0.5">
+                {topBudgetShares.map(s => (
+                  <div
+                    key={s.id}
+                    style={{ width: `${s.pct}%` }}
+                    className={cn("h-full transition-all", s.color)}
+                    title={`${s.name}: ${s.pct.toFixed(0)}%`}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pt-0.5">
+                {topBudgetShares.map(s => (
+                  <div key={s.id} className="flex items-center gap-1.5 text-[10px] font-bold whitespace-nowrap shrink-0">
+                    <div className={cn("w-2 h-2 rounded-full", s.color)} />
+                    <span className="text-on-surface-variant/80">{s.name}</span>
+                    <span className="text-on-surface font-extrabold">{s.pct.toFixed(0)}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       )}
 
@@ -798,17 +876,40 @@ export const Budgets: React.FC = () => {
                   {/* Status Badge */}
                   <div className="shrink-0 pt-0.5">
                     {isEnabled && budgetVal > 0 ? (
-                      <span className={cn(
-                        "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1 shadow-2xs",
-                        isOver 
-                          ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20" 
-                          : percent >= 80 
-                          ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" 
-                          : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                      )}>
-                        {isOver && <AlertTriangle size={11} />}
-                        {isOver ? `+${(percent - 100).toFixed(0)}% excedido` : `${percent.toFixed(0)}% consumido`}
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className={cn(
+                          "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1 shadow-2xs",
+                          isOver 
+                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20" 
+                            : percent >= 80 
+                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" 
+                            : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                        )}>
+                          {isOver && <AlertTriangle size={11} />}
+                          {isOver ? `+${(percent - 100).toFixed(0)}% excedido` : `${percent.toFixed(0)}% consumido`}
+                        </span>
+
+                        {isCurrentMonth && !isOver && spent > 0 && (
+                          <span className={cn(
+                            "text-[9px] font-black uppercase tracking-tight inline-flex items-center gap-1 px-1.5 py-0.2 rounded-md",
+                            (spent / budgetVal) > (monthElapsedRatio * 1.15)
+                              ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                              : "text-emerald-600 dark:text-emerald-400"
+                          )}>
+                            {(spent / budgetVal) > (monthElapsedRatio * 1.15) ? (
+                              <>
+                                <Flame size={10} className="shrink-0" />
+                                <span>Ritmo acelerado</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
+                                <span>Ritmo óptimo</span>
+                              </>
+                            )}
+                          </span>
+                        )}
+                      </div>
                     ) : !isEnabled ? (
                       <span className="px-2.5 py-0.5 rounded-full bg-on-surface/5 text-on-surface-variant/40 text-[10px] font-bold uppercase tracking-wider">
                         Sin Meta
@@ -926,6 +1027,55 @@ export const Budgets: React.FC = () => {
                           )}
                         </div>
                       )}
+
+                      {/* Quick 1-Tap Increment Pills for fast budgeting */}
+                      {isEnabled && isCurrentMonth && (
+                        <div className="flex items-center justify-end gap-1 mt-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              haptic.selection();
+                              const nextVal = budgetVal + 10000;
+                              const display = formatAmountForDisplay(nextVal);
+                              setLocalBudgets(prev => ({ ...prev, [category.id]: display }));
+                              handleSave(category.id, nextVal);
+                            }}
+                            className="px-1.5 py-0.5 rounded-md bg-on-surface/5 hover:bg-primary/10 hover:text-primary text-[10px] font-black text-on-surface-variant transition-colors active:scale-95"
+                            title="Sumar $10.000"
+                          >
+                            +10k
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              haptic.selection();
+                              const nextVal = budgetVal + 50000;
+                              const display = formatAmountForDisplay(nextVal);
+                              setLocalBudgets(prev => ({ ...prev, [category.id]: display }));
+                              handleSave(category.id, nextVal);
+                            }}
+                            className="px-1.5 py-0.5 rounded-md bg-on-surface/5 hover:bg-primary/10 hover:text-primary text-[10px] font-black text-on-surface-variant transition-colors active:scale-95"
+                            title="Sumar $50.000"
+                          >
+                            +50k
+                          </button>
+                          {prevSpent > 0 && Math.round(prevSpent) !== Math.round(budgetVal) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                haptic.selection();
+                                const display = formatAmountForDisplay(prevSpent);
+                                setLocalBudgets(prev => ({ ...prev, [category.id]: display }));
+                                handleSave(category.id, prevSpent);
+                              }}
+                              className="px-1.5 py-0.5 rounded-md bg-primary/10 hover:bg-primary/20 text-primary text-[10px] font-black transition-colors active:scale-95"
+                              title={`Copiar mes anterior: ${formatCurrency(prevSpent, activeCurrency)}`}
+                            >
+                              Mes ant.
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1024,8 +1174,9 @@ export const Budgets: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
               onClick={() => setBreakdownCategory(null)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
             />
 
             {/* Centered Modal Card */}
@@ -1064,39 +1215,46 @@ export const Budgets: React.FC = () => {
                 </button>
               </div>
 
-              {/* Total spending summary banner */}
-              <div className="px-5 py-3.5 bg-surface-container-low/60 flex items-center justify-between border-b border-on-surface/5">
-                <div>
-                  <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-wider block">
-                    Total gastado en el mes
-                  </span>
-                  <span className="text-lg font-black text-on-surface font-headline">
-                    {formatCurrency(categorySpentMap[breakdownCategory.id] || 0, activeCurrency)}
-                  </span>
-                </div>
+              {/* Total spending summary banner with Average Ticket */}
+              {(() => {
+                const cSpent = categorySpentMap[breakdownCategory.id] || 0;
+                const avgExpense = breakdownTransactions.length > 0 ? (cSpent / breakdownTransactions.length) : 0;
+                const currentAmount = localBudgets[breakdownCategory.id] || 0;
+                const bVal = typeof currentAmount === 'string' ? parseFormattedAmount(currentAmount) : Number(currentAmount || 0);
+                const isOver = bVal > 0 && cSpent > bVal;
 
-                {/* Show budget vs spent comparison if set */}
-                {(() => {
-                  const currentAmount = localBudgets[breakdownCategory.id] || 0;
-                  const bVal = typeof currentAmount === 'string' ? parseFormattedAmount(currentAmount) : Number(currentAmount || 0);
-                  const cSpent = categorySpentMap[breakdownCategory.id] || 0;
-                  if (bVal <= 0) return null;
-                  const isOver = cSpent > bVal;
-                  return (
-                    <div className="text-right">
+                return (
+                  <div className="px-5 py-3.5 bg-surface-container-low/60 flex items-center justify-between border-b border-on-surface/5">
+                    <div>
                       <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-wider block">
-                        Presupuesto
+                        Total gastado en el mes
                       </span>
-                      <span className={cn(
-                        "text-xs font-black px-2 py-0.5 rounded-full inline-block",
-                        isOver ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                      )}>
-                        {isOver ? `+${formatCurrency(cSpent - bVal, activeCurrency)} excedido` : `${formatCurrency(bVal - cSpent, activeCurrency)} restante`}
+                      <span className="text-lg font-black text-on-surface font-headline">
+                        {formatCurrency(cSpent, activeCurrency)}
                       </span>
+                      {avgExpense > 0 && breakdownTransactions.length > 1 && (
+                        <span className="text-[10px] text-on-surface-variant/70 font-semibold block mt-0.5">
+                          Promedio: <strong className="text-on-surface font-bold">~{formatCurrency(Math.round(avgExpense), activeCurrency)}</strong> / compra
+                        </span>
+                      )}
                     </div>
-                  );
-                })()}
-              </div>
+
+                    {bVal > 0 && (
+                      <div className="text-right">
+                        <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-wider block">
+                          Presupuesto
+                        </span>
+                        <span className={cn(
+                          "text-xs font-black px-2.5 py-0.5 rounded-full inline-block mt-0.5",
+                          isOver ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                        )}>
+                          {isOver ? `+${formatCurrency(cSpent - bVal, activeCurrency)} excedido` : `${formatCurrency(bVal - cSpent, activeCurrency)} restante`}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Transactions list */}
               <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
@@ -1111,6 +1269,8 @@ export const Budgets: React.FC = () => {
                     const formattedDate = !isNaN(tDate.getTime()) 
                       ? tDate.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
                       : '';
+                    const payInfo = getPaymentMethodInfo(t);
+
                     return (
                       <div 
                         key={t.id}
@@ -1120,8 +1280,14 @@ export const Budgets: React.FC = () => {
                           <p className="text-xs font-extrabold text-on-surface truncate">
                             {t.description || 'Gasto sin descripción'}
                           </p>
-                          <p className="text-[10px] text-on-surface-variant/60 font-semibold flex items-center gap-1.5 mt-0.5">
+                          <p className="text-[10px] text-on-surface-variant/60 font-semibold flex items-center flex-wrap gap-1.5 mt-0.5">
                             <span>{formattedDate}</span>
+                            {payInfo.label && (
+                              <span className="px-1.5 py-0.2 rounded bg-on-surface/5 text-on-surface-variant/80 text-[9px] font-bold inline-flex items-center gap-1">
+                                {payInfo.isCard && <CardIcon size={9} />}
+                                {payInfo.label}
+                              </span>
+                            )}
                             {(t as any).installmentNumber && (
                               <span className="px-1.5 py-0.2 rounded bg-primary/10 text-primary text-[9px] font-bold">
                                 Cuota {(t as any).installmentNumber}/{(t as any).installmentTotal}
