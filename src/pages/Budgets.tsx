@@ -50,7 +50,9 @@ export const Budgets: React.FC = () => {
     categoryColor: string;
     prevAmount: number;
     avg3mAmount: number;
+    existingAmount: number;
     chosenAmount: number;
+    chosenDisplay: string;
     source: 'prev' | 'avg' | 'custom';
     selected: boolean;
   }>>([]);
@@ -73,7 +75,11 @@ export const Budgets: React.FC = () => {
   const activeMonth = activeDate.getMonth();
   const activeYear = activeDate.getFullYear();
   const currentMonthDisplay = activeDate.toLocaleString('es-ES', { month: 'long', year: 'numeric' });
-  const isCurrentMonth = budgetMonth === getLocalMonth();
+  const localMonthNow = getLocalMonth();
+  const isCurrentMonth = budgetMonth === localMonthNow;
+  const isFutureMonth = budgetMonth > localMonthNow;
+  const isPastMonth = budgetMonth < localMonthNow;
+  const isEditableMonth = budgetMonth >= localMonthNow;
 
   // Day & month elapsed ratio for pacing analysis
   const now = new Date();
@@ -383,34 +389,60 @@ export const Budgets: React.FC = () => {
     }).length;
   }, [expenseCategories, budgets, budgetMonth, selectedProjectId, categorySpentMap]);
 
+  // Helper to get active budget amount for a category in current scope/month
+  const getCategoryBudgetAmount = (categoryId: string) => {
+    const budgetObj = budgets.find(b => 
+      b.categoryId === categoryId && 
+      (!b.month || b.month === budgetMonth) &&
+      ((selectedProjectId === null && (!b.projectId || b.projectId === 'personal' || b.projectId === null)) || 
+       (selectedProjectId !== null && b.projectId === selectedProjectId))
+    );
+    return budgetObj?.amount || 0;
+  };
+
   // Filtered, searched and sorted category list for display
   const displayedCategories = useMemo(() => {
     let list = [...expenseCategories];
 
+    // In past (historical) months, only show categories that actually had a budget or spending
+    if (isPastMonth) {
+      list = list.filter(cat => getCategoryBudgetAmount(cat.id) > 0);
+    }
+
     if (budgetFilter === 'alerts') {
       list = list.filter(cat => {
-        const budgetObj = budgets.find(b => 
-          b.categoryId === cat.id && 
-          (!b.month || b.month === budgetMonth) &&
-          ((selectedProjectId === null && (!b.projectId || b.projectId === 'personal' || b.projectId === null)) || 
-           (selectedProjectId !== null && b.projectId === selectedProjectId))
-        );
-        if (!budgetObj || budgetObj.amount <= 0) return false;
+        const bAmount = getCategoryBudgetAmount(cat.id);
+        if (bAmount <= 0) return false;
         const spent = categorySpentMap[cat.id] || 0;
-        return spent >= budgetObj.amount * 0.8;
+        return spent >= bAmount * 0.8;
       });
     } else if (budgetFilter === 'active') {
-      list = list.filter(cat => {
-        return budgets.some(b => 
-          b.categoryId === cat.id && 
-          (!b.month || b.month === budgetMonth) &&
-          ((selectedProjectId === null && (!b.projectId || b.projectId === 'personal' || b.projectId === null)) || 
-           (selectedProjectId !== null && b.projectId === selectedProjectId)) &&
-          b.amount > 0
-        );
-      });
+      list = list.filter(cat => getCategoryBudgetAmount(cat.id) > 0);
     } else if (budgetFilter === 'top_spent') {
       list.sort((a, b) => (categorySpentMap[b.id] || 0) - (categorySpentMap[a.id] || 0));
+    } else {
+      // 'all': Smart sorting -> Active budgets first (by % consumed desc), then unbudgeted (by spent desc)
+      list.sort((a, b) => {
+        const bA = getCategoryBudgetAmount(a.id);
+        const bB = getCategoryBudgetAmount(b.id);
+        const hasA = bA > 0;
+        const hasB = bB > 0;
+
+        if (hasA && !hasB) return -1;
+        if (!hasA && hasB) return 1;
+
+        const spentA = categorySpentMap[a.id] || 0;
+        const spentB = categorySpentMap[b.id] || 0;
+
+        if (hasA && hasB) {
+          const pctA = spentA / bA;
+          const pctB = spentB / bB;
+          if (pctB !== pctA) return pctB - pctA;
+          return bB - bA;
+        }
+
+        return spentB - spentA;
+      });
     }
 
     if (searchTerm.trim()) {
@@ -419,7 +451,7 @@ export const Budgets: React.FC = () => {
     }
 
     return list;
-  }, [expenseCategories, budgetFilter, budgets, budgetMonth, selectedProjectId, categorySpentMap, searchTerm]);
+  }, [expenseCategories, budgetFilter, budgets, budgetMonth, selectedProjectId, categorySpentMap, searchTerm, isPastMonth]);
 
   const handleSave = async (categoryId: string, rawAmount: number | string, isDelete: boolean = false) => {
     setSavingMap(prev => ({ ...prev, [categoryId]: true }));
@@ -449,7 +481,7 @@ export const Budgets: React.FC = () => {
   };
 
   const handleAutoSave = (categoryId: string) => {
-    if (!isCurrentMonth) return;
+    if (!isEditableMonth) return;
     const currentVal = parseFormattedAmount(localBudgets[categoryId] || '');
     const existingBudget = budgets.find(b => 
       b.categoryId === categoryId && 
@@ -514,7 +546,9 @@ export const Budgets: React.FC = () => {
         categoryColor: string;
         prevAmount: number;
         avg3mAmount: number;
+        existingAmount: number;
         chosenAmount: number;
+        chosenDisplay: string;
         source: 'prev' | 'avg' | 'custom';
         selected: boolean;
       }> = [];
@@ -524,6 +558,7 @@ export const Budgets: React.FC = () => {
         const prevAmount = prevB ? prevB.amount : 0;
         const avg3m = avg3MonthSpentMap[cat.id] || 0;
         const prevSpent = prevMonthSpentMap[cat.id] || 0;
+        const existingAmount = getCategoryBudgetAmount(cat.id);
 
         // Has any historical signal
         if (prevAmount > 0 || avg3m > 0 || prevSpent > 0) {
@@ -535,7 +570,9 @@ export const Budgets: React.FC = () => {
             categoryColor: cat.color,
             prevAmount,
             avg3mAmount: avg3m,
+            existingAmount,
             chosenAmount: defaultAmount,
+            chosenDisplay: formatAmountForDisplay(defaultAmount),
             source: prevAmount > 0 ? 'prev' : 'avg',
             selected: true
           });
@@ -593,16 +630,16 @@ export const Budgets: React.FC = () => {
         title="Presupuestos"
         subtitle="Establece límites mensuales por categoría para mantener tus finanzas bajo control."
         badge={
-          <div className="flex items-center gap-2">
+          !isCurrentMonth ? (
             <span className={cn(
-              "text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border",
-              isCurrentMonth
+              "text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border",
+              isFutureMonth
                 ? "bg-primary/10 text-primary border-primary/20"
                 : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
             )}>
-              {currentMonthDisplay} {!isCurrentMonth && '• Histórico'}
+              {isFutureMonth ? 'Planificación' : 'Histórico'}
             </span>
-          </div>
+          ) : undefined
         }
       />
 
@@ -691,22 +728,22 @@ export const Budgets: React.FC = () => {
           <div className="absolute top-0 right-0 w-48 h-48 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
           
           {/* Top Bar: Title & Fast Assistant Action */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-xs shrink-0">
                 <Target size={20} />
               </div>
-              <div className="min-w-0">
-                <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/60 block truncate">
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/60 block">
                   Ejecución del Mes
                 </span>
-                <h3 className="text-sm sm:text-base font-black text-on-surface font-headline tracking-tight truncate">
+                <h3 className="text-sm sm:text-base font-black text-on-surface font-headline tracking-tight leading-snug break-words">
                   {selectedProjectId ? (activeProject?.name || 'Proyecto') : 'Presupuesto Personal'}
                 </h3>
               </div>
             </div>
 
-            {isCurrentMonth && (
+            {isEditableMonth && (
               <button
                 onClick={openCopyAssistantModal}
                 disabled={copying}
@@ -718,7 +755,7 @@ export const Budgets: React.FC = () => {
                 ) : (
                   <Wand2 size={13} />
                 )}
-                <span>Copiar / Asistente</span>
+                <span>Asistente</span>
               </button>
             )}
           </div>
@@ -780,7 +817,21 @@ export const Budgets: React.FC = () => {
             {isCurrentMonth && (
               <div className="flex items-center justify-between text-[10px] text-on-surface-variant/60 font-bold px-0.5">
                 <span>Día {currentDay} de {daysInActiveMonth} ({Math.round(monthElapsedRatio * 100)}% transcurrido)</span>
-                <span>{budgetSummary.overBudgetCount > 0 ? `${budgetSummary.overBudgetCount} en alerta` : 'En regla'}</span>
+                {budgetSummary.overBudgetCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptic.selection();
+                      setBudgetFilter('alerts');
+                    }}
+                    className="text-rose-500 hover:underline font-black inline-flex items-center gap-0.5 cursor-pointer"
+                  >
+                    <span>{budgetSummary.overBudgetCount} en alerta</span>
+                    <ChevronRight size={11} />
+                  </button>
+                ) : (
+                  <span>En regla</span>
+                )}
               </div>
             )}
           </div>
@@ -873,7 +924,7 @@ export const Budgets: React.FC = () => {
               Fija límites mensuales por categoría para mantener tus finanzas bajo control o utiliza el asistente predictivo.
             </p>
           </div>
-          {isCurrentMonth && (
+          {isEditableMonth && (
             <button
               onClick={openCopyAssistantModal}
               disabled={copying}
@@ -903,7 +954,7 @@ export const Budgets: React.FC = () => {
                   : "text-on-surface-variant/70 hover:text-on-surface hover:bg-surface-container-high/40"
               )}
             >
-              Todas ({expenseCategories.length})
+              Todas ({isPastMonth ? budgetSummary.activeBudgetsCount : expenseCategories.length})
             </button>
             <button
               onClick={() => {
@@ -982,6 +1033,8 @@ export const Budgets: React.FC = () => {
             <p className="text-sm font-bold uppercase tracking-wider text-on-surface">
               {searchTerm 
                 ? `No se encontraron categorías para "${searchTerm}"`
+                : isPastMonth && budgetFilter === 'all'
+                ? 'No se registraron presupuestos en este mes'
                 : budgetFilter === 'alerts' 
                 ? '¡Excelente! No hay categorías en alerta'
                 : budgetFilter === 'active' 
@@ -1033,8 +1086,7 @@ export const Budgets: React.FC = () => {
                   isOver 
                     ? "border-rose-500/25 bg-rose-500/[0.015]" 
                     : "border-on-surface/5 hover:border-on-surface/15",
-                  (!isEnabled && isCurrentMonth) && "opacity-75 bg-surface-container-lowest/60",
-                  (!isEnabled && !isCurrentMonth) && "hidden"
+                  (!isEnabled && isEditableMonth) && "opacity-75 bg-surface-container-lowest/60"
                 )}
               >
                 {/* TIER 1: Identity & Full Category Title (Full Width - Never Truncated) */}
@@ -1135,7 +1187,7 @@ export const Budgets: React.FC = () => {
                         Presupuesto
                       </span>
                       {!isEnabled || budgetVal === 0 ? (
-                        isCurrentMonth ? (
+                        isEditableMonth ? (
                           <button
                             type="button"
                             onClick={() => openEditModal(category)}
@@ -1152,21 +1204,21 @@ export const Budgets: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => {
-                            if (isCurrentMonth) {
+                            if (isEditableMonth) {
                               openEditModal(category);
                             }
                           }}
-                          disabled={!isCurrentMonth}
+                          disabled={!isEditableMonth}
                           className={cn(
                             "mt-0.5 px-2.5 py-1 rounded-xl font-headline font-black text-sm sm:text-base tracking-tight transition-all inline-flex items-center gap-1.5",
-                            isCurrentMonth 
+                            isEditableMonth 
                               ? "bg-surface-container-low hover:bg-surface-container-high text-on-surface active:scale-95 border border-on-surface/5 shadow-2xs cursor-pointer group/btn" 
                               : "text-on-surface/80 cursor-default"
                           )}
-                          title={isCurrentMonth ? "Toca para modificar presupuesto" : undefined}
+                          title={isEditableMonth ? "Toca para modificar presupuesto" : undefined}
                         >
                           <span>{formatCurrency(budgetVal, activeCurrency)}</span>
-                          {isCurrentMonth && (
+                          {isEditableMonth && (
                             <Pencil size={11} className="text-on-surface-variant/40 group-hover/btn:text-primary transition-colors" />
                           )}
                         </button>
@@ -1627,15 +1679,15 @@ export const Budgets: React.FC = () => {
                           : "bg-surface-container-lowest/40 border-on-surface/5 opacity-45"
                       )}
                     >
-                      {/* Top row: Checkmark + Category + Amount display */}
+                      {/* Top row: Checkmark + Category + Inline Amount Edit */}
                       <div 
                         onClick={() => {
                           haptic.selection();
                           setCopyItems(prev => prev.map(i => i.categoryId === item.categoryId ? { ...i, selected: !i.selected } : i));
                         }}
-                        className="flex items-center justify-between gap-3 cursor-pointer"
+                        className="flex items-center justify-between gap-2.5 cursor-pointer"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           {/* Circular iOS Checkmark */}
                           <div className={cn(
                             "w-6 h-6 rounded-full flex items-center justify-center transition-all shrink-0",
@@ -1648,16 +1700,42 @@ export const Budgets: React.FC = () => {
                             <IconComponent name={item.categoryIcon} size={16} />
                           </div>
 
-                          <span className="font-extrabold text-xs sm:text-sm text-on-surface truncate">
-                            {item.categoryName}
-                          </span>
+                          <div className="min-w-0 flex-1">
+                            <span className="font-extrabold text-xs sm:text-sm text-on-surface block leading-snug break-words">
+                              {item.categoryName}
+                            </span>
+                            {item.existingAmount > 0 && (
+                              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 block">
+                                Ya tiene meta: {formatCurrency(item.existingAmount, activeCurrency)}
+                              </span>
+                            )}
+                          </div>
                         </div>
 
-                        {/* Amount */}
-                        <div className="text-right shrink-0">
-                          <span className="font-headline font-black text-xs sm:text-sm text-on-surface">
-                            {formatCurrency(item.chosenAmount, activeCurrency)}
+                        {/* Inline Editable Amount */}
+                        <div 
+                          onClick={(e) => e.stopPropagation()}
+                          className="shrink-0 flex items-center gap-1 bg-surface-container-lowest/90 border border-on-surface/10 rounded-xl px-2 py-1 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20 transition-all"
+                        >
+                          <span className="text-[10px] font-black text-on-surface-variant/40 select-none">
+                            {activeCurrency}
                           </span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            disabled={!item.selected}
+                            value={item.chosenDisplay}
+                            onChange={(e) => {
+                              const { display, numeric } = formatCurrencyInput(e.target.value);
+                              setCopyItems(prev => prev.map(i => 
+                                i.categoryId === item.categoryId 
+                                  ? { ...i, chosenAmount: numeric, chosenDisplay: display, source: 'custom' } 
+                                  : i
+                              ));
+                            }}
+                            placeholder="0"
+                            className="w-20 sm:w-24 text-right font-headline font-black text-xs sm:text-sm text-on-surface bg-transparent focus:outline-hidden"
+                          />
                         </div>
                       </div>
 
@@ -1670,7 +1748,11 @@ export const Budgets: React.FC = () => {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 haptic.selection();
-                                setCopyItems(prev => prev.map(i => i.categoryId === item.categoryId ? { ...i, chosenAmount: item.prevAmount, source: 'prev' } : i));
+                                setCopyItems(prev => prev.map(i => 
+                                  i.categoryId === item.categoryId 
+                                    ? { ...i, chosenAmount: item.prevAmount, chosenDisplay: formatAmountForDisplay(item.prevAmount), source: 'prev' } 
+                                    : i
+                                ));
                               }}
                               className={cn(
                                 "px-2 py-0.5 rounded-lg text-[10px] font-black transition-all active:scale-95 inline-flex items-center gap-1 cursor-pointer",
@@ -1690,7 +1772,11 @@ export const Budgets: React.FC = () => {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 haptic.selection();
-                                setCopyItems(prev => prev.map(i => i.categoryId === item.categoryId ? { ...i, chosenAmount: item.avg3mAmount, source: 'avg' } : i));
+                                setCopyItems(prev => prev.map(i => 
+                                  i.categoryId === item.categoryId 
+                                    ? { ...i, chosenAmount: item.avg3mAmount, chosenDisplay: formatAmountForDisplay(item.avg3mAmount), source: 'avg' } 
+                                    : i
+                                ));
                               }}
                               className={cn(
                                 "px-2 py-0.5 rounded-lg text-[10px] font-black transition-all active:scale-95 inline-flex items-center gap-1 cursor-pointer",
