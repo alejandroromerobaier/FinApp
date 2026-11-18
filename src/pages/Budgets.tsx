@@ -5,7 +5,7 @@ import {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
   Landmark, Tag, Gift, Briefcase, Home as HomeIcon, Plane, Coffee, Zap, Smartphone, ShieldCheck,
   ShoppingCart, Hotel, CheckCircle2, TrendingUp, AlertTriangle, Sparkles, Receipt, X, Search,
-  Flame, CreditCard as CardIcon
+  Flame, CreditCard as CardIcon, Pencil, Trash2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useData, Category } from '../lib/DataContext';
@@ -39,6 +39,9 @@ export const Budgets: React.FC = () => {
   const [budgetFilter, setBudgetFilter] = useState<BudgetFilter>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [breakdownCategory, setBreakdownCategory] = useState<Category | null>(null);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editSheetAmount, setEditSheetAmount] = useState<string>('');
+  const [isSavingSheet, setIsSavingSheet] = useState<boolean>(false);
 
   // Filter expense categories and omit system categories
   const expenseCategories = useMemo(() => {
@@ -383,6 +386,19 @@ export const Budgets: React.FC = () => {
     const oldAmount = existingBudget?.amount || 0;
     if (currentVal !== oldAmount) {
       handleSave(categoryId, currentVal);
+    }
+  };
+
+  const openEditModal = (cat: Category) => {
+    haptic.selection();
+    setEditingCategory(cat);
+    const existing = localBudgets[cat.id];
+    if (existing && parseFormattedAmount(existing) > 0) {
+      setEditSheetAmount(existing);
+    } else if (prevMonthSpentMap[cat.id] > 0) {
+      setEditSheetAmount(formatAmountForDisplay(prevMonthSpentMap[cat.id]));
+    } else {
+      setEditSheetAmount('');
     }
   };
 
@@ -938,143 +954,47 @@ export const Budgets: React.FC = () => {
                       </span>
                     </div>
 
-                    {/* Target Amount or Activation */}
+                    {/* Target Amount - Tap to Edit (Mobile-first Fintech) */}
                     <div className="text-right">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/50 block">
                         Presupuesto
                       </span>
-                      {!isEnabled ? (
-                        isCurrentMonth && (
+                      {!isEnabled || budgetVal === 0 ? (
+                        isCurrentMonth ? (
                           <button
-                            onClick={async () => {
-                              haptic.light();
-                              const targetVal = prevSpent > 0 ? prevSpent : 0;
-                              if (prevSpent > 0) {
-                                const display = formatAmountForDisplay(prevSpent);
-                                setLocalBudgets(prev => ({ ...prev, [category.id]: display }));
-                              }
-                              await handleSave(category.id, targetVal);
-                            }}
-                            className="mt-0.5 px-3 py-1 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-black transition-all active:scale-95 inline-flex items-center gap-1"
+                            type="button"
+                            onClick={() => openEditModal(category)}
+                            className="mt-0.5 px-3 py-1 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-black transition-all active:scale-95 inline-flex items-center gap-1 shadow-2xs cursor-pointer"
                           >
-                            <span>+ Fijar Meta</span>
+                            <span>+ Asignar meta</span>
                           </button>
+                        ) : (
+                          <span className="text-xs font-bold text-on-surface-variant/40 mt-0.5 block">
+                            Sin meta
+                          </span>
                         )
                       ) : (
-                        <div className="mt-0.5 flex items-center justify-end gap-1.5">
-                          <div className="relative flex items-center">
-                            <span className="absolute left-2.5 text-[10px] font-black text-on-surface-variant/40 uppercase tracking-tighter pointer-events-none">
-                              {activeCurrency}
-                            </span>
-                            <input 
-                              type="text"
-                              inputMode="decimal"
-                              value={currentAmount || ''}
-                              disabled={!isCurrentMonth}
-                              onChange={(e) => {
-                                const input = e.target;
-                                const oldVal = input.value;
-                                const oldCursor = input.selectionStart || oldVal.length;
-                                const charsFromRight = oldVal.length - oldCursor;
-
-                                const { display } = formatCurrencyInput(oldVal);
-                                setLocalBudgets(prev => ({ ...prev, [category.id]: display }));
-
-                                requestAnimationFrame(() => {
-                                  if (input && document.activeElement === input) {
-                                    const newCursor = Math.max(0, display.length - charsFromRight);
-                                    input.setSelectionRange(newCursor, newCursor);
-                                  }
-                                });
-                              }}
-                              onBlur={() => handleAutoSave(category.id)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  (e.target as HTMLInputElement).blur();
-                                }
-                              }}
-                              placeholder="0"
-                              className={cn(
-                                "w-28 sm:w-32 pl-9 pr-3 py-1 rounded-xl text-right font-headline font-black text-sm text-on-surface transition-all",
-                                "bg-surface-container-low hover:bg-surface-container-high focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/25",
-                                !isCurrentMonth && "opacity-80 bg-transparent pr-0"
-                              )}
-                            />
-                          </div>
-
-                          {/* Subtle Status Feedback */}
-                          {isSaving ? (
-                            <div className="w-5 h-5 flex items-center justify-center">
-                              <div className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                            </div>
-                          ) : isSuccess ? (
-                            <div className="w-5 h-5 flex items-center justify-center text-emerald-500 animate-in fade-in zoom-in duration-200">
-                              <Check size={15} />
-                            </div>
-                          ) : (
-                            isCurrentMonth && (
-                              <button
-                                onClick={async () => {
-                                  haptic.light();
-                                  await handleSave(category.id, 0, true);
-                                }}
-                                className="w-6 h-6 rounded-md hover:bg-on-surface/5 flex items-center justify-center text-on-surface-variant/30 hover:text-rose-500 transition-colors"
-                                title="Desactivar objetivo"
-                              >
-                                <X size={13} />
-                              </button>
-                            )
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isCurrentMonth) {
+                              openEditModal(category);
+                            }
+                          }}
+                          disabled={!isCurrentMonth}
+                          className={cn(
+                            "mt-0.5 px-2.5 py-1 rounded-xl font-headline font-black text-sm sm:text-base tracking-tight transition-all inline-flex items-center gap-1.5",
+                            isCurrentMonth 
+                              ? "bg-surface-container-low hover:bg-surface-container-high text-on-surface active:scale-95 border border-on-surface/5 shadow-2xs cursor-pointer group/btn" 
+                              : "text-on-surface/80 cursor-default"
                           )}
-                        </div>
-                      )}
-
-                      {/* Quick 1-Tap Increment Pills for fast budgeting */}
-                      {isEnabled && isCurrentMonth && (
-                        <div className="flex items-center justify-end gap-1 mt-1.5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              haptic.selection();
-                              const nextVal = budgetVal + 10000;
-                              const display = formatAmountForDisplay(nextVal);
-                              setLocalBudgets(prev => ({ ...prev, [category.id]: display }));
-                              handleSave(category.id, nextVal);
-                            }}
-                            className="px-1.5 py-0.5 rounded-md bg-on-surface/5 hover:bg-primary/10 hover:text-primary text-[10px] font-black text-on-surface-variant transition-colors active:scale-95"
-                            title="Sumar $10.000"
-                          >
-                            +10k
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              haptic.selection();
-                              const nextVal = budgetVal + 50000;
-                              const display = formatAmountForDisplay(nextVal);
-                              setLocalBudgets(prev => ({ ...prev, [category.id]: display }));
-                              handleSave(category.id, nextVal);
-                            }}
-                            className="px-1.5 py-0.5 rounded-md bg-on-surface/5 hover:bg-primary/10 hover:text-primary text-[10px] font-black text-on-surface-variant transition-colors active:scale-95"
-                            title="Sumar $50.000"
-                          >
-                            +50k
-                          </button>
-                          {prevSpent > 0 && Math.round(prevSpent) !== Math.round(budgetVal) && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                haptic.selection();
-                                const display = formatAmountForDisplay(prevSpent);
-                                setLocalBudgets(prev => ({ ...prev, [category.id]: display }));
-                                handleSave(category.id, prevSpent);
-                              }}
-                              className="px-1.5 py-0.5 rounded-md bg-primary/10 hover:bg-primary/20 text-primary text-[10px] font-black transition-colors active:scale-95"
-                              title={`Copiar mes anterior: ${formatCurrency(prevSpent, activeCurrency)}`}
-                            >
-                              Mes ant.
-                            </button>
+                          title={isCurrentMonth ? "Toca para modificar presupuesto" : undefined}
+                        >
+                          <span>{formatCurrency(budgetVal, activeCurrency)}</span>
+                          {isCurrentMonth && (
+                            <Pencil size={11} className="text-on-surface-variant/40 group-hover/btn:text-primary transition-colors" />
                           )}
-                        </div>
+                        </button>
                       )}
                     </div>
                   </div>
@@ -1097,29 +1017,7 @@ export const Budgets: React.FC = () => {
                   )}
                 </div>
 
-                {/* Suggested budget chip if not configured but spent last month */}
-                {isCurrentMonth && isEnabled && budgetVal === 0 && prevSpent > 0 && (
-                  <div className="pt-2 border-t border-on-surface/5 flex items-center justify-between">
-                    <span className="text-[11px] text-on-surface-variant/60 font-medium">
-                      Gasto mes anterior: <strong>{formatCurrency(prevSpent, activeCurrency)}</strong>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        haptic.selection();
-                        const display = formatAmountForDisplay(prevSpent);
-                        setLocalBudgets(prev => ({ ...prev, [category.id]: display }));
-                        handleSave(category.id, prevSpent);
-                      }}
-                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-bold transition-all active:scale-95"
-                    >
-                      <Sparkles size={11} />
-                      <span>Fijar como meta</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* TIER 3: Metrics & Action (Disponible / Excedido + Safe Daily + Ver detalle) */}
+                {/* TIER 3: Metrics & Action (Disponible / Excedido + Ver detalle) */}
                 {isEnabled && budgetVal > 0 && (
                   <div className="pt-2 border-t border-on-surface/5 flex items-center justify-between text-xs">
                     <div>
@@ -1134,29 +1032,17 @@ export const Budgets: React.FC = () => {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      {isCurrentMonth && remainingCat > 0 && daysRemainingInMonth > 0 && (
-                        <span 
-                          className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full inline-flex items-center gap-1"
-                          title={`Gasto diario recomendado (${daysRemainingInMonth} días restantes)`}
-                        >
-                          <Zap size={10} />
-                          ~{formatCurrency(safeDaily, activeCurrency)}/día
-                        </span>
-                      )}
-
-                      <button 
-                        onClick={() => {
-                          haptic.light();
-                          setBreakdownCategory(category);
-                        }}
-                        className="flex items-center gap-0.5 text-xs font-bold text-primary hover:text-primary-dark transition-colors px-1 py-0.5 rounded-lg active:scale-95"
-                        title="Ver detalle de movimientos"
-                      >
-                        <span>Ver detalle</span>
-                        <ChevronRight size={14} />
-                      </button>
-                    </div>
+                    <button 
+                      onClick={() => {
+                        haptic.light();
+                        setBreakdownCategory(category);
+                      }}
+                      className="flex items-center gap-0.5 text-xs font-bold text-primary hover:text-primary-dark transition-colors px-1 py-0.5 rounded-lg active:scale-95 cursor-pointer"
+                      title="Ver detalle de movimientos"
+                    >
+                      <span>Ver detalle</span>
+                      <ChevronRight size={14} />
+                    </button>
                   </div>
                 )}
               </div>
@@ -1303,6 +1189,166 @@ export const Budgets: React.FC = () => {
                       </div>
                     );
                   })
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Tap-to-Edit Budget Bottom Sheet Modal (Mobile-first Fintech) */}
+      <AnimatePresence>
+        {editingCategory && (
+          <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+              onClick={() => setEditingCategory(null)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+
+            {/* Bottom Sheet / Dialog */}
+            <motion.div
+              initial={{ y: '100%', opacity: 0.8 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 350 }}
+              className="relative w-full sm:max-w-md bg-surface-container-lowest rounded-t-[2.5rem] sm:rounded-[2.5rem] border border-on-surface/10 shadow-2xl p-5 sm:p-6 z-10 overflow-hidden flex flex-col gap-5 max-h-[90vh] my-0 sm:my-auto"
+            >
+              {/* Drag handle for mobile */}
+              <div className="w-12 h-1.5 rounded-full bg-on-surface/15 mx-auto -mt-1 sm:hidden" />
+
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={cn(
+                    "w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-xs shrink-0",
+                    editingCategory.color
+                  )}>
+                    <IconComponent name={editingCategory.icon} size={24} />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-black text-on-surface-variant/60 uppercase tracking-wider block">
+                      Presupuesto Mensual
+                    </span>
+                    <h3 className="text-base sm:text-lg font-black text-on-surface truncate">
+                      {editingCategory.name}
+                    </h3>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setEditingCategory(null)}
+                  className="w-9 h-9 rounded-full bg-on-surface/5 hover:bg-on-surface/10 flex items-center justify-center text-on-surface-variant transition-colors shrink-0"
+                  title="Cerrar"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Big Hero Amount Input */}
+              <div className="bg-surface-container-low/70 rounded-2xl p-4 sm:p-5 border border-on-surface/5 text-center space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/60 block">
+                  Límite deseado para {currentMonthDisplay}
+                </span>
+
+                <div className="flex items-center justify-center gap-2 py-1">
+                  <span className="text-xl sm:text-2xl font-black text-on-surface-variant/40 font-headline pointer-events-none select-none">
+                    {activeCurrency}
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    autoFocus
+                    value={editSheetAmount}
+                    onChange={(e) => {
+                      const { display } = formatCurrencyInput(e.target.value);
+                      setEditSheetAmount(display);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                    placeholder="0"
+                    className="w-full max-w-[240px] text-center font-headline font-black text-3xl sm:text-4xl text-on-surface bg-transparent border-b-2 border-primary/30 focus:border-primary focus:outline-hidden transition-colors"
+                  />
+                </div>
+
+                {/* Context Helper info */}
+                <div className="pt-2 flex items-center justify-center flex-wrap gap-2 text-xs text-on-surface-variant/70 font-semibold border-t border-on-surface/5">
+                  <span>Gastado este mes: <strong className="text-on-surface font-extrabold">{formatCurrency(categorySpentMap[editingCategory.id] || 0, activeCurrency)}</strong></span>
+                  {prevMonthSpentMap[editingCategory.id] > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptic.selection();
+                        setEditSheetAmount(formatAmountForDisplay(prevMonthSpentMap[editingCategory.id]));
+                      }}
+                      className="text-primary hover:underline font-bold text-[11px] inline-flex items-center gap-1 bg-primary/10 px-2 py-0.5 rounded-lg active:scale-95 transition-all"
+                      title="Copiar gasto registrado el mes pasado"
+                    >
+                      <Sparkles size={11} />
+                      <span>Mes ant: {formatCurrency(prevMonthSpentMap[editingCategory.id], activeCurrency)}</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="space-y-2 pt-1">
+                <button
+                  type="button"
+                  disabled={isSavingSheet}
+                  onClick={async () => {
+                    haptic.success();
+                    setIsSavingSheet(true);
+                    const numVal = parseFormattedAmount(editSheetAmount);
+                    setLocalBudgets(prev => ({ ...prev, [editingCategory.id]: editSheetAmount }));
+                    await handleSave(editingCategory.id, numVal);
+                    setIsSavingSheet(false);
+                    setEditingCategory(null);
+                  }}
+                  className="w-full py-3.5 px-4 rounded-2xl bg-primary hover:bg-primary/90 text-on-primary font-headline font-black text-sm uppercase tracking-wider transition-all shadow-md active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isSavingSheet ? (
+                    <div className="w-5 h-5 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Check size={18} />
+                      <span>Guardar Presupuesto</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Delete budget option if category has an active budget */}
+                {budgets.some(b => 
+                  b.categoryId === editingCategory.id && 
+                  (!b.month || b.month === budgetMonth) && 
+                  b.amount > 0 &&
+                  ((selectedProjectId === null && (!b.projectId || b.projectId === 'personal' || b.projectId === null)) || 
+                   (selectedProjectId !== null && b.projectId === selectedProjectId))
+                ) && (
+                  <button
+                    type="button"
+                    disabled={isSavingSheet}
+                    onClick={async () => {
+                      haptic.warning();
+                      setIsSavingSheet(true);
+                      setLocalBudgets(prev => ({ ...prev, [editingCategory.id]: '0' }));
+                      await handleSave(editingCategory.id, 0, true);
+                      setIsSavingSheet(false);
+                      setEditingCategory(null);
+                    }}
+                    className="w-full py-2.5 px-4 text-center text-xs font-bold text-rose-500 hover:text-rose-600 hover:bg-rose-500/5 rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Trash2 size={13} />
+                    <span>Eliminar meta de esta categoría</span>
+                  </button>
                 )}
               </div>
             </motion.div>
