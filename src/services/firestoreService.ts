@@ -1810,20 +1810,21 @@ export const updateBudget = async (categoryId: string, month: string, amount: nu
 /**
  * Remove a budget document.
  */
-export const deleteBudget = async (categoryId: string, month: string, projectId: string | null = null) => {
+export const deleteBudget = async (categoryId: string, month: string, projectId: string | null = null, docId?: string) => {
   if (!auth.currentUser) return;
   const uid = auth.currentUser.uid;
   
-  const budgetId = projectId 
+  const deterministicId = projectId 
     ? `budget_${projectId}_${categoryId}_${month}` 
     : `budget_personal_${uid}_${categoryId}_${month}`;
     
-  console.log(`Deleting budget: ${budgetId}`);
   try {
-    const docRef = doc(db, 'budgets', budgetId);
-    await deleteDoc(docRef);
+    if (docId && docId !== deterministicId) {
+      await deleteDoc(doc(db, 'budgets', docId));
+    }
+    await deleteDoc(doc(db, 'budgets', deterministicId));
   } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, `budgets/${budgetId}`);
+    handleFirestoreError(error, OperationType.DELETE, `budgets/${docId || deterministicId}`);
   }
 };
 

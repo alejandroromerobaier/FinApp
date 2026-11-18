@@ -458,7 +458,13 @@ export const Budgets: React.FC = () => {
     const amount = typeof rawAmount === 'string' ? parseFormattedAmount(rawAmount) : rawAmount;
     try {
       if (isDelete) {
-        await deleteBudget(categoryId, budgetMonth, selectedProjectId);
+        const existingBudget = budgets.find(b => 
+          b.categoryId === categoryId && 
+          (!b.month || b.month === budgetMonth) &&
+          ((selectedProjectId === null && (!b.projectId || b.projectId === 'personal' || b.projectId === null)) || 
+           (selectedProjectId !== null && b.projectId === selectedProjectId))
+        );
+        await deleteBudget(categoryId, budgetMonth, selectedProjectId, existingBudget?.id);
         haptic.light();
         toast.info('Objetivo desactivado');
       } else {
@@ -1521,11 +1527,25 @@ export const Budgets: React.FC = () => {
                         haptic.selection();
                         setEditSheetAmount(formatAmountForDisplay(prevMonthSpentMap[editingCategory.id]));
                       }}
-                      className="text-primary hover:underline font-bold text-[11px] inline-flex items-center gap-1 bg-primary/10 px-2 py-0.5 rounded-lg active:scale-95 transition-all"
-                      title="Copiar gasto registrado el mes pasado"
+                      className="text-primary hover:underline font-bold text-[11px] inline-flex items-center gap-1 bg-primary/10 px-2 py-0.5 rounded-lg active:scale-95 transition-all cursor-pointer"
+                      title="Usar el gasto real del mes pasado como referencia"
+                    >
+                      <Calendar size={11} />
+                      <span>Gasto mes ant: {formatCurrency(prevMonthSpentMap[editingCategory.id], activeCurrency)}</span>
+                    </button>
+                  )}
+                  {avg3MonthSpentMap[editingCategory.id] > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptic.selection();
+                        setEditSheetAmount(formatAmountForDisplay(avg3MonthSpentMap[editingCategory.id]));
+                      }}
+                      className="text-primary hover:underline font-bold text-[11px] inline-flex items-center gap-1 bg-primary/10 px-2 py-0.5 rounded-lg active:scale-95 transition-all cursor-pointer"
+                      title="Usar promedio de gasto de los últimos 3 meses"
                     >
                       <Sparkles size={11} />
-                      <span>Mes ant: {formatCurrency(prevMonthSpentMap[editingCategory.id], activeCurrency)}</span>
+                      <span>Prom 3M: {formatCurrency(avg3MonthSpentMap[editingCategory.id], activeCurrency)}</span>
                     </button>
                   )}
                 </div>
@@ -1569,9 +1589,13 @@ export const Budgets: React.FC = () => {
                     type="button"
                     disabled={isSavingSheet}
                     onClick={async () => {
-                      haptic.warning();
+                      haptic.medium();
                       setIsSavingSheet(true);
-                      setLocalBudgets(prev => ({ ...prev, [editingCategory.id]: '0' }));
+                      setLocalBudgets(prev => {
+                        const next = { ...prev };
+                        delete next[editingCategory.id];
+                        return next;
+                      });
                       await handleSave(editingCategory.id, 0, true);
                       setIsSavingSheet(false);
                       setEditingCategory(null);
@@ -1762,7 +1786,7 @@ export const Budgets: React.FC = () => {
                               )}
                             >
                               <Calendar size={10} />
-                              <span>Mes ant: {formatCurrency(item.prevAmount, activeCurrency)}</span>
+                              <span>Presup. ant: {formatCurrency(item.prevAmount, activeCurrency)}</span>
                             </button>
                           )}
 
