@@ -5,7 +5,7 @@ import {
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
   Landmark, Tag, Gift, Briefcase, Home as HomeIcon, Plane, Coffee, Zap, Smartphone, ShieldCheck,
   ShoppingCart, Hotel, CheckCircle2, TrendingUp, AlertTriangle, Sparkles, Receipt, X, Search,
-  Flame, CreditCard as CardIcon, Pencil, Trash2
+  Flame, CreditCard as CardIcon, Pencil, Trash2, Wand2, Calendar, TrendingDown
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useData, Category } from '../lib/DataContext';
@@ -42,6 +42,19 @@ export const Budgets: React.FC = () => {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editSheetAmount, setEditSheetAmount] = useState<string>('');
   const [isSavingSheet, setIsSavingSheet] = useState<boolean>(false);
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [copyItems, setCopyItems] = useState<Array<{
+    categoryId: string;
+    categoryName: string;
+    categoryIcon: string;
+    categoryColor: string;
+    prevAmount: number;
+    avg3mAmount: number;
+    chosenAmount: number;
+    source: 'prev' | 'avg' | 'custom';
+    selected: boolean;
+  }>>([]);
+  const [isApplyingBatch, setIsApplyingBatch] = useState(false);
 
   // Filter expense categories and omit system categories
   const expenseCategories = useMemo(() => {
@@ -162,6 +175,67 @@ export const Budgets: React.FC = () => {
     });
     return map;
   }, [transactions, selectedProjectId, budgetMonth]);
+
+  // 3-Month Average Spending per Category (Previous 3 closed months)
+  const avg3MonthSpentMap = useMemo(() => {
+    const d = parseLocalMonth(budgetMonth);
+    const m1 = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+    const m2 = new Date(d.getFullYear(), d.getMonth() - 2, 1);
+    const m3 = new Date(d.getFullYear(), d.getMonth() - 3, 1);
+
+    const m1Idx = m1.getMonth(); const m1Yr = m1.getFullYear();
+    const m2Idx = m2.getMonth(); const m2Yr = m2.getFullYear();
+    const m3Idx = m3.getMonth(); const m3Yr = m3.getFullYear();
+
+    const catSums: Record<string, number> = {};
+    transactions.forEach(t => {
+      if (t.type !== 'expense') return;
+      const isPersonalScope = selectedProjectId === null;
+      const matchesScope = isPersonalScope 
+        ? (!t.projectId || t.projectId === 'personal' || t.projectId === null)
+        : t.projectId === selectedProjectId;
+      if (!matchesScope) return;
+
+      const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+      if (isNaN(tDate.getTime())) return;
+      const tMonth = tDate.getMonth();
+      const tYear = tDate.getFullYear();
+
+      const inM1 = tMonth === m1Idx && tYear === m1Yr;
+      const inM2 = tMonth === m2Idx && tYear === m2Yr;
+      const inM3 = tMonth === m3Idx && tYear === m3Yr;
+
+      if (inM1 || inM2 || inM3) {
+        if (t.categoryId) {
+          catSums[t.categoryId] = (catSums[t.categoryId] || 0) + (t.amount || 0);
+        }
+      }
+    });
+
+    const avgMap: Record<string, number> = {};
+    Object.keys(catSums).forEach(catId => {
+      avgMap[catId] = Math.round(catSums[catId] / 3);
+    });
+    return avgMap;
+  }, [transactions, selectedProjectId, budgetMonth]);
+
+  // Total Income for active month in current scope (Personal or Project)
+  const totalScopeIncome = useMemo(() => {
+    return transactions
+      .filter(t => {
+        if (t.type !== 'income') return false;
+        const isPersonalScope = selectedProjectId === null;
+        const matchesScope = isPersonalScope 
+          ? (!t.projectId || t.projectId === 'personal' || t.projectId === null)
+          : t.projectId === selectedProjectId;
+        if (!matchesScope) return false;
+
+        const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+        if (isNaN(tDate.getTime())) return false;
+        return tDate.getMonth() === activeMonth && tDate.getFullYear() === activeYear;
+      })
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+  }, [transactions, selectedProjectId, activeMonth, activeYear]);
 
   // Transactions list for Category Breakdown Drawer
   const breakdownTransactions = useMemo(() => {
@@ -416,40 +490,97 @@ export const Budgets: React.FC = () => {
     setBudgetMonth(getLocalMonth(d));
   };
 
-  const copyFromLastMonth = async () => {
+  const openCopyAssistantModal = async () => {
     if (copying) return;
     setCopying(true);
-    haptic.light();
+    haptic.selection();
     try {
       const d = parseLocalMonth(budgetMonth);
       d.setMonth(d.getMonth() - 1);
       const prevMonthStr = getLocalMonth(d);
-      
+
       const projectIds = activeProjects.map(p => p.id);
       const prevBudgets = await getBudgetsOnce(prevMonthStr, projectIds);
-      
+
       const filteredPrev = prevBudgets.filter(b => 
-        (selectedProjectId === null && (!b.projectId || b.projectId === 'personal')) ||
+        (selectedProjectId === null && (!b.projectId || b.projectId === 'personal' || b.projectId === null)) ||
         (selectedProjectId !== null && b.projectId === selectedProjectId)
       );
 
-      if (filteredPrev.length === 0) {
-        toast.warning('No se encontraron presupuestos en el mes anterior');
+      const items: Array<{
+        categoryId: string;
+        categoryName: string;
+        categoryIcon: string;
+        categoryColor: string;
+        prevAmount: number;
+        avg3mAmount: number;
+        chosenAmount: number;
+        source: 'prev' | 'avg' | 'custom';
+        selected: boolean;
+      }> = [];
+
+      expenseCategories.forEach(cat => {
+        const prevB = filteredPrev.find(b => b.categoryId === cat.id);
+        const prevAmount = prevB ? prevB.amount : 0;
+        const avg3m = avg3MonthSpentMap[cat.id] || 0;
+        const prevSpent = prevMonthSpentMap[cat.id] || 0;
+
+        // Has any historical signal
+        if (prevAmount > 0 || avg3m > 0 || prevSpent > 0) {
+          const defaultAmount = prevAmount > 0 ? prevAmount : (avg3m > 0 ? avg3m : prevSpent);
+          items.push({
+            categoryId: cat.id,
+            categoryName: cat.name,
+            categoryIcon: cat.icon,
+            categoryColor: cat.color,
+            prevAmount,
+            avg3mAmount: avg3m,
+            chosenAmount: defaultAmount,
+            source: prevAmount > 0 ? 'prev' : 'avg',
+            selected: true
+          });
+        }
+      });
+
+      if (items.length === 0) {
+        toast.info('No se encontraron metas en el mes anterior ni gastos en los últimos 3 meses.');
         return;
       }
 
-      for (const b of filteredPrev) {
-        await updateBudget(b.categoryId, budgetMonth, b.amount, b.projectId);
-      }
-      
-      haptic.success();
-      toast.success(`Se copiaron ${filteredPrev.length} presupuestos con éxito`);
+      setCopyItems(items);
+      setShowCopyModal(true);
     } catch (err) {
-      console.error(err);
+      console.error('Error opening copy assistant:', err);
       haptic.error();
-      toast.error('Error al copiar presupuestos');
+      toast.error('Error al preparar el asistente de presupuesto');
     } finally {
       setCopying(false);
+    }
+  };
+
+  const handleApplyBatchBudgets = async () => {
+    const selected = copyItems.filter(item => item.selected && item.chosenAmount > 0);
+    if (selected.length === 0) {
+      toast.warning('Selecciona al menos una categoría con monto mayor a cero.');
+      return;
+    }
+
+    setIsApplyingBatch(true);
+    haptic.light();
+    try {
+      for (const item of selected) {
+        await updateBudget(item.categoryId, budgetMonth, item.chosenAmount, selectedProjectId);
+        setLocalBudgets(prev => ({ ...prev, [item.categoryId]: formatAmountForDisplay(item.chosenAmount) }));
+      }
+      haptic.success();
+      toast.success(`Se aplicaron ${selected.length} presupuestos con éxito`);
+      setShowCopyModal(false);
+    } catch (err) {
+      console.error('Error applying batch budgets:', err);
+      haptic.error();
+      toast.error('Error al aplicar los presupuestos');
+    } finally {
+      setIsApplyingBatch(false);
     }
   };
 
@@ -479,7 +610,7 @@ export const Budgets: React.FC = () => {
       <section className="flex items-center justify-between bg-surface-container-low p-2 rounded-2xl border border-on-surface/5 shadow-xs">
         <button 
           onClick={handlePrevMonth}
-          className="w-10 h-10 rounded-xl hover:bg-on-surface/5 flex items-center justify-center text-on-surface-variant transition-colors active:scale-95"
+          className="w-10 h-10 rounded-xl hover:bg-on-surface/5 flex items-center justify-center text-on-surface-variant transition-colors active:scale-95 cursor-pointer"
           title="Mes anterior"
         >
           <ChevronLeft size={20} />
@@ -487,90 +618,133 @@ export const Budgets: React.FC = () => {
         <div 
           className="text-center group cursor-pointer" 
           onClick={() => {
-            haptic.selection();
-            setBudgetMonth(getLocalMonth());
+            if (!isCurrentMonth) {
+              haptic.selection();
+              setBudgetMonth(getLocalMonth());
+            }
           }}
-          title="Volver al mes actual"
+          title={!isCurrentMonth ? "Volver al mes actual" : undefined}
         >
-          <p className="text-[10px] font-black uppercase text-on-surface-variant/40 group-hover:text-primary transition-colors italic">Snap to Present</p>
-          <p className="text-xs font-bold text-on-surface uppercase tracking-tight">{currentMonthDisplay}</p>
+          <p className="text-xs sm:text-sm font-black text-on-surface uppercase tracking-tight flex items-center justify-center gap-1.5">
+            {isCurrentMonth && <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />}
+            {currentMonthDisplay}
+          </p>
+          {!isCurrentMonth && (
+            <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-primary bg-primary/10 px-2.5 py-0.5 rounded-full hover:bg-primary/20 transition-all active:scale-95">
+              <span>↩ Volver al mes actual</span>
+            </span>
+          )}
         </div>
         <button 
           onClick={handleNextMonth}
-          className="w-10 h-10 rounded-xl hover:bg-on-surface/5 flex items-center justify-center text-on-surface-variant transition-colors active:scale-95"
+          className="w-10 h-10 rounded-xl hover:bg-on-surface/5 flex items-center justify-center text-on-surface-variant transition-colors active:scale-95 cursor-pointer"
           title="Mes siguiente"
         >
           <ChevronRight size={20} />
         </button>
       </section>
 
-      {/* Project Selector (Only Active Projects) */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-          {isPersonalActive && (
-            <button
-              onClick={() => {
-                haptic.selection();
-                setSelectedProjectId(null);
-              }}
-              className={cn(
-                "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all shrink-0 active:scale-95",
-                selectedProjectId === null 
-                  ? "bg-primary text-white shadow-md shadow-primary/20" 
-                  : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
-              )}
-            >
-              Personal
-            </button>
-          )}
-          {activeProjects.map(p => (
-            <button
-              key={p.id}
-              onClick={() => {
-                haptic.selection();
-                setSelectedProjectId(p.id);
-              }}
-              className={cn(
-                "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all shrink-0 active:scale-95",
-                selectedProjectId === p.id 
-                  ? "bg-primary text-white shadow-md shadow-primary/20" 
-                  : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
-              )}
-            >
-              {p.name}
-            </button>
-          ))}
-        </div>
-      </section>
+      {/* Project Selector (Only if active projects exist) */}
+      {activeProjects.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+            {isPersonalActive && (
+              <button
+                onClick={() => {
+                  haptic.selection();
+                  setSelectedProjectId(null);
+                }}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all shrink-0 active:scale-95 cursor-pointer",
+                  selectedProjectId === null 
+                    ? "bg-primary text-white shadow-md shadow-primary/20" 
+                    : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
+                )}
+              >
+                Personal
+              </button>
+            )}
+            {activeProjects.map(p => (
+              <button
+                key={p.id}
+                onClick={() => {
+                  haptic.selection();
+                  setSelectedProjectId(p.id);
+                }}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all shrink-0 active:scale-95 cursor-pointer",
+                  selectedProjectId === p.id 
+                    ? "bg-primary text-white shadow-md shadow-primary/20" 
+                    : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high"
+                )}
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Hero: Global Budget Execution Summary Card */}
-      {budgetSummary.hasBudgets && (
-        <section className="isolate bg-gradient-to-br from-surface-container-lowest via-surface-container-low to-surface-container-low p-5 sm:p-6 rounded-[2rem] border border-on-surface/10 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-44 h-44 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+      {budgetSummary.hasBudgets ? (
+        <section className="isolate bg-gradient-to-br from-surface-container-lowest via-surface-container-low to-surface-container-low p-5 sm:p-6 rounded-[2rem] border border-primary/15 shadow-sm relative overflow-hidden space-y-4">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
           
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-xs">
+          {/* Top Bar: Title & Fast Assistant Action */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-xs shrink-0">
                 <Target size={20} />
               </div>
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/60 block">
+              <div className="min-w-0">
+                <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/60 block truncate">
                   Ejecución del Mes
                 </span>
-                <h3 className="text-base font-black text-on-surface font-headline tracking-tight">
+                <h3 className="text-sm sm:text-base font-black text-on-surface font-headline tracking-tight truncate">
                   {selectedProjectId ? (activeProject?.name || 'Proyecto') : 'Presupuesto Personal'}
                 </h3>
               </div>
             </div>
 
-            <div className="text-right">
+            {isCurrentMonth && (
+              <button
+                onClick={openCopyAssistantModal}
+                disabled={copying}
+                className="px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-black uppercase tracking-wider transition-all inline-flex items-center gap-1.5 active:scale-95 shadow-2xs shrink-0 cursor-pointer"
+                title="Copiar metas anteriores o calcular promedios de 3 meses"
+              >
+                {copying ? (
+                  <div className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                ) : (
+                  <Wand2 size={13} />
+                )}
+                <span>Copiar / Asistente</span>
+              </button>
+            )}
+          </div>
+
+          {/* Hero KPI: Saldo Disponible / Excedido destacado sin cortes */}
+          <div className="py-1 flex flex-col sm:flex-row sm:items-end justify-between gap-2 border-t border-on-surface/5 pt-3">
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-on-surface-variant/60 block">
+                {budgetSummary.remaining >= 0 ? 'Disponible para gastar' : 'Presupuesto excedido'}
+              </span>
               <span className={cn(
-                "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1",
+                "text-2xl sm:text-3xl font-headline font-black tracking-tight block leading-tight",
+                budgetSummary.remaining >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+              )}>
+                {budgetSummary.remaining >= 0 ? '' : '-'}{formatCurrency(Math.abs(budgetSummary.remaining), activeCurrency)}
+              </span>
+            </div>
+
+            <div className="shrink-0 flex items-center gap-2">
+              <span className={cn(
+                "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1 shadow-2xs",
                 budgetSummary.rawPercent > 100 
-                  ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" 
+                  ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20" 
                   : budgetSummary.rawPercent >= 80 
-                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" 
-                  : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" 
+                  : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
               )}>
                 {budgetSummary.rawPercent > 100 && <AlertTriangle size={12} />}
                 {budgetSummary.rawPercent.toFixed(0)}% Utilizado
@@ -578,63 +752,13 @@ export const Budgets: React.FC = () => {
             </div>
           </div>
 
-          {/* Primary KPIs */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-4 py-3 border-y border-on-surface/5">
-            <div>
-              <span className="text-[9px] font-black uppercase tracking-wider text-on-surface-variant/60 block mb-0.5">
-                Presupuestado
-              </span>
-              <span className="text-sm sm:text-base font-black text-on-surface font-headline block truncate whitespace-nowrap">
-                {formatCurrency(budgetSummary.totalBudget, activeCurrency)}
-              </span>
-              <span className="text-[10px] font-bold text-on-surface-variant/50 block">
-                {budgetSummary.activeBudgetsCount} {budgetSummary.activeBudgetsCount === 1 ? 'objetivo' : 'objetivos'}
-              </span>
-            </div>
-
-            <div>
-              <span className="text-[9px] font-black uppercase tracking-wider text-on-surface-variant/60 block mb-0.5">
-                Gastado
-              </span>
-              <span className={cn(
-                "text-sm sm:text-base font-black font-headline block truncate whitespace-nowrap",
-                budgetSummary.rawPercent > 100 ? "text-rose-600 dark:text-rose-400" : "text-on-surface"
-              )}>
-                {formatCurrency(budgetSummary.totalSpent, activeCurrency)}
-              </span>
-              <span className="text-[10px] font-bold text-on-surface-variant/50 block">
-                acumulado
-              </span>
-            </div>
-
-            <div>
-              <span className="text-[9px] font-black uppercase tracking-wider text-on-surface-variant/60 block mb-0.5">
-                {budgetSummary.remaining >= 0 ? 'Disponible' : 'Excedido'}
-              </span>
-              <span className={cn(
-                "text-sm sm:text-base font-black font-headline block truncate whitespace-nowrap",
-                budgetSummary.remaining >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-              )}>
-                {formatCurrency(Math.abs(budgetSummary.remaining), activeCurrency)}
-              </span>
-              <span className={cn(
-                "text-[10px] font-bold block truncate",
-                budgetSummary.overBudgetCount > 0 ? "text-rose-500 font-black" : "text-on-surface-variant/50"
-              )}>
-                {budgetSummary.overBudgetCount > 0 
-                  ? `${budgetSummary.overBudgetCount} ${budgetSummary.overBudgetCount === 1 ? 'alerta' : 'alertas'}`
-                  : 'En regla'}
-              </span>
-            </div>
-          </div>
-
-          {/* Global Animated Progress Bar */}
-          <div className="mt-4 space-y-1.5">
+          {/* Global Progress Bar with Month Day Micro-Marker */}
+          <div className="space-y-1.5">
             <div className="relative h-2.5 w-full bg-on-surface/5 rounded-full overflow-hidden">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${budgetSummary.percentUsed}%` }}
-                transition={{ duration: 1, ease: 'easeOut' }}
+                transition={{ duration: 0.8, ease: 'easeOut' }}
                 className={cn(
                   "h-full rounded-full transition-all duration-500",
                   budgetSummary.rawPercent > 100 
@@ -644,12 +768,71 @@ export const Budgets: React.FC = () => {
                     : "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]"
                 )}
               />
+              {isCurrentMonth && (
+                <div 
+                  style={{ left: `${monthElapsedRatio * 100}%` }}
+                  className="absolute top-0 bottom-0 w-0.5 bg-on-surface/40 z-10 pointer-events-none"
+                  title={`Día actual: ${currentDay}`}
+                />
+              )}
+            </div>
+
+            {isCurrentMonth && (
+              <div className="flex items-center justify-between text-[10px] text-on-surface-variant/60 font-bold px-0.5">
+                <span>Día {currentDay} de {daysInActiveMonth} ({Math.round(monthElapsedRatio * 100)}% transcurrido)</span>
+                <span>{budgetSummary.overBudgetCount > 0 ? `${budgetSummary.overBudgetCount} en alerta` : 'En regla'}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Sub-KPIs: Presupuestado vs. Gastado real */}
+          <div className="grid grid-cols-2 gap-3 pt-2 border-t border-on-surface/5">
+            <div className="bg-surface-container-lowest/60 p-2.5 rounded-xl border border-on-surface/5">
+              <span className="text-[9px] font-black uppercase tracking-wider text-on-surface-variant/60 block">
+                Presupuestado
+              </span>
+              <span className="text-sm sm:text-base font-black text-on-surface font-headline block truncate">
+                {formatCurrency(budgetSummary.totalBudget, activeCurrency)}
+              </span>
+              <span className="text-[10px] text-on-surface-variant/50 font-semibold block">
+                {budgetSummary.activeBudgetsCount} {budgetSummary.activeBudgetsCount === 1 ? 'meta activa' : 'metas activas'}
+              </span>
+            </div>
+
+            <div className="bg-surface-container-lowest/60 p-2.5 rounded-xl border border-on-surface/5">
+              <span className="text-[9px] font-black uppercase tracking-wider text-on-surface-variant/60 block">
+                Gastado real
+              </span>
+              <span className={cn(
+                "text-sm sm:text-base font-black font-headline block truncate",
+                budgetSummary.rawPercent > 100 ? "text-rose-600 dark:text-rose-400" : "text-on-surface"
+              )}>
+                {formatCurrency(budgetSummary.totalSpent, activeCurrency)}
+              </span>
+              <span className="text-[10px] text-on-surface-variant/50 font-semibold block">
+                acumulado en el mes
+              </span>
             </div>
           </div>
 
+          {/* Alerta Inteligente de Déficit Presupuestario (No bloqueante) */}
+          {totalScopeIncome > 0 && budgetSummary.totalBudget > totalScopeIncome && (
+            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2.5 text-xs">
+              <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-0.5 min-w-0 flex-1">
+                <p className="font-bold text-amber-700 dark:text-amber-300">
+                  Presupuesto en déficit respecto a tus ingresos
+                </p>
+                <p className="text-amber-600/90 dark:text-amber-400/90 text-[11px] leading-relaxed">
+                  Estás presupuestando <strong>{formatCurrency(budgetSummary.totalBudget, activeCurrency)}</strong> frente a ingresos registrados de <strong>{formatCurrency(totalScopeIncome, activeCurrency)}</strong> (Déficit: {formatCurrency(budgetSummary.totalBudget - totalScopeIncome, activeCurrency)}).
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Category Share Distribution Bar (Revolut Style) */}
           {topBudgetShares.length > 1 && (
-            <div className="mt-4 pt-3 border-t border-on-surface/5 space-y-2">
+            <div className="pt-2 border-t border-on-surface/5 space-y-2">
               <div className="flex items-center justify-between text-[10px] font-black text-on-surface-variant/60 uppercase tracking-wider">
                 <span>Distribución del Presupuesto</span>
                 <span>Top {topBudgetShares.length} categorías</span>
@@ -676,40 +859,32 @@ export const Budgets: React.FC = () => {
             </div>
           )}
         </section>
-      )}
-
-      {/* Info & Copy Action Banner */}
-      <section className="bg-primary/5 border border-primary/10 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="flex gap-3 sm:gap-4 items-start">
-          <div className="p-2 bg-primary rounded-xl text-white shrink-0">
-            <Target size={20} />
+      ) : (
+        /* Empty State Inspirador con CTA */
+        <section className="bg-gradient-to-br from-surface-container-lowest via-surface-container-low to-surface-container-low p-6 sm:p-8 rounded-[2rem] border border-on-surface/10 text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto shadow-xs">
+            <Target size={28} />
           </div>
-          <div className="space-y-0.5">
-            <h3 className="font-bold text-sm text-primary uppercase tracking-tight">
-              {selectedProjectId ? 'Objetivos de Proyecto' : 'Objetivos Personales'}
+          <div className="space-y-1 max-w-md mx-auto">
+            <h3 className="text-base sm:text-lg font-black text-on-surface font-headline tracking-tight">
+              Sin presupuestos en {currentMonthDisplay}
             </h3>
             <p className="text-xs text-on-surface-variant/70 leading-relaxed">
-              Define cuánto planeas gastar en {selectedProjectId ? 'este proyecto' : 'tus gastos personales'}.
+              Fija límites mensuales por categoría para mantener tus finanzas bajo control o utiliza el asistente predictivo.
             </p>
           </div>
-        </div>
-
-        {isCurrentMonth && (
-          <button
-            onClick={copyFromLastMonth}
-            disabled={copying}
-            className="flex items-center gap-2 px-4 py-2 bg-surface-container-lowest border border-on-surface/10 rounded-xl text-xs font-black uppercase tracking-wider text-on-surface hover:bg-on-surface/5 transition-all shadow-sm active:scale-95 shrink-0"
-            title="Copiar presupuestos del mes anterior"
-          >
-            {copying ? (
-              <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-            ) : (
-              <Copy size={14} className="text-primary" />
-            )}
-            Copiar Anterior
-          </button>
-        )}
-      </section>
+          {isCurrentMonth && (
+            <button
+              onClick={openCopyAssistantModal}
+              disabled={copying}
+              className="px-4 py-2.5 rounded-2xl bg-primary hover:bg-primary/90 text-on-primary font-headline font-black text-xs uppercase tracking-wider inline-flex items-center gap-2 shadow-md active:scale-95 transition-all cursor-pointer"
+            >
+              <Wand2 size={15} />
+              <span>Configurar con Inteligencia (Copiar mes ant. o Promedios 3M)</span>
+            </button>
+          )}
+        </section>
+      )}
 
       {/* Filter & Search Bar */}
       <section className="space-y-2.5">
@@ -1013,6 +1188,13 @@ export const Budgets: React.FC = () => {
                             : "bg-emerald-500"
                         )}
                       />
+                      {isCurrentMonth && (
+                        <div 
+                          style={{ left: `${monthElapsedRatio * 100}%` }}
+                          className="absolute top-0 bottom-0 w-0.5 bg-on-surface/35 z-10 pointer-events-none"
+                          title={`Día actual: ${currentDay}`}
+                        />
+                      )}
                     </div>
                   )}
                 </div>
@@ -1349,6 +1531,217 @@ export const Budgets: React.FC = () => {
                   </button>
                 )}
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Smart Copy & 3M Predictor Assistant Modal */}
+      <AnimatePresence>
+        {showCopyModal && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+              onClick={() => setShowCopyModal(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+
+            {/* Modal Dialog Card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+              className="relative w-full max-w-lg bg-surface-container-lowest rounded-[2.5rem] border border-on-surface/10 shadow-2xl p-5 sm:p-6 z-10 overflow-y-auto no-scrollbar flex flex-col gap-4 max-h-[85dvh] my-auto"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-on-surface/5 pb-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-xs shrink-0">
+                    <Wand2 size={22} />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-black text-on-surface text-base sm:text-lg font-headline tracking-tight truncate">
+                      Asistente de Presupuesto
+                    </h3>
+                    <p className="text-xs text-on-surface-variant/60 font-semibold truncate">
+                      Copia el mes anterior o aplica promedios de 3 meses
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowCopyModal(false)}
+                  className="w-9 h-9 rounded-full bg-on-surface/5 hover:bg-on-surface/10 flex items-center justify-center text-on-surface-variant transition-colors shrink-0"
+                  title="Cerrar"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Mass Selection Controls */}
+              <div className="flex items-center justify-between text-xs px-0.5">
+                <span className="font-bold text-on-surface-variant/70">
+                  {copyItems.filter(i => i.selected).length} de {copyItems.length} seleccionadas
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptic.selection();
+                      setCopyItems(prev => prev.map(i => ({ ...i, selected: true })));
+                    }}
+                    className="text-[11px] font-black text-primary hover:underline cursor-pointer"
+                  >
+                    Seleccionar todas
+                  </button>
+                  <span className="text-on-surface-variant/30">•</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptic.selection();
+                      setCopyItems(prev => prev.map(i => ({ ...i, selected: false })));
+                    }}
+                    className="text-[11px] font-bold text-on-surface-variant/60 hover:text-on-surface cursor-pointer"
+                  >
+                    Deseleccionar
+                  </button>
+                </div>
+              </div>
+
+              {/* Category Cards List (Interactive Fintech Cards - Option A) */}
+              <div className="space-y-2.5 overflow-y-auto max-h-[46vh] pr-0.5 no-scrollbar">
+                {copyItems.map((item) => {
+                  return (
+                    <div
+                      key={item.categoryId}
+                      className={cn(
+                        "rounded-2xl p-3 border transition-all select-none space-y-2",
+                        item.selected 
+                          ? "bg-surface-container-low/70 border-primary/25 shadow-2xs" 
+                          : "bg-surface-container-lowest/40 border-on-surface/5 opacity-45"
+                      )}
+                    >
+                      {/* Top row: Checkmark + Category + Amount display */}
+                      <div 
+                        onClick={() => {
+                          haptic.selection();
+                          setCopyItems(prev => prev.map(i => i.categoryId === item.categoryId ? { ...i, selected: !i.selected } : i));
+                        }}
+                        className="flex items-center justify-between gap-3 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {/* Circular iOS Checkmark */}
+                          <div className={cn(
+                            "w-6 h-6 rounded-full flex items-center justify-center transition-all shrink-0",
+                            item.selected ? "bg-primary text-white shadow-xs" : "border-2 border-on-surface/20"
+                          )}>
+                            {item.selected && <Check size={14} />}
+                          </div>
+
+                          <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0 shadow-2xs", item.categoryColor)}>
+                            <IconComponent name={item.categoryIcon} size={16} />
+                          </div>
+
+                          <span className="font-extrabold text-xs sm:text-sm text-on-surface truncate">
+                            {item.categoryName}
+                          </span>
+                        </div>
+
+                        {/* Amount */}
+                        <div className="text-right shrink-0">
+                          <span className="font-headline font-black text-xs sm:text-sm text-on-surface">
+                            {formatCurrency(item.chosenAmount, activeCurrency)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Source Pills (Mes anterior vs Promedio 3m) */}
+                      {item.selected && (
+                        <div className="flex items-center justify-end flex-wrap gap-1.5 pt-1.5 border-t border-on-surface/5">
+                          {item.prevAmount > 0 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                haptic.selection();
+                                setCopyItems(prev => prev.map(i => i.categoryId === item.categoryId ? { ...i, chosenAmount: item.prevAmount, source: 'prev' } : i));
+                              }}
+                              className={cn(
+                                "px-2 py-0.5 rounded-lg text-[10px] font-black transition-all active:scale-95 inline-flex items-center gap-1 cursor-pointer",
+                                item.source === 'prev' 
+                                  ? "bg-primary text-white shadow-2xs" 
+                                  : "bg-on-surface/5 text-on-surface-variant hover:bg-on-surface/10"
+                              )}
+                            >
+                              <Calendar size={10} />
+                              <span>Mes ant: {formatCurrency(item.prevAmount, activeCurrency)}</span>
+                            </button>
+                          )}
+
+                          {item.avg3mAmount > 0 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                haptic.selection();
+                                setCopyItems(prev => prev.map(i => i.categoryId === item.categoryId ? { ...i, chosenAmount: item.avg3mAmount, source: 'avg' } : i));
+                              }}
+                              className={cn(
+                                "px-2 py-0.5 rounded-lg text-[10px] font-black transition-all active:scale-95 inline-flex items-center gap-1 cursor-pointer",
+                                item.source === 'avg' 
+                                  ? "bg-primary text-white shadow-2xs" 
+                                  : "bg-on-surface/5 text-on-surface-variant hover:bg-on-surface/10"
+                              )}
+                            >
+                              <Sparkles size={10} />
+                              <span>Prom 3M: {formatCurrency(item.avg3mAmount, activeCurrency)}</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Total Summary & Apply Button */}
+              {(() => {
+                const selectedItems = copyItems.filter(i => i.selected && i.chosenAmount > 0);
+                const totalBatch = selectedItems.reduce((sum, i) => sum + i.chosenAmount, 0);
+
+                return (
+                  <div className="pt-2 border-t border-on-surface/5 space-y-3">
+                    <div className="flex items-center justify-between text-xs px-1">
+                      <span className="font-bold text-on-surface-variant/70">Total a presupuestar:</span>
+                      <span className="font-headline font-black text-base text-on-surface">
+                        {formatCurrency(totalBatch, activeCurrency)}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={isApplyingBatch || selectedItems.length === 0}
+                      onClick={handleApplyBatchBudgets}
+                      className="w-full py-3.5 px-4 rounded-2xl bg-primary hover:bg-primary/90 text-on-primary font-headline font-black text-sm uppercase tracking-wider transition-all shadow-md active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {isApplyingBatch ? (
+                        <div className="w-5 h-5 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <Check size={18} />
+                          <span>Aplicar {selectedItems.length} {selectedItems.length === 1 ? 'Presupuesto' : 'Presupuestos'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                );
+              })()}
             </motion.div>
           </div>
         )}
