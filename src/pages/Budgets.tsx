@@ -4,7 +4,7 @@ import {
   ArrowLeft, Target, Save, Check, AlertCircle, ChevronLeft, ChevronRight, Copy,
   ShoppingBag, Utensils, Car, Play, Heart, Book, MoreHorizontal, 
   Landmark, Tag, Gift, Briefcase, Home as HomeIcon, Plane, Coffee, Zap, Smartphone, ShieldCheck,
-  ShoppingCart, Hotel, CheckCircle2, TrendingUp, AlertTriangle, Sparkles, Receipt, X
+  ShoppingCart, Hotel, CheckCircle2, TrendingUp, AlertTriangle, Sparkles, Receipt, X, Search
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useData, Category } from '../lib/DataContext';
@@ -36,6 +36,7 @@ export const Budgets: React.FC = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [copying, setCopying] = useState(false);
   const [budgetFilter, setBudgetFilter] = useState<BudgetFilter>('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [breakdownCategory, setBreakdownCategory] = useState<Category | null>(null);
 
   // Filter expense categories and omit system categories
@@ -176,6 +177,30 @@ export const Budgets: React.FC = () => {
       });
   }, [breakdownCategory, transactions, selectedProjectId, activeMonth, activeYear]);
 
+  // Transaction count per category in active month
+  const categoryTxCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    transactions.forEach(t => {
+      if (t.type !== 'expense') return;
+
+      const isPersonalScope = selectedProjectId === null;
+      const matchesProject = isPersonalScope 
+        ? (!t.projectId || t.projectId === 'personal') 
+        : t.projectId === selectedProjectId;
+        
+      if (!matchesProject) return;
+
+      const tDate = t.date instanceof Date ? t.date : new Date(t.date);
+      if (isNaN(tDate.getTime())) return;
+      if (tDate.getMonth() !== activeMonth || tDate.getFullYear() !== activeYear) return;
+
+      if (t.categoryId) {
+        map[t.categoryId] = (map[t.categoryId] || 0) + 1;
+      }
+    });
+    return map;
+  }, [transactions, selectedProjectId, activeMonth, activeYear]);
+
   // Global Budget Execution Summary
   const budgetSummary = useMemo(() => {
     let totalBudget = 0;
@@ -232,7 +257,7 @@ export const Budgets: React.FC = () => {
     }).length;
   }, [expenseCategories, budgets, budgetMonth, selectedProjectId, categorySpentMap]);
 
-  // Filtered and sorted category list for display
+  // Filtered, searched and sorted category list for display
   const displayedCategories = useMemo(() => {
     let list = [...expenseCategories];
 
@@ -262,8 +287,13 @@ export const Budgets: React.FC = () => {
       list.sort((a, b) => (categorySpentMap[b.id] || 0) - (categorySpentMap[a.id] || 0));
     }
 
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase().trim();
+      list = list.filter(cat => cat.name.toLowerCase().includes(q));
+    }
+
     return list;
-  }, [expenseCategories, budgetFilter, budgets, budgetMonth, selectedProjectId, categorySpentMap]);
+  }, [expenseCategories, budgetFilter, budgets, budgetMonth, selectedProjectId, categorySpentMap, searchTerm]);
 
   const handleSave = async (categoryId: string, rawAmount: number | string, isDelete: boolean = false) => {
     setSavingMap(prev => ({ ...prev, [categoryId]: true }));
@@ -587,90 +617,118 @@ export const Budgets: React.FC = () => {
         )}
       </section>
 
-      {/* Quick Filters (Modern Fintech Segmented Bar) */}
-      <section className="bg-surface-container-low/70 p-1 rounded-2xl border border-on-surface/5 flex items-center gap-1 overflow-x-auto no-scrollbar shadow-2xs">
-        <button
-          onClick={() => {
-            haptic.selection();
-            setBudgetFilter('all');
-          }}
-          className={cn(
-            "px-3.5 py-1.5 rounded-xl font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all shrink-0 active:scale-95",
-            budgetFilter === 'all'
-              ? "bg-surface-container-lowest text-on-surface shadow-xs font-black"
-              : "text-on-surface-variant/70 hover:text-on-surface hover:bg-surface-container-high/40"
-          )}
-        >
-          Todas ({expenseCategories.length})
-        </button>
-        <button
-          onClick={() => {
-            haptic.selection();
-            setBudgetFilter('alerts');
-          }}
-          className={cn(
-            "px-3.5 py-1.5 rounded-xl font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 active:scale-95",
-            budgetFilter === 'alerts'
-              ? "bg-rose-500 text-white shadow-xs font-black"
-              : "text-rose-600 dark:text-rose-400 hover:bg-rose-500/10"
-          )}
-        >
-          <AlertTriangle size={13} />
-          En Alerta ({alertCategoriesCount})
-        </button>
-        <button
-          onClick={() => {
-            haptic.selection();
-            setBudgetFilter('active');
-          }}
-          className={cn(
-            "px-3.5 py-1.5 rounded-xl font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 active:scale-95",
-            budgetFilter === 'active'
-              ? "bg-surface-container-lowest text-primary shadow-xs font-black"
-              : "text-on-surface-variant/70 hover:text-primary hover:bg-surface-container-high/40"
-          )}
-        >
-          <Target size={13} />
-          Solo Activas ({budgetSummary.activeBudgetsCount})
-        </button>
-        <button
-          onClick={() => {
-            haptic.selection();
-            setBudgetFilter('top_spent');
-          }}
-          className={cn(
-            "px-3.5 py-1.5 rounded-xl font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 active:scale-95",
-            budgetFilter === 'top_spent'
-              ? "bg-surface-container-lowest text-amber-600 dark:text-amber-400 shadow-xs font-black"
-              : "text-on-surface-variant/70 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-surface-container-high/40"
-          )}
-        >
-          <TrendingUp size={13} />
-          Mayor Gasto
-        </button>
+      {/* Filter & Search Bar */}
+      <section className="space-y-2.5">
+        <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between">
+          {/* Quick Filters (Modern Fintech Segmented Bar) */}
+          <div className="bg-surface-container-low/70 p-1 rounded-2xl border border-on-surface/5 flex items-center gap-1 overflow-x-auto no-scrollbar shadow-2xs flex-1">
+            <button
+              onClick={() => {
+                haptic.selection();
+                setBudgetFilter('all');
+              }}
+              className={cn(
+                "px-3.5 py-1.5 rounded-xl font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all shrink-0 active:scale-95",
+                budgetFilter === 'all'
+                  ? "bg-surface-container-lowest text-on-surface shadow-xs font-black"
+                  : "text-on-surface-variant/70 hover:text-on-surface hover:bg-surface-container-high/40"
+              )}
+            >
+              Todas ({expenseCategories.length})
+            </button>
+            <button
+              onClick={() => {
+                haptic.selection();
+                setBudgetFilter('alerts');
+              }}
+              className={cn(
+                "px-3.5 py-1.5 rounded-xl font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 active:scale-95",
+                budgetFilter === 'alerts'
+                  ? "bg-rose-500 text-white shadow-xs font-black"
+                  : "text-rose-600 dark:text-rose-400 hover:bg-rose-500/10"
+              )}
+            >
+              <AlertTriangle size={13} />
+              En Alerta ({alertCategoriesCount})
+            </button>
+            <button
+              onClick={() => {
+                haptic.selection();
+                setBudgetFilter('active');
+              }}
+              className={cn(
+                "px-3.5 py-1.5 rounded-xl font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 active:scale-95",
+                budgetFilter === 'active'
+                  ? "bg-surface-container-lowest text-primary shadow-xs font-black"
+                  : "text-on-surface-variant/70 hover:text-primary hover:bg-surface-container-high/40"
+              )}
+            >
+              <Target size={13} />
+              Solo Activas ({budgetSummary.activeBudgetsCount})
+            </button>
+            <button
+              onClick={() => {
+                haptic.selection();
+                setBudgetFilter('top_spent');
+              }}
+              className={cn(
+                "px-3.5 py-1.5 rounded-xl font-bold text-xs uppercase tracking-wider whitespace-nowrap transition-all shrink-0 flex items-center gap-1.5 active:scale-95",
+                budgetFilter === 'top_spent'
+                  ? "bg-surface-container-lowest text-amber-600 dark:text-amber-400 shadow-xs font-black"
+                  : "text-on-surface-variant/70 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-surface-container-high/40"
+              )}
+            >
+              <TrendingUp size={13} />
+              Mayor Gasto
+            </button>
+          </div>
+
+          {/* Quick Search Input */}
+          <div className="relative w-full sm:w-56 shrink-0">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar categoría..."
+              className="w-full pl-8.5 pr-8 py-1.5 rounded-xl bg-surface-container-low/70 border border-on-surface/5 text-xs font-bold text-on-surface placeholder:text-on-surface-variant/40 focus:ring-2 focus:ring-primary/20 transition-all"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant/40 hover:text-on-surface"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        </div>
       </section>
 
-      {/* Categories Budget List (Fintech Cards) */}
-      <div className="space-y-2.5">
+      {/* Categories Budget List (3-Tier Fintech Cards) */}
+      <div className="space-y-3">
         {displayedCategories.length === 0 ? (
           <div className="text-center py-12 space-y-3 opacity-60 bg-surface-container-lowest rounded-2xl border border-on-surface/5">
             <AlertCircle size={36} className="mx-auto text-on-surface-variant" />
             <p className="text-sm font-bold uppercase tracking-wider text-on-surface">
-              {budgetFilter === 'alerts' 
+              {searchTerm 
+                ? `No se encontraron categorías para "${searchTerm}"`
+                : budgetFilter === 'alerts' 
                 ? '¡Excelente! No hay categorías en alerta'
                 : budgetFilter === 'active' 
                 ? 'No hay objetivos activos para este mes' 
                 : 'No hay categorías de gasto'}
             </p>
-            {budgetFilter !== 'all' && (
+            {(budgetFilter !== 'all' || searchTerm) && (
               <button
                 onClick={() => {
                   haptic.selection();
                   setBudgetFilter('all');
+                  setSearchTerm('');
                 }}
                 className="text-xs font-bold text-primary hover:underline"
               >
-                Ver todas las categorías
+                Limpiar filtros y ver todas
               </button>
             )}
           </div>
@@ -688,6 +746,7 @@ export const Budgets: React.FC = () => {
             );
 
             const spent = categorySpentMap[category.id] || 0;
+            const txCount = categoryTxCountMap[category.id] || 0;
             const prevSpent = prevMonthSpentMap[category.id] || 0;
             const budgetVal = typeof currentAmount === 'string' ? parseFormattedAmount(currentAmount) : Number(currentAmount || 0);
             const percent = budgetVal > 0 ? (spent / budgetVal) * 100 : 0;
@@ -701,7 +760,7 @@ export const Budgets: React.FC = () => {
               <div 
                 key={`${category.id}-${selectedProjectId}`}
                 className={cn(
-                  "group bg-surface-container-lowest border rounded-2xl p-3.5 sm:p-4 transition-all duration-150 shadow-2xs",
+                  "group bg-surface-container-lowest border rounded-2xl p-4 sm:p-5 transition-all duration-150 shadow-2xs space-y-3",
                   isOver 
                     ? "border-rose-500/25 bg-rose-500/[0.015]" 
                     : "border-on-surface/5 hover:border-on-surface/15",
@@ -709,155 +768,190 @@ export const Budgets: React.FC = () => {
                   (!isEnabled && !isCurrentMonth) && "hidden"
                 )}
               >
-                {/* Header Row: Category Details + Inline Editor */}
-                <div className="flex items-center justify-between gap-3">
-                  {/* Category Info (Clickable for transactions drawer) */}
+                {/* TIER 1: Identity & Full Category Title (Full Width - Never Truncated) */}
+                <div className="flex items-start justify-between gap-3">
                   <div 
                     onClick={() => {
                       haptic.light();
                       setBreakdownCategory(category);
                     }}
                     className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer select-none"
-                    title="Toca para ver el detalle de movimientos"
+                    title="Toca para ver movimientos del mes"
                   >
                     <div className={cn(
-                      "w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-2xs shrink-0 transition-transform group-hover:scale-105", 
+                      "w-11 h-11 rounded-2xl flex items-center justify-center text-white shadow-2xs shrink-0 transition-transform group-hover:scale-105", 
                       isEnabled ? category.color : "bg-on-surface/10 text-on-surface/40"
                     )}>
-                      <IconComponent name={category.icon} size={20} />
+                      <IconComponent name={category.icon} size={22} />
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-extrabold text-on-surface text-sm tracking-tight truncate group-hover:text-primary transition-colors">
-                          {category.name}
-                        </h4>
-                        {isOver && (
-                          <span className="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase tracking-wider shrink-0 flex items-center gap-1">
-                            <AlertTriangle size={11} /> Excedido
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="text-xs text-on-surface-variant/60 font-semibold truncate mt-0.5">
-                        {isEnabled && budgetVal > 0 ? (
-                          <>
-                            <span className="font-extrabold text-on-surface">{formatCurrency(spent, activeCurrency)}</span>
-                            <span className="text-on-surface-variant/40 font-normal"> de </span>
-                            <span>{formatCurrency(budgetVal, activeCurrency)}</span>
-                            <span className="text-on-surface-variant/40"> • </span>
-                            <span className={cn(
-                              "font-black",
-                              isOver ? "text-rose-500" : percent >= 80 ? "text-amber-500" : "text-emerald-500"
-                            )}>
-                              {percent.toFixed(0)}%
-                            </span>
-                          </>
-                        ) : isEnabled ? (
-                          <span className="text-primary font-bold">Límite sin definir</span>
-                        ) : (
-                          <span className="text-on-surface-variant/40">Sin objetivo activo</span>
-                        )}
+                      <h4 className="font-extrabold text-on-surface text-sm sm:text-base tracking-tight break-words group-hover:text-primary transition-colors leading-snug">
+                        {category.name}
+                      </h4>
+                      <p className="text-[11px] text-on-surface-variant/60 font-medium mt-0.5">
+                        {txCount === 0 ? 'Sin movimientos en el mes' : `${txCount} ${txCount === 1 ? 'movimiento' : 'movimientos'}`}
                       </p>
                     </div>
                   </div>
 
-                  {/* Inline Value Input or Activation Button (Fintech Style) */}
-                  <div className="shrink-0 flex items-center gap-1.5">
-                    {!isEnabled ? (
-                      isCurrentMonth && (
-                        <button
-                          onClick={async () => {
-                            haptic.light();
-                            const targetVal = prevSpent > 0 ? prevSpent : 0;
-                            if (prevSpent > 0) {
-                              const display = formatAmountForDisplay(prevSpent);
-                              setLocalBudgets(prev => ({ ...prev, [category.id]: display }));
-                            }
-                            await handleSave(category.id, targetVal);
-                          }}
-                          className="px-3 py-1.5 rounded-xl bg-surface-container-low hover:bg-primary/10 text-on-surface-variant hover:text-primary border border-on-surface/5 text-xs font-bold transition-all active:scale-95 flex items-center gap-1"
-                          title="Establecer límite para esta categoría"
-                        >
-                          <span>+ Fijar Meta</span>
-                        </button>
-                      )
+                  {/* Status Badge */}
+                  <div className="shrink-0 pt-0.5">
+                    {isEnabled && budgetVal > 0 ? (
+                      <span className={cn(
+                        "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1 shadow-2xs",
+                        isOver 
+                          ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20" 
+                          : percent >= 80 
+                          ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" 
+                          : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                      )}>
+                        {isOver && <AlertTriangle size={11} />}
+                        {isOver ? `+${(percent - 100).toFixed(0)}% excedido` : `${percent.toFixed(0)}% consumido`}
+                      </span>
+                    ) : !isEnabled ? (
+                      <span className="px-2.5 py-0.5 rounded-full bg-on-surface/5 text-on-surface-variant/40 text-[10px] font-bold uppercase tracking-wider">
+                        Sin Meta
+                      </span>
                     ) : (
-                      <div className="flex items-center gap-1.5">
-                        {/* Modern Pill Input */}
-                        <div className="relative flex items-center">
-                          <span className="absolute left-2.5 text-[10px] font-black text-on-surface-variant/40 uppercase tracking-tighter pointer-events-none">
-                            {activeCurrency}
-                          </span>
-                          <input 
-                            type="text"
-                            inputMode="decimal"
-                            value={currentAmount || ''}
-                            disabled={!isCurrentMonth}
-                            onChange={(e) => {
-                              const input = e.target;
-                              const oldVal = input.value;
-                              const oldCursor = input.selectionStart || oldVal.length;
-                              const charsFromRight = oldVal.length - oldCursor;
-
-                              const { display } = formatCurrencyInput(oldVal);
-                              setLocalBudgets(prev => ({ ...prev, [category.id]: display }));
-
-                              requestAnimationFrame(() => {
-                                if (input && document.activeElement === input) {
-                                  const newCursor = Math.max(0, display.length - charsFromRight);
-                                  input.setSelectionRange(newCursor, newCursor);
-                                }
-                              });
-                            }}
-                            onBlur={() => handleAutoSave(category.id)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                (e.target as HTMLInputElement).blur();
-                              }
-                            }}
-                            placeholder="0"
-                            className={cn(
-                              "w-28 sm:w-32 pl-9 pr-3 py-1.5 rounded-xl text-right font-headline font-black text-sm text-on-surface transition-all",
-                              "bg-surface-container-low hover:bg-surface-container-high focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/25",
-                              !isCurrentMonth && "opacity-80 bg-transparent pr-0"
-                            )}
-                          />
-                        </div>
-
-                        {/* Status feedback (saving spinner or checkmark or deactivation cross) */}
-                        {isSaving ? (
-                          <div className="w-6 h-6 flex items-center justify-center">
-                            <div className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                          </div>
-                        ) : isSuccess ? (
-                          <div className="w-6 h-6 flex items-center justify-center text-emerald-500 animate-in fade-in zoom-in duration-200">
-                            <Check size={16} />
-                          </div>
-                        ) : (
-                          isCurrentMonth && (
-                            <button
-                              onClick={async () => {
-                                haptic.light();
-                                await handleSave(category.id, 0, true);
-                              }}
-                              className="w-7 h-7 rounded-lg hover:bg-on-surface/5 flex items-center justify-center text-on-surface-variant/30 hover:text-rose-500 transition-colors"
-                              title="Desactivar objetivo"
-                            >
-                              <X size={14} />
-                            </button>
-                          )
-                        )}
-                      </div>
+                      <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
+                        Activo
+                      </span>
                     )}
                   </div>
                 </div>
 
-                {/* Suggested Budget Micro-chip if unconfigured & spent last month */}
+                {/* TIER 2: Amounts & Progress (Gastado vs Meta) */}
+                <div className="pt-2.5 border-t border-on-surface/5 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    {/* Spent */}
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/50 block">
+                        Gastado
+                      </span>
+                      <span className={cn(
+                        "font-headline font-black text-sm sm:text-base tracking-tight",
+                        isOver ? "text-rose-600 dark:text-rose-400" : "text-on-surface"
+                      )}>
+                        {formatCurrency(spent, activeCurrency)}
+                      </span>
+                    </div>
+
+                    {/* Target Amount or Activation */}
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/50 block">
+                        Presupuesto
+                      </span>
+                      {!isEnabled ? (
+                        isCurrentMonth && (
+                          <button
+                            onClick={async () => {
+                              haptic.light();
+                              const targetVal = prevSpent > 0 ? prevSpent : 0;
+                              if (prevSpent > 0) {
+                                const display = formatAmountForDisplay(prevSpent);
+                                setLocalBudgets(prev => ({ ...prev, [category.id]: display }));
+                              }
+                              await handleSave(category.id, targetVal);
+                            }}
+                            className="mt-0.5 px-3 py-1 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-black transition-all active:scale-95 inline-flex items-center gap-1"
+                          >
+                            <span>+ Fijar Meta</span>
+                          </button>
+                        )
+                      ) : (
+                        <div className="mt-0.5 flex items-center justify-end gap-1.5">
+                          <div className="relative flex items-center">
+                            <span className="absolute left-2.5 text-[10px] font-black text-on-surface-variant/40 uppercase tracking-tighter pointer-events-none">
+                              {activeCurrency}
+                            </span>
+                            <input 
+                              type="text"
+                              inputMode="decimal"
+                              value={currentAmount || ''}
+                              disabled={!isCurrentMonth}
+                              onChange={(e) => {
+                                const input = e.target;
+                                const oldVal = input.value;
+                                const oldCursor = input.selectionStart || oldVal.length;
+                                const charsFromRight = oldVal.length - oldCursor;
+
+                                const { display } = formatCurrencyInput(oldVal);
+                                setLocalBudgets(prev => ({ ...prev, [category.id]: display }));
+
+                                requestAnimationFrame(() => {
+                                  if (input && document.activeElement === input) {
+                                    const newCursor = Math.max(0, display.length - charsFromRight);
+                                    input.setSelectionRange(newCursor, newCursor);
+                                  }
+                                });
+                              }}
+                              onBlur={() => handleAutoSave(category.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  (e.target as HTMLInputElement).blur();
+                                }
+                              }}
+                              placeholder="0"
+                              className={cn(
+                                "w-28 sm:w-32 pl-9 pr-3 py-1 rounded-xl text-right font-headline font-black text-sm text-on-surface transition-all",
+                                "bg-surface-container-low hover:bg-surface-container-high focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/25",
+                                !isCurrentMonth && "opacity-80 bg-transparent pr-0"
+                              )}
+                            />
+                          </div>
+
+                          {/* Subtle Status Feedback */}
+                          {isSaving ? (
+                            <div className="w-5 h-5 flex items-center justify-center">
+                              <div className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                            </div>
+                          ) : isSuccess ? (
+                            <div className="w-5 h-5 flex items-center justify-center text-emerald-500 animate-in fade-in zoom-in duration-200">
+                              <Check size={15} />
+                            </div>
+                          ) : (
+                            isCurrentMonth && (
+                              <button
+                                onClick={async () => {
+                                  haptic.light();
+                                  await handleSave(category.id, 0, true);
+                                }}
+                                className="w-6 h-6 rounded-md hover:bg-on-surface/5 flex items-center justify-center text-on-surface-variant/30 hover:text-rose-500 transition-colors"
+                                title="Desactivar objetivo"
+                              >
+                                <X size={13} />
+                              </button>
+                            )
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Progress Bar (Only when budget is set) */}
+                  {isEnabled && budgetVal > 0 && (
+                    <div className="relative h-2 w-full bg-on-surface/5 rounded-full overflow-hidden mt-1">
+                      <div
+                        style={{ width: `${Math.min(percent, 100)}%` }}
+                        className={cn(
+                          "h-full rounded-full transition-all duration-300",
+                          isOver 
+                            ? "bg-rose-500" 
+                            : percent >= 80 
+                            ? "bg-amber-500" 
+                            : "bg-emerald-500"
+                        )}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Suggested budget chip if not configured but spent last month */}
                 {isCurrentMonth && isEnabled && budgetVal === 0 && prevSpent > 0 && (
-                  <div className="mt-2.5 pt-2 border-t border-on-surface/5 flex items-center justify-between">
+                  <div className="pt-2 border-t border-on-surface/5 flex items-center justify-between">
                     <span className="text-[11px] text-on-surface-variant/60 font-medium">
-                      Gastaste <strong>{formatCurrency(prevSpent, activeCurrency)}</strong> el mes anterior
+                      Gasto mes anterior: <strong>{formatCurrency(prevSpent, activeCurrency)}</strong>
                     </span>
                     <button
                       type="button"
@@ -875,61 +969,43 @@ export const Budgets: React.FC = () => {
                   </div>
                 )}
 
-                {/* Progress Bar & Modern Fintech Footer */}
+                {/* TIER 3: Metrics & Action (Disponible / Excedido + Safe Daily + Ver detalle) */}
                 {isEnabled && budgetVal > 0 && (
-                  <div className="mt-2.5 pt-2 border-t border-on-surface/5 space-y-1.5">
-                    {/* Slim Progress Bar */}
-                    <div className="relative h-1.5 w-full bg-on-surface/5 rounded-full overflow-hidden">
-                      <div
-                        style={{ width: `${Math.min(percent, 100)}%` }}
-                        className={cn(
-                          "h-full rounded-full transition-all duration-300",
-                          isOver 
-                            ? "bg-rose-500" 
-                            : percent >= 80 
-                            ? "bg-amber-500" 
-                            : "bg-emerald-500"
-                        )}
-                      />
+                  <div className="pt-2 border-t border-on-surface/5 flex items-center justify-between text-xs">
+                    <div>
+                      {isOver ? (
+                        <span className="text-rose-600 dark:text-rose-400 font-black text-xs">
+                          +{formatCurrency(spent - budgetVal, activeCurrency)} excedido
+                        </span>
+                      ) : (
+                        <span className="text-on-surface-variant/70 text-xs font-medium">
+                          Disponible: <strong className="text-on-surface font-black">{formatCurrency(remainingCat, activeCurrency)}</strong>
+                        </span>
+                      )}
                     </div>
 
-                    {/* Concise Metrics */}
-                    <div className="flex items-center justify-between text-xs pt-0.5">
-                      <div>
-                        {isOver ? (
-                          <span className="text-rose-600 dark:text-rose-400 font-black text-[11px]">
-                            +{formatCurrency(spent - budgetVal, activeCurrency)} excedido
-                          </span>
-                        ) : (
-                          <span className="text-on-surface-variant/70 text-[11px] font-medium">
-                            Disponible: <strong className="text-on-surface font-black">{formatCurrency(remainingCat, activeCurrency)}</strong>
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {isCurrentMonth && remainingCat > 0 && daysRemainingInMonth > 0 && (
-                          <span 
-                            className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full inline-flex items-center gap-1"
-                            title={`Gasto diario recomendado (${daysRemainingInMonth} días restantes)`}
-                          >
-                            <Zap size={10} />
-                            ~{formatCurrency(safeDaily, activeCurrency)}/día
-                          </span>
-                        )}
-
-                        <button 
-                          onClick={() => {
-                            haptic.light();
-                            setBreakdownCategory(category);
-                          }}
-                          className="flex items-center gap-0.5 text-[11px] font-bold text-on-surface-variant/40 hover:text-primary transition-colors"
-                          title="Ver movimientos"
+                    <div className="flex items-center gap-2">
+                      {isCurrentMonth && remainingCat > 0 && daysRemainingInMonth > 0 && (
+                        <span 
+                          className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full inline-flex items-center gap-1"
+                          title={`Gasto diario recomendado (${daysRemainingInMonth} días restantes)`}
                         >
-                          <span>Ver</span>
-                          <ChevronRight size={13} />
-                        </button>
-                      </div>
+                          <Zap size={10} />
+                          ~{formatCurrency(safeDaily, activeCurrency)}/día
+                        </span>
+                      )}
+
+                      <button 
+                        onClick={() => {
+                          haptic.light();
+                          setBreakdownCategory(category);
+                        }}
+                        className="flex items-center gap-0.5 text-xs font-bold text-primary hover:text-primary-dark transition-colors px-1 py-0.5 rounded-lg active:scale-95"
+                        title="Ver detalle de movimientos"
+                      >
+                        <span>Ver detalle</span>
+                        <ChevronRight size={14} />
+                      </button>
                     </div>
                   </div>
                 )}
