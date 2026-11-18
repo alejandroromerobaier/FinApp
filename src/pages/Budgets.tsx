@@ -42,7 +42,9 @@ export const Budgets: React.FC = () => {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editSheetAmount, setEditSheetAmount] = useState<string>('');
   const [isSavingSheet, setIsSavingSheet] = useState<boolean>(false);
+  const [confirmDeleteEdit, setConfirmDeleteEdit] = useState<boolean>(false);
   const [showCopyModal, setShowCopyModal] = useState(false);
+  const [copyModalStep, setCopyModalStep] = useState<'select' | 'confirm'>('select');
   const [copyItems, setCopyItems] = useState<Array<{
     categoryId: string;
     categoryName: string;
@@ -503,6 +505,7 @@ export const Budgets: React.FC = () => {
 
   const openEditModal = (cat: Category) => {
     haptic.selection();
+    setConfirmDeleteEdit(false);
     setEditingCategory(cat);
     const existing = localBudgets[cat.id];
     if (existing && parseFormattedAmount(existing) > 0) {
@@ -591,6 +594,7 @@ export const Budgets: React.FC = () => {
       }
 
       setCopyItems(items);
+      setCopyModalStep('select');
       setShowCopyModal(true);
     } catch (err) {
       console.error('Error opening copy assistant:', err);
@@ -1577,7 +1581,7 @@ export const Budgets: React.FC = () => {
                   )}
                 </button>
 
-                {/* Delete budget option if category has an active budget */}
+                {/* Delete budget option with modern In-Place confirmation */}
                 {budgets.some(b => 
                   b.categoryId === editingCategory.id && 
                   (!b.month || b.month === budgetMonth) && 
@@ -1585,26 +1589,63 @@ export const Budgets: React.FC = () => {
                   ((selectedProjectId === null && (!b.projectId || b.projectId === 'personal' || b.projectId === null)) || 
                    (selectedProjectId !== null && b.projectId === selectedProjectId))
                 ) && (
-                  <button
-                    type="button"
-                    disabled={isSavingSheet}
-                    onClick={async () => {
-                      haptic.medium();
-                      setIsSavingSheet(true);
-                      setLocalBudgets(prev => {
-                        const next = { ...prev };
-                        delete next[editingCategory.id];
-                        return next;
-                      });
-                      await handleSave(editingCategory.id, 0, true);
-                      setIsSavingSheet(false);
-                      setEditingCategory(null);
-                    }}
-                    className="w-full py-2.5 px-4 text-center text-xs font-bold text-rose-500 hover:text-rose-600 hover:bg-rose-500/5 rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <Trash2 size={13} />
-                    <span>Eliminar meta de esta categoría</span>
-                  </button>
+                  confirmDeleteEdit ? (
+                    <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 space-y-2.5 animate-in fade-in zoom-in-95 duration-150">
+                      <div className="flex items-start gap-2 text-xs">
+                        <AlertTriangle size={15} className="text-rose-500 shrink-0 mt-0.5" />
+                        <p className="text-rose-700 dark:text-rose-300 font-semibold leading-snug">
+                          Se quitará la meta de <strong>{editingCategory.name}</strong> para {currentMonthDisplay}. Tus gastos registrados no se borran.
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          disabled={isSavingSheet}
+                          onClick={() => {
+                            haptic.light();
+                            setConfirmDeleteEdit(false);
+                          }}
+                          className="py-2 px-3 rounded-xl bg-surface-container-lowest border border-on-surface/10 text-xs font-bold text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isSavingSheet}
+                          onClick={async () => {
+                            haptic.medium();
+                            setIsSavingSheet(true);
+                            setLocalBudgets(prev => {
+                              const next = { ...prev };
+                              delete next[editingCategory.id];
+                              return next;
+                            });
+                            await handleSave(editingCategory.id, 0, true);
+                            setIsSavingSheet(false);
+                            setConfirmDeleteEdit(false);
+                            setEditingCategory(null);
+                          }}
+                          className="py-2 px-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-black uppercase tracking-wider transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1"
+                        >
+                          <Trash2 size={12} />
+                          <span>Sí, eliminar</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={isSavingSheet}
+                      onClick={() => {
+                        haptic.light();
+                        setConfirmDeleteEdit(true);
+                      }}
+                      className="w-full py-2.5 px-4 text-center text-xs font-bold text-rose-500 hover:text-rose-600 hover:bg-rose-500/5 rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <Trash2 size={13} />
+                      <span>Eliminar meta de esta categoría</span>
+                    </button>
+                  )
                 )}
               </div>
             </motion.div>
@@ -1638,20 +1679,23 @@ export const Budgets: React.FC = () => {
               <div className="flex items-center justify-between border-b border-on-surface/5 pb-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-xs shrink-0">
-                    <Wand2 size={22} />
+                    {copyModalStep === 'confirm' ? <CheckCircle2 size={22} /> : <Wand2 size={22} />}
                   </div>
                   <div className="min-w-0">
                     <h3 className="font-black text-on-surface text-base sm:text-lg font-headline tracking-tight truncate">
-                      Asistente de Presupuesto
+                      {copyModalStep === 'confirm' ? 'Confirmar Aplicación Masiva' : 'Asistente de Presupuesto'}
                     </h3>
                     <p className="text-xs text-on-surface-variant/60 font-semibold truncate">
-                      Copia el mes anterior o aplica promedios de 3 meses
+                      {copyModalStep === 'confirm'
+                        ? `${currentMonthDisplay} • ${selectedProjectId ? (activeProject?.name || 'Proyecto') : 'Personal'}`
+                        : 'Copia el mes anterior o aplica promedios de 3 meses'}
                     </p>
                   </div>
                 </div>
 
                 <button
                   type="button"
+                  disabled={isApplyingBatch}
                   onClick={() => setShowCopyModal(false)}
                   className="w-9 h-9 rounded-full bg-on-surface/5 hover:bg-on-surface/10 flex items-center justify-center text-on-surface-variant transition-colors shrink-0"
                   title="Cerrar"
@@ -1660,198 +1704,310 @@ export const Budgets: React.FC = () => {
                 </button>
               </div>
 
-              {/* Mass Selection Controls */}
-              <div className="flex items-center justify-between text-xs px-0.5">
-                <span className="font-bold text-on-surface-variant/70">
-                  {copyItems.filter(i => i.selected).length} de {copyItems.length} seleccionadas
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      haptic.selection();
-                      setCopyItems(prev => prev.map(i => ({ ...i, selected: true })));
-                    }}
-                    className="text-[11px] font-black text-primary hover:underline cursor-pointer"
-                  >
-                    Seleccionar todas
-                  </button>
-                  <span className="text-on-surface-variant/30">•</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      haptic.selection();
-                      setCopyItems(prev => prev.map(i => ({ ...i, selected: false })));
-                    }}
-                    className="text-[11px] font-bold text-on-surface-variant/60 hover:text-on-surface cursor-pointer"
-                  >
-                    Deseleccionar
-                  </button>
-                </div>
-              </div>
-
-              {/* Category Cards List (Interactive Fintech Cards - Option A) */}
-              <div className="space-y-2.5 overflow-y-auto max-h-[46vh] pr-0.5 no-scrollbar">
-                {copyItems.map((item) => {
-                  return (
-                    <div
-                      key={item.categoryId}
-                      className={cn(
-                        "rounded-2xl p-3 border transition-all select-none space-y-2",
-                        item.selected 
-                          ? "bg-surface-container-low/70 border-primary/25 shadow-2xs" 
-                          : "bg-surface-container-lowest/40 border-on-surface/5 opacity-45"
-                      )}
-                    >
-                      {/* Top row: Checkmark + Category + Inline Amount Edit */}
-                      <div 
+              {copyModalStep === 'select' ? (
+                <>
+                  {/* Mass Selection Controls */}
+                  <div className="flex items-center justify-between text-xs px-0.5">
+                    <span className="font-bold text-on-surface-variant/70">
+                      {copyItems.filter(i => i.selected).length} de {copyItems.length} seleccionadas
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
                         onClick={() => {
                           haptic.selection();
-                          setCopyItems(prev => prev.map(i => i.categoryId === item.categoryId ? { ...i, selected: !i.selected } : i));
+                          setCopyItems(prev => prev.map(i => ({ ...i, selected: true })));
                         }}
-                        className="flex items-center justify-between gap-2.5 cursor-pointer"
+                        className="text-[11px] font-black text-primary hover:underline cursor-pointer"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                          {/* Circular iOS Checkmark */}
-                          <div className={cn(
-                            "w-6 h-6 rounded-full flex items-center justify-center transition-all shrink-0",
-                            item.selected ? "bg-primary text-white shadow-xs" : "border-2 border-on-surface/20"
-                          )}>
-                            {item.selected && <Check size={14} />}
-                          </div>
+                        Seleccionar todas
+                      </button>
+                      <span className="text-on-surface-variant/30">•</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          haptic.selection();
+                          setCopyItems(prev => prev.map(i => ({ ...i, selected: false })));
+                        }}
+                        className="text-[11px] font-bold text-on-surface-variant/60 hover:text-on-surface cursor-pointer"
+                      >
+                        Deseleccionar
+                      </button>
+                    </div>
+                  </div>
 
-                          <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0 shadow-2xs", item.categoryColor)}>
-                            <IconComponent name={item.categoryIcon} size={16} />
-                          </div>
+                  {/* Category Cards List (Interactive Fintech Cards - Option A) */}
+                  <div className="space-y-2.5 overflow-y-auto max-h-[44vh] pr-0.5 no-scrollbar">
+                    {copyItems.map((item) => {
+                      return (
+                        <div
+                          key={item.categoryId}
+                          className={cn(
+                            "rounded-2xl p-3 border transition-all select-none space-y-2",
+                            item.selected 
+                              ? "bg-surface-container-low/70 border-primary/25 shadow-2xs" 
+                              : "bg-surface-container-lowest/40 border-on-surface/5 opacity-45"
+                          )}
+                        >
+                          {/* Top row: Checkmark + Category + Inline Amount Edit */}
+                          <div 
+                            onClick={() => {
+                              haptic.selection();
+                              setCopyItems(prev => prev.map(i => i.categoryId === item.categoryId ? { ...i, selected: !i.selected } : i));
+                            }}
+                            className="flex items-center justify-between gap-2.5 cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              {/* Circular iOS Checkmark */}
+                              <div className={cn(
+                                "w-6 h-6 rounded-full flex items-center justify-center transition-all shrink-0",
+                                item.selected ? "bg-primary text-white shadow-xs" : "border-2 border-on-surface/20"
+                              )}>
+                                {item.selected && <Check size={14} />}
+                              </div>
 
-                          <div className="min-w-0 flex-1">
-                            <span className="font-extrabold text-xs sm:text-sm text-on-surface block leading-snug break-words">
-                              {item.categoryName}
-                            </span>
-                            {item.existingAmount > 0 && (
-                              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 block">
-                                Ya tiene meta: {formatCurrency(item.existingAmount, activeCurrency)}
+                              <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0 shadow-2xs", item.categoryColor)}>
+                                <IconComponent name={item.categoryIcon} size={16} />
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <span className="font-extrabold text-xs sm:text-sm text-on-surface block leading-snug break-words">
+                                  {item.categoryName}
+                                </span>
+                                {item.existingAmount > 0 && (
+                                  <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 block">
+                                    Ya tiene meta: {formatCurrency(item.existingAmount, activeCurrency)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Inline Editable Amount */}
+                            <div 
+                              onClick={(e) => e.stopPropagation()}
+                              className="shrink-0 flex items-center gap-1 bg-surface-container-lowest/90 border border-on-surface/10 rounded-xl px-2 py-1 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20 transition-all"
+                            >
+                              <span className="text-[10px] font-black text-on-surface-variant/40 select-none">
+                                {activeCurrency}
                               </span>
-                            )}
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                disabled={!item.selected}
+                                value={item.chosenDisplay}
+                                onChange={(e) => {
+                                  const { display, numeric } = formatCurrencyInput(e.target.value);
+                                  setCopyItems(prev => prev.map(i => 
+                                    i.categoryId === item.categoryId 
+                                      ? { ...i, chosenAmount: numeric, chosenDisplay: display, source: 'custom' } 
+                                      : i
+                                  ));
+                                }}
+                                placeholder="0"
+                                className="w-20 sm:w-24 text-right font-headline font-black text-xs sm:text-sm text-on-surface bg-transparent focus:outline-hidden"
+                              />
+                            </div>
                           </div>
+
+                          {/* Source Pills (Mes anterior vs Promedio 3m) */}
+                          {item.selected && (
+                            <div className="flex items-center justify-end flex-wrap gap-1.5 pt-1.5 border-t border-on-surface/5">
+                              {item.prevAmount > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    haptic.selection();
+                                    setCopyItems(prev => prev.map(i => 
+                                      i.categoryId === item.categoryId 
+                                        ? { ...i, chosenAmount: item.prevAmount, chosenDisplay: formatAmountForDisplay(item.prevAmount), source: 'prev' } 
+                                        : i
+                                    ));
+                                  }}
+                                  className={cn(
+                                    "px-2 py-0.5 rounded-lg text-[10px] font-black transition-all active:scale-95 inline-flex items-center gap-1 cursor-pointer",
+                                    item.source === 'prev' 
+                                      ? "bg-primary text-white shadow-2xs" 
+                                      : "bg-on-surface/5 text-on-surface-variant hover:bg-on-surface/10"
+                                  )}
+                                >
+                                  <Calendar size={10} />
+                                  <span>Presup. ant: {formatCurrency(item.prevAmount, activeCurrency)}</span>
+                                </button>
+                              )}
+
+                              {item.avg3mAmount > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    haptic.selection();
+                                    setCopyItems(prev => prev.map(i => 
+                                      i.categoryId === item.categoryId 
+                                        ? { ...i, chosenAmount: item.avg3mAmount, chosenDisplay: formatAmountForDisplay(item.avg3mAmount), source: 'avg' } 
+                                        : i
+                                    ));
+                                  }}
+                                  className={cn(
+                                    "px-2 py-0.5 rounded-lg text-[10px] font-black transition-all active:scale-95 inline-flex items-center gap-1 cursor-pointer",
+                                    item.source === 'avg' 
+                                      ? "bg-primary text-white shadow-2xs" 
+                                      : "bg-on-surface/5 text-on-surface-variant hover:bg-on-surface/10"
+                                  )}
+                                >
+                                  <Sparkles size={10} />
+                                  <span>Prom 3M: {formatCurrency(item.avg3mAmount, activeCurrency)}</span>
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Total Summary & Next Step Button */}
+                  {(() => {
+                    const selectedItems = copyItems.filter(i => i.selected && i.chosenAmount > 0);
+                    const totalBatch = selectedItems.reduce((sum, i) => sum + i.chosenAmount, 0);
+
+                    return (
+                      <div className="pt-2 border-t border-on-surface/5 space-y-3">
+                        <div className="flex items-center justify-between text-xs px-1">
+                          <span className="font-bold text-on-surface-variant/70">Total seleccionado:</span>
+                          <span className="font-headline font-black text-base text-on-surface">
+                            {formatCurrency(totalBatch, activeCurrency)}
+                          </span>
                         </div>
 
-                        {/* Inline Editable Amount */}
-                        <div 
-                          onClick={(e) => e.stopPropagation()}
-                          className="shrink-0 flex items-center gap-1 bg-surface-container-lowest/90 border border-on-surface/10 rounded-xl px-2 py-1 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20 transition-all"
+                        <button
+                          type="button"
+                          disabled={selectedItems.length === 0}
+                          onClick={() => {
+                            haptic.selection();
+                            setCopyModalStep('confirm');
+                          }}
+                          className="w-full py-3.5 px-4 rounded-2xl bg-primary hover:bg-primary/90 text-on-primary font-headline font-black text-sm uppercase tracking-wider transition-all shadow-md active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                         >
-                          <span className="text-[10px] font-black text-on-surface-variant/40 select-none">
-                            {activeCurrency}
+                          <span>Continuar ({selectedItems.length} {selectedItems.length === 1 ? 'categoría' : 'categorías'})</span>
+                          <ChevronRight size={17} />
+                        </button>
+                      </div>
+                    );
+                  })()}
+                </>
+              ) : (
+                /* Step 2: Smart Confirmation Summary */
+                (() => {
+                  const selectedItems = copyItems.filter(i => i.selected && i.chosenAmount > 0);
+                  const newItems = selectedItems.filter(i => i.existingAmount <= 0);
+                  const overwriteItems = selectedItems.filter(i => i.existingAmount > 0);
+                  const totalBatch = selectedItems.reduce((sum, i) => sum + i.chosenAmount, 0);
+
+                  return (
+                    <div className="space-y-4">
+                      {/* Impact Summary Cards */}
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300 block">
+                            Metas nuevas
                           </span>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            disabled={!item.selected}
-                            value={item.chosenDisplay}
-                            onChange={(e) => {
-                              const { display, numeric } = formatCurrencyInput(e.target.value);
-                              setCopyItems(prev => prev.map(i => 
-                                i.categoryId === item.categoryId 
-                                  ? { ...i, chosenAmount: numeric, chosenDisplay: display, source: 'custom' } 
-                                  : i
-                              ));
-                            }}
-                            placeholder="0"
-                            className="w-20 sm:w-24 text-right font-headline font-black text-xs sm:text-sm text-on-surface bg-transparent focus:outline-hidden"
-                          />
+                          <span className="text-xl font-black font-headline text-emerald-600 dark:text-emerald-400">
+                            {newItems.length}
+                          </span>
+                        </div>
+                        <div className={cn(
+                          "p-3 rounded-2xl border",
+                          overwriteItems.length > 0
+                            ? "bg-amber-500/10 border-amber-500/20"
+                            : "bg-surface-container-low/70 border-on-surface/5"
+                        )}>
+                          <span className={cn(
+                            "text-[10px] font-black uppercase tracking-wider block",
+                            overwriteItems.length > 0 ? "text-amber-700 dark:text-amber-300" : "text-on-surface-variant/60"
+                          )}>
+                            Se reemplazarán
+                          </span>
+                          <span className={cn(
+                            "text-xl font-black font-headline",
+                            overwriteItems.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-on-surface-variant/60"
+                          )}>
+                            {overwriteItems.length}
+                          </span>
                         </div>
                       </div>
 
-                      {/* Source Pills (Mes anterior vs Promedio 3m) */}
-                      {item.selected && (
-                        <div className="flex items-center justify-end flex-wrap gap-1.5 pt-1.5 border-t border-on-surface/5">
-                          {item.prevAmount > 0 && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                haptic.selection();
-                                setCopyItems(prev => prev.map(i => 
-                                  i.categoryId === item.categoryId 
-                                    ? { ...i, chosenAmount: item.prevAmount, chosenDisplay: formatAmountForDisplay(item.prevAmount), source: 'prev' } 
-                                    : i
-                                ));
-                              }}
-                              className={cn(
-                                "px-2 py-0.5 rounded-lg text-[10px] font-black transition-all active:scale-95 inline-flex items-center gap-1 cursor-pointer",
-                                item.source === 'prev' 
-                                  ? "bg-primary text-white shadow-2xs" 
-                                  : "bg-on-surface/5 text-on-surface-variant hover:bg-on-surface/10"
-                              )}
-                            >
-                              <Calendar size={10} />
-                              <span>Presup. ant: {formatCurrency(item.prevAmount, activeCurrency)}</span>
-                            </button>
-                          )}
-
-                          {item.avg3mAmount > 0 && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                haptic.selection();
-                                setCopyItems(prev => prev.map(i => 
-                                  i.categoryId === item.categoryId 
-                                    ? { ...i, chosenAmount: item.avg3mAmount, chosenDisplay: formatAmountForDisplay(item.avg3mAmount), source: 'avg' } 
-                                    : i
-                                ));
-                              }}
-                              className={cn(
-                                "px-2 py-0.5 rounded-lg text-[10px] font-black transition-all active:scale-95 inline-flex items-center gap-1 cursor-pointer",
-                                item.source === 'avg' 
-                                  ? "bg-primary text-white shadow-2xs" 
-                                  : "bg-on-surface/5 text-on-surface-variant hover:bg-on-surface/10"
-                              )}
-                            >
-                              <Sparkles size={10} />
-                              <span>Prom 3M: {formatCurrency(item.avg3mAmount, activeCurrency)}</span>
-                            </button>
-                          )}
+                      {/* Overwrite Details if any */}
+                      {overwriteItems.length > 0 && (
+                        <div className="p-3 rounded-2xl bg-amber-500/5 border border-amber-500/20 space-y-2 max-h-[30vh] overflow-y-auto no-scrollbar">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-300">
+                            <AlertTriangle size={14} className="shrink-0" />
+                            <span>Categorías con meta existente que se actualizarán:</span>
+                          </div>
+                          <div className="space-y-1.5">
+                            {overwriteItems.map(item => (
+                              <div key={item.categoryId} className="flex items-center justify-between text-[11px] gap-2">
+                                <span className="font-bold text-on-surface truncate">{item.categoryName}</span>
+                                <span className="shrink-0 font-semibold text-on-surface-variant">
+                                  {formatCurrency(item.existingAmount, activeCurrency)} <span className="text-primary font-black">→ {formatCurrency(item.chosenAmount, activeCurrency)}</span>
+                                </span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
+
+                      {/* Total & Income Check */}
+                      <div className="p-3.5 rounded-2xl bg-surface-container-low/70 border border-on-surface/5 space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-on-surface-variant/70">Total de presupuestos a aplicar</span>
+                          <span className="font-headline font-black text-base text-on-surface">
+                            {formatCurrency(totalBatch, activeCurrency)}
+                          </span>
+                        </div>
+                        {totalScopeIncome > 0 && totalBatch > totalScopeIncome && (
+                          <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1 pt-1">
+                            <AlertTriangle size={12} className="shrink-0" />
+                            <span>Supera los ingresos del mes ({formatCurrency(totalScopeIncome, activeCurrency)}).</span>
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Final Confirm / Back Buttons */}
+                      <div className="grid grid-cols-3 gap-2.5 pt-1">
+                        <button
+                          type="button"
+                          disabled={isApplyingBatch}
+                          onClick={() => {
+                            haptic.light();
+                            setCopyModalStep('select');
+                          }}
+                          className="col-span-1 py-3.5 px-3 rounded-2xl bg-surface-container-low hover:bg-surface-container-high text-on-surface font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1"
+                        >
+                          <ChevronLeft size={15} />
+                          <span>Volver</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isApplyingBatch}
+                          onClick={handleApplyBatchBudgets}
+                          className="col-span-2 py-3.5 px-4 rounded-2xl bg-primary hover:bg-primary/90 text-on-primary font-headline font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-md active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                        >
+                          {isApplyingBatch ? (
+                            <div className="w-5 h-5 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
+                          ) : (
+                            <>
+                              <Check size={17} />
+                              <span>Confirmar y aplicar</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   );
-                })}
-              </div>
-
-              {/* Total Summary & Apply Button */}
-              {(() => {
-                const selectedItems = copyItems.filter(i => i.selected && i.chosenAmount > 0);
-                const totalBatch = selectedItems.reduce((sum, i) => sum + i.chosenAmount, 0);
-
-                return (
-                  <div className="pt-2 border-t border-on-surface/5 space-y-3">
-                    <div className="flex items-center justify-between text-xs px-1">
-                      <span className="font-bold text-on-surface-variant/70">Total a presupuestar:</span>
-                      <span className="font-headline font-black text-base text-on-surface">
-                        {formatCurrency(totalBatch, activeCurrency)}
-                      </span>
-                    </div>
-
-                    <button
-                      type="button"
-                      disabled={isApplyingBatch || selectedItems.length === 0}
-                      onClick={handleApplyBatchBudgets}
-                      className="w-full py-3.5 px-4 rounded-2xl bg-primary hover:bg-primary/90 text-on-primary font-headline font-black text-sm uppercase tracking-wider transition-all shadow-md active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                    >
-                      {isApplyingBatch ? (
-                        <div className="w-5 h-5 border-2 border-on-primary/30 border-t-on-primary rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <Check size={18} />
-                          <span>Aplicar {selectedItems.length} {selectedItems.length === 1 ? 'Presupuesto' : 'Presupuestos'}</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                );
-              })()}
+                })()
+              )}
             </motion.div>
           </div>
         )}
