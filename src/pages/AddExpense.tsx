@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, 
@@ -224,22 +224,35 @@ export const AddExpense: React.FC = () => {
     }
   }, [id, hasInitializedDefault, profile, projects, isPersonalActive, visibleProjects]);
 
+  const loadedTxIdRef = useRef<string | null>(null);
+  const pendingCategoryIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (id) {
+      if (loadedTxIdRef.current === id) {
+        if (pendingCategoryIdRef.current && allCategories.length > 0 && !selectedCategory) {
+          const cat = allCategories.find(c => c.id === pendingCategoryIdRef.current);
+          if (cat) {
+            setSelectedCategory(cat);
+            pendingCategoryIdRef.current = null;
+          }
+        }
+        return;
+      }
+
       const fetchTransaction = async () => {
         try {
           const t: any = await getTransaction(id);
           if (t) {
+            loadedTxIdRef.current = id;
             setAmount(formatAmountForDisplay(t.amount));
             setType(t.type);
             setDescription(t.description || '');
-            // Use original time from Firestore but normalize date string for the input
             const localDateStr = formatLocalYYYYMMDD(t.date);
             setDate(localDateStr);
             setOriginalDate(t.date);
             setAuthorId(t.authorId);
             
-            // Normalize paymentMethod
             const pm = t.paymentMethod === 'Tarjeta' ? 'Tarjeta de Crédito' : (t.paymentMethod || 'Efectivo');
             setPaymentMethod(pm);
             if (t.cardId) setSelectedCardId(t.cardId);
@@ -258,7 +271,7 @@ export const AddExpense: React.FC = () => {
               setFirstDueDate(localDateStr);
             }
 
-            if (t.isInstallment) {
+            if (t.isInstallment && (t.totalInstallments || 1) > 1) {
               setIsExistingInstallment(true);
               setExistingInstallmentNumber(t.installmentNumber || null);
               setExistingTotalInstallments(t.totalInstallments || null);
@@ -277,7 +290,12 @@ export const AddExpense: React.FC = () => {
             }
 
             const cat = allCategories.find(c => c.id === t.categoryId);
-            if (cat) setSelectedCategory(cat);
+            if (cat) {
+              setSelectedCategory(cat);
+              pendingCategoryIdRef.current = null;
+            } else {
+              pendingCategoryIdRef.current = t.categoryId || null;
+            }
           }
         } catch (error) {
           console.error('Error fetching transaction:', error);
@@ -285,10 +303,10 @@ export const AddExpense: React.FC = () => {
           setInitialLoading(false);
         }
       };
-      if (allCategories.length > 0) {
-        fetchTransaction();
-      }
+      fetchTransaction();
     } else {
+      loadedTxIdRef.current = null;
+      pendingCategoryIdRef.current = null;
       if (categories.length > 0 && !selectedCategory) {
         setSelectedCategory(categories[0]);
       }
@@ -386,7 +404,15 @@ export const AddExpense: React.FC = () => {
   const isCustomDate = !isToday && !isYesterday;
 
   const handleSave = async () => {
-    if (!isValidAmount || !selectedCategory) return;
+    if (!isValidAmount) {
+      toast.warning('Ingresa un importe válido mayor a cero');
+      return;
+    }
+    if (!selectedCategory) {
+      toast.warning('Por favor selecciona una categoría');
+      setShowCategorySheet(true);
+      return;
+    }
     if (destination === 'shared' && !selectedProjectId) {
       toast.warning('Por favor selecciona un proyecto compartido');
       return;

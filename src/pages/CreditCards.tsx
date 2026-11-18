@@ -507,7 +507,9 @@ export const CreditCards: React.FC = () => {
                   "text-[9px] font-extrabold truncate max-w-full transition-opacity",
                   m.totalAmount > 0 ? "opacity-100 text-on-surface-variant" : "opacity-0"
                 )}>
-                  {m.totalAmount > 0 ? `$${Math.round(m.totalAmount / 1000)}k` : ''}
+                  {m.totalAmount > 0
+                    ? (m.totalAmount >= 1000 ? `$${Math.round(m.totalAmount / 1000)}k` : `$${Math.round(m.totalAmount)}`)
+                    : ''}
                 </span>
 
                 {/* Vertical Bar container */}
@@ -748,7 +750,7 @@ export const CreditCards: React.FC = () => {
 
                     <div className="flex items-center justify-between text-[10px] text-on-surface-variant/60 font-medium pt-0.5">
                       <span>{plan.totalInstallments > 1 ? 'Total financiado' : 'Monto total'}: {formatCurrency(plan.totalAmount, defaultCurrency)}</span>
-                      <span>{plan.totalInstallments > 1 ? 'Inicio' : 'Vencimiento'}: {plan.firstDueDate}</span>
+                      <span>{plan.totalInstallments > 1 ? 'Inicio' : 'Vencimiento'}: {formatDisplayDate(plan.firstDueDate)}</span>
                     </div>
                   </div>
 

@@ -221,9 +221,10 @@ export const Home: React.FC = () => {
       return {};
     }
   });
+  const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({});
 
   const isCardBlurred = (id: string) => {
-    if (!showBalances) return true;
+    if (!showBalances) return !revealedIds[id];
     return !!hiddenProjectIds[id];
   };
 
@@ -231,8 +232,9 @@ export const Home: React.FC = () => {
 
   const handleToggleAllBalances = () => {
     haptic.light();
-    if (showBalances && isAnyCardVisible) {
+    if (isAnyCardVisible) {
       setShowBalances(false);
+      setRevealedIds({});
       const nextHidden: Record<string, boolean> = {};
       balancesByProject.forEach(([id]) => {
         nextHidden[id] = true;
@@ -241,6 +243,7 @@ export const Home: React.FC = () => {
       localStorage.setItem('hiddenProjectCards', JSON.stringify(nextHidden));
     } else {
       setShowBalances(true);
+      setRevealedIds({});
       setHiddenProjectIds({});
       localStorage.setItem('hiddenProjectCards', JSON.stringify({}));
     }
@@ -251,14 +254,10 @@ export const Home: React.FC = () => {
     const currentlyBlurred = isCardBlurred(projectId);
 
     if (!showBalances) {
-      // Global was off: unhide this card, keep other existing project cards hidden
-      const nextHidden: Record<string, boolean> = {};
-      balancesByProject.forEach(([id]) => {
-        nextHidden[id] = id !== projectId;
-      });
-      setShowBalances(true);
-      setHiddenProjectIds(nextHidden);
-      localStorage.setItem('hiddenProjectCards', JSON.stringify(nextHidden));
+      setRevealedIds(prev => ({
+        ...prev,
+        [projectId]: currentlyBlurred
+      }));
     } else {
       const nextHidden = {
         ...hiddenProjectIds,
@@ -374,12 +373,19 @@ export const Home: React.FC = () => {
         <div className="flex gap-2 sm:gap-3">
           <button 
             onClick={handleToggleAllBalances}
-            className="p-2.5 sm:p-3 bg-surface-container-low rounded-2xl text-on-surface-variant hover:bg-on-surface/5 transition-all active:scale-95 border border-on-surface/5"
-            title={showBalances && isAnyCardVisible ? "Ocultar todos los saldos" : "Mostrar todos los saldos"}
+            className="p-2.5 sm:p-3 bg-surface-container-low rounded-2xl text-on-surface-variant hover:bg-on-surface/5 transition-all active:scale-95 border border-on-surface/5 cursor-pointer"
+            title={isAnyCardVisible ? "Ocultar todos los saldos" : "Mostrar todos los saldos"}
           >
-            {showBalances && isAnyCardVisible ? <EyeOff size={20} className="sm:w-[22px] sm:h-[22px]" /> : <Eye size={20} className="sm:w-[22px] sm:h-[22px]" />}
+            {isAnyCardVisible ? <EyeOff size={20} className="sm:w-[22px] sm:h-[22px]" /> : <Eye size={20} className="sm:w-[22px] sm:h-[22px]" />}
           </button>
-          <button className="p-2.5 sm:p-3 bg-surface-container-low rounded-2xl text-on-surface-variant hover:bg-on-surface/5 transition-all active:scale-95 border border-on-surface/5">
+          <button 
+            onClick={() => {
+              haptic.selection();
+              navigate('/history');
+            }}
+            className="p-2.5 sm:p-3 bg-surface-container-low rounded-2xl text-on-surface-variant hover:bg-on-surface/5 transition-all active:scale-95 border border-on-surface/5 cursor-pointer"
+            title="Buscar en el historial"
+          >
             <Search size={20} className="sm:w-[22px] sm:h-[22px]" />
           </button>
         </div>
@@ -664,6 +670,7 @@ export const Home: React.FC = () => {
                   category={category}
                   projects={projects}
                   index={i}
+                  isBlurred={isCardBlurred(t.projectId || 'personal')}
                 />
               );
             })
@@ -690,9 +697,10 @@ interface TransactionItemProps {
   projects?: any[];
   index: number;
   color?: string;
+  isBlurred?: boolean;
 }
 
-const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, category, projects, index, color }) => {
+const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, category, projects, index, color, isBlurred }) => {
   const navigate = useNavigate();
   const { userNames, showBalances } = useData();
   const { user, profile } = useAuth();
@@ -787,7 +795,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, category
         <p className={cn(
           "font-bold font-headline tracking-tighter text-sm sm:text-base whitespace-nowrap transition-all duration-300",
           transaction.type === 'expense' ? "text-on-surface" : "text-emerald-600 dark:text-emerald-400",
-          !showBalances && "filter blur-sm select-none opacity-60"
+          (isBlurred ?? !showBalances) && "filter blur-sm select-none opacity-60"
         )}>
           {transaction.type === 'expense' ? '-' : '+'}
           {formatCurrency(transaction.amount, project?.currency || profile?.currency)}

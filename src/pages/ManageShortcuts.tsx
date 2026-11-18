@@ -16,6 +16,7 @@ import { createShortcut, updateShortcut, deleteShortcut, updateShortcutOrders, S
 import { PageHeader } from '../components/PageHeader';
 import { CustomSelect } from '../components/CustomSelect';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
+import { getCategoryIcon } from '../lib/categoryIcons';
 import { haptic } from '../lib/haptics';
 
 export const SHORTCUT_ICONS: Record<string, any> = {
@@ -25,7 +26,6 @@ export const SHORTCUT_ICONS: Record<string, any> = {
   ShoppingBag,
   Zap,
   Home,
-  HomeIcon: Home,
   Briefcase,
   Heart,
   Plane,
@@ -518,7 +518,7 @@ export const ManageShortcuts: React.FC = () => {
                             "w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-sm shrink-0",
                             selectedCategory.color || 'bg-amber-500'
                           )}>
-                            <ShortcutIconComponent name={selectedCategory.icon} size={20} />
+                            {React.createElement(getCategoryIcon(selectedCategory.icon), { size: 20 })}
                           </div>
                           <span className="font-extrabold text-base">{selectedCategory.name}</span>
                           {selectedCategory.ownerId && (
@@ -710,7 +710,7 @@ export const ManageShortcuts: React.FC = () => {
                       "w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-md transition-transform group-active:scale-90",
                       cat.color || 'bg-amber-500'
                     )}>
-                      <ShortcutIconComponent name={cat.icon} size={24} />
+                      {React.createElement(getCategoryIcon(cat.icon), { size: 24 })}
                     </div>
                     <div className="w-full text-center">
                       <span className="text-xs font-bold text-on-surface truncate block">

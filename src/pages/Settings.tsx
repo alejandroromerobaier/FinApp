@@ -142,9 +142,11 @@ export const Settings: React.FC = () => {
       let nearestCardName = cards[0].name;
       let nearestDays = 99;
       let nearestLabel = 'vence';
+      let hasDates = false;
 
       cards.forEach(c => {
         if (c.dueDay) {
+          hasDates = true;
           const daysToDue = getDaysUntilDayOfMonth(c.dueDay);
           if (daysToDue < nearestDays) {
             nearestDays = daysToDue;
@@ -153,6 +155,7 @@ export const Settings: React.FC = () => {
           }
         }
         if (c.closingDay) {
+          hasDates = true;
           const daysToClose = getDaysUntilDayOfMonth(c.closingDay);
           if (daysToClose < nearestDays) {
             nearestDays = daysToClose;
@@ -162,9 +165,15 @@ export const Settings: React.FC = () => {
         }
       });
 
-      if (nearestDays === 0) cardHealth = `${nearestCardName} ${nearestLabel} hoy`;
-      else if (nearestDays === 1) cardHealth = `${nearestCardName} ${nearestLabel} mañana`;
-      else cardHealth = `${nearestCardName} ${nearestLabel} en ${nearestDays} d`;
+      if (!hasDates) {
+        cardHealth = `${cards.length} ${cards.length === 1 ? 'tarjeta cargada' : 'tarjetas cargadas'}`;
+      } else if (nearestDays === 0) {
+        cardHealth = `${nearestCardName} ${nearestLabel} hoy`;
+      } else if (nearestDays === 1) {
+        cardHealth = `${nearestCardName} ${nearestLabel} mañana`;
+      } else {
+        cardHealth = `${nearestCardName} ${nearestLabel} en ${nearestDays} d`;
+      }
     }
 
     // 2. Current month installment commitments
@@ -627,7 +636,9 @@ Abrí el link en Safari o Chrome y tocá *"Agregar a pantalla de inicio"*. Se in
             className="rounded-2xl bg-surface-container-lowest/80 dark:bg-surface-container-low/80 px-3 py-2.5 border border-on-surface/5 hover:border-primary/30 transition-colors"
           >
             <span className="block text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Bóvedas</span>
-            <span className="block text-sm font-black text-on-surface mt-0.5">{activeProjects.length + 1} activas</span>
+            <span className="block text-sm font-black text-on-surface mt-0.5">
+              {activeProjects.length + (profile?.personalStatus !== 'inactive' ? 1 : 0)} activas
+            </span>
           </Link>
           <button
             type="button"

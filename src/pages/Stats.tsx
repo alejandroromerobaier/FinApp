@@ -468,27 +468,42 @@ export const Stats: React.FC = () => {
         if (d.netBalance <= 0.5) dIdx++;
       }
 
-      // Evolution data
-      const evolutionMap: Record<string, { expense: number; income: number }> = {};
+      // Evolution data (chronologically ordered)
+      const evolutionMap: Record<string, { expense: number; income: number; sortKey: number }> = {};
       
       filtered.forEach(t => {
         const d = new Date(t.date);
         let key = '';
-        if (timeRange === 'today') key = d.getHours().toString().padStart(2, '0') + ':00';
-        else if (timeRange === 'week') key = d.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase();
-        else if (timeRange === 'month' || timeRange === 'lastMonth') key = d.getDate().toString();
-        else if (timeRange === 'year') key = d.toLocaleDateString('es-ES', { month: 'short' }).toUpperCase();
+        let sortKey = 0;
+        if (timeRange === 'today') {
+          const h = d.getHours();
+          key = h.toString().padStart(2, '0') + ':00';
+          sortKey = h;
+        } else if (timeRange === 'week') {
+          key = d.toLocaleDateString('es-ES', { weekday: 'short' }).toUpperCase();
+          const day = d.getDay();
+          sortKey = day === 0 ? 7 : day; // Monday=1 .. Sunday=7
+        } else if (timeRange === 'month' || timeRange === 'lastMonth') {
+          const dayNum = d.getDate();
+          key = dayNum.toString();
+          sortKey = dayNum;
+        } else if (timeRange === 'year') {
+          key = d.toLocaleDateString('es-ES', { month: 'short' }).toUpperCase();
+          sortKey = d.getMonth();
+        }
         
-        if (!evolutionMap[key]) evolutionMap[key] = { expense: 0, income: 0 };
+        if (!evolutionMap[key]) evolutionMap[key] = { expense: 0, income: 0, sortKey };
         if (t.type === 'income') evolutionMap[key].income += t.amount;
         else evolutionMap[key].expense += t.amount;
       });
 
-      const evolution = Object.entries(evolutionMap).map(([name, data]) => ({ 
-        name, 
-        value: data.expense, 
-        income: data.income 
-      }));
+      const evolution = Object.entries(evolutionMap)
+        .sort(([, a], [, b]) => a.sortKey - b.sortKey)
+        .map(([name, data]) => ({ 
+          name, 
+          value: data.expense, 
+          income: data.income 
+        }));
 
       // Previous period calculation for MoM (Month over Month / Period over Period)
       const prevPeriodLabel = 
@@ -1379,12 +1394,12 @@ export const Stats: React.FC = () => {
                             <stop offset="95%" stopColor={viewType === 'expense' ? '#f43f5e' : '#10b981'} stopOpacity={0}/>
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" strokeOpacity={0.07} />
                         <XAxis 
                           dataKey="name" 
                           axisLine={false} 
                           tickLine={false} 
-                          tick={{ fontSize: 11, fontWeight: 600, fill: 'rgba(0,0,0,0.3)' }} 
+                          tick={{ fontSize: 11, fontWeight: 600, fill: 'currentColor', opacity: 0.5 }} 
                         />
                         <YAxis hide />
                         <Tooltip 
@@ -2097,7 +2112,31 @@ export const Stats: React.FC = () => {
             {/* TAB: MIEMBROS */}
             {activeTab === 'members' && (
               <div className="space-y-8">
-                {stats.userContributions.length === 0 ? (
+                {filterProject === 'all' ? (
+                  <div className="p-8 text-center bg-surface-container-lowest rounded-[2rem] border border-on-surface/10 space-y-4">
+                    <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto">
+                      <Users size={24} />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-base font-bold text-on-surface">Selecciona un Proyecto Compartido</h3>
+                      <p className="text-xs text-on-surface-variant max-w-md mx-auto">
+                        Para calcular compensaciones y aportes equitativos sin mezclar gastos personales ni bóvedas distintas, elige el proyecto que querés analizar:
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                      {activeProjects.map(p => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setFilterProject(p.id)}
+                          className="px-4 py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold uppercase tracking-wider transition-all active:scale-95 cursor-pointer"
+                        >
+                          {p.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : stats.userContributions.length === 0 ? (
                   <div className="p-8 text-center bg-surface-container-lowest rounded-[2rem] border border-on-surface/10 space-y-3">
                     <Users size={32} className="mx-auto text-on-surface-variant/40" />
                     <h3 className="text-base font-bold text-on-surface">Sin actividad registrada</h3>

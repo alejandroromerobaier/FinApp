@@ -414,33 +414,6 @@ export const History: React.FC = () => {
               : `${filteredTransactions.length} movimiento${filteredTransactions.length > 1 ? 's' : ''}`
           )
         }
-        rightAction={
-          <button 
-            type="button"
-            onClick={() => {
-              haptic.light();
-              setShowFilters(!showFilters);
-            }}
-            className={cn(
-              "px-3.5 py-2.5 rounded-2xl transition-all flex items-center gap-2 font-bold text-xs sm:text-sm cursor-pointer border",
-              (showFilters || activeFiltersCount > 0)
-                ? "bg-primary text-white border-primary shadow-md shadow-primary/20" 
-                : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container border-on-surface/10"
-            )}
-            title={showFilters ? "Ocultar filtros" : "Mostrar filtros"}
-          >
-            <Filter size={18} />
-            <span className="hidden sm:inline">Filtros</span>
-            {activeFiltersCount > 0 && (
-              <span className={cn(
-                "min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 shadow-xs",
-                (showFilters || activeFiltersCount > 0) ? "bg-white text-primary" : "bg-primary text-white"
-              )}>
-                {activeFiltersCount}
-              </span>
-            )}
-          </button>
-        }
         className="mb-6 sm:mb-8"
       />
 
@@ -1115,7 +1088,7 @@ export const History: React.FC = () => {
                               {t.authorId === user?.uid ? 'Pagado por Ti' : `Por: ${userNames[t.authorId] || 'Miembro'}`}
                             </span>
 
-                            {t.installmentNumber && t.totalInstallments ? (
+                            {t.installmentNumber && t.totalInstallments && t.totalInstallments > 1 ? (
                               <>
                                 <span className="w-1 h-1 rounded-full bg-on-surface-variant/30 shrink-0" />
                                 <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-tight bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/10 leading-none shrink-0">
@@ -1178,7 +1151,7 @@ export const History: React.FC = () => {
                           onClick={(e) => {
                             e.stopPropagation();
                             const planId = t.parentPlanId || t.installmentPlanId;
-                            if (planId && t.installmentNumber && t.totalInstallments) {
+                            if (planId && t.installmentNumber && t.totalInstallments && t.totalInstallments > 1) {
                               setPlanToDelete({
                                 planId,
                                 txId: t.id,
@@ -1241,14 +1214,8 @@ export const History: React.FC = () => {
             <h3 className="text-xl font-bold text-on-surface font-headline">No hay resultados</h3>
             <p className="text-on-surface-variant mt-2 max-w-[240px] mx-auto text-sm font-medium">No encontramos transacciones que coincidan con tus filtros.</p>
             <button 
-              onClick={() => {
-                setFilterType('all');
-                setFilterCategory('all');
-                setFilterProject('all');
-                setFilterClassification('all');
-                setSearchQuery('');
-              }}
-              className="mt-6 text-primary font-bold text-sm hover:underline"
+              onClick={handleClearFilters}
+              className="mt-6 text-primary font-bold text-sm hover:underline cursor-pointer"
             >
               Limpiar filtros
             </button>

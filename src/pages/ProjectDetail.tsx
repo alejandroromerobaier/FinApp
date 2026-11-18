@@ -263,12 +263,37 @@ export const ProjectDetail: React.FC = () => {
     }
   };
 
-  if (loading || !project) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-10 h-10 text-primary animate-spin" />
           <p className="text-on-surface-variant font-bold text-xs uppercase tracking-widest">Cargando detalles...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center px-6">
+        <div className="max-w-sm w-full bg-surface-container-lowest p-8 rounded-[2.5rem] border border-on-surface/10 text-center space-y-4 shadow-sm">
+          <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
+            <Users size={28} />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-lg font-black text-on-surface font-headline">Proyecto no encontrado</h2>
+            <p className="text-xs text-on-surface-variant">
+              Este proyecto no existe o ya no tienes acceso para visualizarlo.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/shared')}
+            className="w-full py-3 px-4 rounded-2xl bg-primary text-on-primary font-bold text-xs uppercase tracking-wider cursor-pointer active:scale-95 transition-all"
+          >
+            Volver a Proyectos
+          </button>
         </div>
       </div>
     );
@@ -344,7 +369,7 @@ export const ProjectDetail: React.FC = () => {
             <div className="flex -space-x-3 mb-6">
               {members.map((m, i) => (
                 <div key={m.id} className="w-12 h-12 rounded-full border-4 border-surface-container-lowest bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shadow-sm overflow-hidden">
-                  {m.photoURL ? <img src={m.photoURL} alt={m.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : m.name.substring(0, 2).toUpperCase()}
+                  {m.photoURL ? <img src={m.photoURL} alt={m.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : (m.name || 'U').substring(0, 2).toUpperCase()}
                 </div>
               ))}
               {isOwner && (
@@ -375,10 +400,10 @@ export const ProjectDetail: React.FC = () => {
                 <div key={m.id} className="flex items-center justify-between group">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-sm bg-on-surface/5 flex items-center justify-center border border-on-surface/10">
-                      {m.photoURL ? <img src={m.photoURL} className="w-full h-full object-cover" alt={m.name} referrerPolicy="no-referrer" /> : <span className="font-bold text-on-surface-variant/40">{m.name.substring(0, 2).toUpperCase()}</span>}
+                      {m.photoURL ? <img src={m.photoURL} className="w-full h-full object-cover" alt={m.name} referrerPolicy="no-referrer" /> : <span className="font-bold text-on-surface-variant/40">{(m.name || 'U').substring(0, 2).toUpperCase()}</span>}
                     </div>
                     <div>
-                      <p className="font-bold text-on-surface group-hover:text-primary transition-colors">{m.name}</p>
+                      <p className="font-bold text-on-surface group-hover:text-primary transition-colors">{m.name || 'Miembro'}</p>
                       <p className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">{m.percentage}% del total</p>
                     </div>
                   </div>
