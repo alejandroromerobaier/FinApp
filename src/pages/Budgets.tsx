@@ -1196,10 +1196,10 @@ export const Budgets: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Tap-to-Edit Budget Bottom Sheet Modal (Mobile-first Fintech) */}
+      {/* Tap-to-Edit Budget Modal (Mobile-friendly Centered Dialog) */}
       <AnimatePresence>
         {editingCategory && (
-          <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
             {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
@@ -1210,16 +1210,14 @@ export const Budgets: React.FC = () => {
               className="fixed inset-0 bg-black/60 backdrop-blur-xs"
             />
 
-            {/* Bottom Sheet / Dialog */}
+            {/* Modal Dialog Card */}
             <motion.div
-              initial={{ y: '100%', opacity: 0.8 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: '100%', opacity: 0 }}
-              transition={{ type: 'spring', damping: 28, stiffness: 350 }}
-              className="relative w-full sm:max-w-md bg-surface-container-lowest rounded-t-[2.5rem] sm:rounded-[2.5rem] border border-on-surface/10 shadow-2xl p-5 sm:p-6 z-10 overflow-hidden flex flex-col gap-5 max-h-[90vh] my-0 sm:my-auto"
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+              className="relative w-full max-w-md bg-surface-container-lowest rounded-[2.5rem] border border-on-surface/10 shadow-2xl p-5 sm:p-6 z-10 overflow-y-auto no-scrollbar flex flex-col gap-5 max-h-[85dvh] my-auto"
             >
-              {/* Drag handle for mobile */}
-              <div className="w-12 h-1.5 rounded-full bg-on-surface/15 mx-auto -mt-1 sm:hidden" />
 
               {/* Header */}
               <div className="flex items-center justify-between">
