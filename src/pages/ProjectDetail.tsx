@@ -607,7 +607,7 @@ export const ProjectDetail: React.FC = () => {
                     return (
                       <div 
                         key={t.id} 
-                        onClick={() => navigate(`/edit/${t.id}`)}
+                        onClick={() => navigate(`/edit/${t.id}`, { state: { from: `/project/${id}` } })}
                         className="bg-surface-container-lowest p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] flex items-center justify-between hover:shadow-md transition-all border border-on-surface/10 cursor-pointer group active:scale-[0.99] gap-3 min-w-0"
                       >
                         <div className="flex items-center gap-3.5 sm:gap-5 min-w-0 flex-1">

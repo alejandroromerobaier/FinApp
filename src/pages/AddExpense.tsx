@@ -35,7 +35,7 @@ import {
   Plus,
   Info
 } from 'lucide-react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
 import { cn, formatCurrencyInput, formatAmountForDisplay, parseFormattedAmount, formatCurrency } from '../lib/utils';
 import { haptic } from '../lib/haptics';
 import { useToast } from '../context/ToastContext';
@@ -122,7 +122,10 @@ const computeDefaultFirstDueDate = (purchaseDateStr: string, card?: CreditCardTy
 
 export const AddExpense: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams<{ id: string }>();
+  const returnTo = (location.state as { from?: string } | null)?.from || (id ? '/history' : '/');
+  const navigateBack = () => navigate(returnTo, { replace: true });
   const { user, profile } = useAuth();
   const { categories: allCategories, projects, cards, transactions, loading: dataLoading } = useData();
   const { toast } = useToast();
@@ -447,7 +450,7 @@ export const AddExpense: React.FC = () => {
         trackEvent('add_installment_expense', { installments: parsedInstallments, totalAmount: currentTotalAmount });
         haptic.success();
         toast.success(`Compra en ${parsedInstallments} cuotas registrada`);
-        navigate(-1);
+        navigateBack();
         return;
       }
 
@@ -490,7 +493,7 @@ export const AddExpense: React.FC = () => {
         haptic.success();
         toast.success(type === 'income' ? 'Ingreso registrado con éxito' : 'Gasto registrado con éxito');
       }
-      navigate(-1);
+      navigateBack();
     } catch (error) {
       console.error('Error saving transaction:', error);
       toast.error('Error al guardar la transacción');
@@ -507,7 +510,7 @@ export const AddExpense: React.FC = () => {
       haptic.medium();
       toast.info('Transacción eliminada con éxito');
       setShowDeleteModal(false);
-      navigate(-1);
+      navigateBack();
     } catch (error) {
       console.error('Error deleting transaction:', error);
       toast.error('Error al eliminar la transacción');
@@ -1324,7 +1327,7 @@ export const AddExpense: React.FC = () => {
         <div className="max-w-2xl mx-auto flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={navigateBack}
             disabled={isSaving || isDeleting}
             className={cn(
               "py-3.5 rounded-2xl bg-surface-container hover:bg-surface-container-high text-on-surface font-extrabold text-xs uppercase tracking-wider border border-on-surface/10 transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer",

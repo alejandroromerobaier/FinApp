@@ -1048,7 +1048,7 @@ export const History: React.FC = () => {
                           ? "bg-surface-container-low/60 border-blue-500/20 hover:bg-surface-container-low" 
                           : "bg-surface-container-lowest border-on-surface/5 hover:bg-on-surface/5"
                       )}
-                      onClick={() => navigate(`/edit/${t.id}`)}
+                      onClick={() => navigate(`/edit/${t.id}`, { state: { from: '/history' } })}
                     >
                       <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
                         <div className={cn(

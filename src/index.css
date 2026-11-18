@@ -29,6 +29,7 @@
   html, body {
     touch-action: manipulation;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: none;
   }
 
   button, a, input, select, textarea, [role="button"] {
