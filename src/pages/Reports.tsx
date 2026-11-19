@@ -52,7 +52,6 @@ const IconComponent = ({ name, size = 20 }: { name: string, size?: number }) => 
   return <Icon size={size} />;
 };
 
-import { generateProfessionalPDF } from '../services/pdfService';
 import { generateProfessionalCSV, downloadCSV } from '../services/csvService';
 import { getBudgetsOnce } from '../services/firestoreService';
 import { getLocalMonth } from '../lib/dateUtils';
@@ -404,6 +403,7 @@ export const Reports: React.FC = () => {
     try {
       const project = selectedProjectId !== 'all' ? projects.find(p => p.id === selectedProjectId) : null;
       const logoBase64 = await getLogoBase64();
+      const { generateProfessionalPDF } = await import('../services/pdfService');
       const doc = await generateProfessionalPDF({
         title: project ? `Reporte de Proyecto: ${project.name}` : 'Reporte Financiero de Estado',
         monthName: periodLabel,
@@ -460,6 +460,7 @@ export const Reports: React.FC = () => {
     try {
       const project = selectedProjectId !== 'all' ? projects.find(p => p.id === selectedProjectId) : null;
       const logoBase64 = await getLogoBase64();
+      const { generateProfessionalPDF } = await import('../services/pdfService');
       const doc = await generateProfessionalPDF({
         title: project ? `Reporte: ${project.name}` : 'Reporte Financiero de Estado',
         monthName: periodLabel,

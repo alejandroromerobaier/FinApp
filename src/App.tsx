@@ -7,21 +7,33 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { RouteTracker } from './components/RouteTracker';
 import { UpdatePrompt } from './components/UpdatePrompt';
 
-import { Login } from './pages/Login';
 import { Home } from './pages/Home';
-import { ProjectDetail } from './pages/ProjectDetail';
-import { SharedProjects } from './pages/SharedProjects';
-import { AddExpense } from './pages/AddExpense';
-import { ManageCategories } from './pages/ManageCategories';
-import { Stats } from './pages/Stats';
-import { Settings } from './pages/Settings';
-import { History } from './pages/History';
-import { Reports } from './pages/Reports';
-import { Budgets } from './pages/Budgets';
-import { ManageShortcuts } from './pages/ManageShortcuts';
-import { ManageCards } from './pages/ManageCards';
-import { CreditCards } from './pages/CreditCards';
-import { WelcomeOnboarding } from './pages/WelcomeOnboarding';
+
+const lazyPage = <K extends string>(
+  loader: () => Promise<Record<K, React.ComponentType<any>> & Record<string, any>>,
+  exportName: K
+) => React.lazy(() => loader().then(m => ({ default: m[exportName] })));
+
+const Login = lazyPage(() => import('./pages/Login'), 'Login');
+const ProjectDetail = lazyPage(() => import('./pages/ProjectDetail'), 'ProjectDetail');
+const SharedProjects = lazyPage(() => import('./pages/SharedProjects'), 'SharedProjects');
+const AddExpense = lazyPage(() => import('./pages/AddExpense'), 'AddExpense');
+const ManageCategories = lazyPage(() => import('./pages/ManageCategories'), 'ManageCategories');
+const Stats = lazyPage(() => import('./pages/Stats'), 'Stats');
+const Settings = lazyPage(() => import('./pages/Settings'), 'Settings');
+const History = lazyPage(() => import('./pages/History'), 'History');
+const Reports = lazyPage(() => import('./pages/Reports'), 'Reports');
+const Budgets = lazyPage(() => import('./pages/Budgets'), 'Budgets');
+const ManageShortcuts = lazyPage(() => import('./pages/ManageShortcuts'), 'ManageShortcuts');
+const ManageCards = lazyPage(() => import('./pages/ManageCards'), 'ManageCards');
+const CreditCards = lazyPage(() => import('./pages/CreditCards'), 'CreditCards');
+const WelcomeOnboarding = lazyPage(() => import('./pages/WelcomeOnboarding'), 'WelcomeOnboarding');
+
+const RouteFallback: React.FC = () => (
+  <div className="min-h-[60dvh] flex items-center justify-center bg-surface">
+    <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+  </div>
+);
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
@@ -46,38 +58,42 @@ function AppContent() {
     <Router>
       <RouteTracker />
       <UpdatePrompt />
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/bienvenida" element={<WelcomeOnboarding />} />
-        <Route path="/inicio" element={<WelcomeOnboarding />} />
-        <Route
-          path="/*"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route path="/history" element={<History />} />
-                  <Route path="/project/:id" element={<ProjectDetail />} />
-                  <Route path="/shared" element={<SharedProjects />} />
-                  <Route path="/add" element={<AddExpense />} />
-                  <Route path="/edit/:id" element={<AddExpense />} />
-                  <Route path="/categories" element={<ManageCategories />} />
-                  <Route path="/stats" element={<Stats />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/reports" element={<Reports />} />
-                  <Route path="/budgets" element={<Budgets />} />
-                  <Route path="/shortcuts" element={<ManageShortcuts />} />
-                  <Route path="/cards" element={<ManageCards />} />
-                  <Route path="/credit-cards" element={<CreditCards />} />
-                  <Route path="/project-demo" element={<ProjectDetail />} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
+      <React.Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/bienvenida" element={<WelcomeOnboarding />} />
+          <Route path="/inicio" element={<WelcomeOnboarding />} />
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <React.Suspense fallback={<RouteFallback />}>
+                    <Routes>
+                      <Route path="/" element={<Home />} />
+                      <Route path="/history" element={<History />} />
+                      <Route path="/project/:id" element={<ProjectDetail />} />
+                      <Route path="/shared" element={<SharedProjects />} />
+                      <Route path="/add" element={<AddExpense />} />
+                      <Route path="/edit/:id" element={<AddExpense />} />
+                      <Route path="/categories" element={<ManageCategories />} />
+                      <Route path="/stats" element={<Stats />} />
+                      <Route path="/settings" element={<Settings />} />
+                      <Route path="/reports" element={<Reports />} />
+                      <Route path="/budgets" element={<Budgets />} />
+                      <Route path="/shortcuts" element={<ManageShortcuts />} />
+                      <Route path="/cards" element={<ManageCards />} />
+                      <Route path="/credit-cards" element={<CreditCards />} />
+                      <Route path="/project-demo" element={<ProjectDetail />} />
+                      <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
+                  </React.Suspense>
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </React.Suspense>
     </Router>
   );
 }

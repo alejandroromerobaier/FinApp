@@ -349,6 +349,10 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const unreadCount = notifications.filter(n => !n.isRead).length;
   const displayedNotifs = notifications.filter(n => filterNotifs === 'all' || !n.isRead);
 
+  useEffect(() => {
+    setShowNotifs(false);
+  }, [location.pathname]);
+
   const handleNotificationClick = (n: any) => {
     if (!n.isRead) {
       markAsRead(n.id);
@@ -356,7 +360,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     setShowNotifs(false);
 
     if (n.type === 'card_due') {
-      navigate('/cards');
+      navigate('/credit-cards');
     } else if (n.type === 'project_shared') {
       if (n.data?.projectId) {
         navigate(`/project/${n.data.projectId}`);
@@ -386,8 +390,21 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     <div className="min-h-screen flex flex-col">
       {/* Top Bar */}
       {!isAddPage && (
-        <header className="fixed top-0 w-full z-50 glass-header pt-safe-top">
-          <div className="flex items-center justify-between px-4 sm:px-6 h-14 sm:h-16">
+        <header
+          onClick={(e) => {
+            if (showNotifs && e.target === e.currentTarget) setShowNotifs(false);
+          }}
+          className={cn(
+            "fixed top-0 w-full glass-header pt-safe-top",
+            showNotifs ? "z-[60]" : "z-50"
+          )}
+        >
+          <div
+            onClick={(e) => {
+              if (showNotifs && e.target === e.currentTarget) setShowNotifs(false);
+            }}
+            className="flex items-center justify-between px-4 sm:px-6 h-14 sm:h-16"
+          >
             <div className="flex items-center gap-2.5 sm:gap-3 cursor-pointer group" onClick={() => navigate('/')}>
               <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-surface-container-lowest flex items-center justify-center p-1 sm:p-1.5 shadow-md shadow-blue-500/10 border border-blue-500/15 overflow-hidden transition-all duration-300 group-hover:scale-105 group-active:scale-95 group-hover:shadow-lg group-hover:shadow-blue-500/20">
                 <img 
@@ -427,20 +444,13 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               {/* Notifications Popover Dropdown (Aligned below the bell icon on both mobile and web) */}
               <AnimatePresence>
                 {showNotifs && (
-                  <>
-                    {/* Backdrop to close when clicking outside */}
-                    <div 
-                      className="fixed inset-0 z-40" 
-                      onClick={() => setShowNotifs(false)} 
-                    />
-
-                    <motion.div 
-                      initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                      transition={{ duration: 0.15, ease: 'easeOut' }}
-                      className="absolute top-full right-0 mt-2 w-[calc(100vw-1.5rem)] max-w-sm sm:w-96 bg-surface-container-lowest rounded-2xl sm:rounded-3xl shadow-2xl border border-on-surface/10 overflow-hidden z-50 flex flex-col max-h-[75vh]"
-                    >
+                  <motion.div 
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                    transition={{ duration: 0.15, ease: 'easeOut' }}
+                    className="absolute top-full right-0 mt-2 w-[calc(100vw-1.5rem)] max-w-sm sm:w-96 bg-surface-container-lowest rounded-2xl sm:rounded-3xl shadow-2xl border border-on-surface/10 overflow-hidden z-50 flex flex-col max-h-[75dvh]"
+                  >
                       {/* Header */}
                       <div className="p-4 sm:p-5 border-b border-on-surface/10 space-y-3 shrink-0">
                         <div className="flex items-center justify-between">
@@ -568,12 +578,29 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                         </div>
                       )}
                     </motion.div>
-                  </>
                 )}
               </AnimatePresence>
             </div>
           </div>
         </header>
+      )}
+
+      {/* Notifications Backdrop rendered outside glass-header stacking context (iOS Safari fix) */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {showNotifs && !isAddPage && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12, ease: 'easeOut' }}
+              onClick={() => setShowNotifs(false)}
+              aria-hidden="true"
+              className="fixed inset-0 z-[55] bg-black/15 sm:bg-transparent cursor-default"
+            />
+          )}
+        </AnimatePresence>,
+        document.body
       )}
 
       {/* Confirmation Modal for Clear All */}

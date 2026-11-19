@@ -1,6 +1,12 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  type Firestore
+} from 'firebase/firestore';
 import fallbackConfig from '../../firebase-applet-config.json';
 
 const firebaseConfig = {
@@ -17,9 +23,20 @@ const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID || fallbackConfig.f
 
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
-export const db = (databaseId && databaseId !== '(default)') 
-  ? getFirestore(app, databaseId) 
-  : getFirestore(app);
+
+let dbInstance: Firestore;
+try {
+  const localCache = persistentLocalCache({ tabManager: persistentMultipleTabManager() });
+  dbInstance = (databaseId && databaseId !== '(default)')
+    ? initializeFirestore(app, { localCache }, databaseId)
+    : initializeFirestore(app, { localCache });
+} catch {
+  // Fallback when Firestore is already initialized (e.g. HMR) or IndexedDB is unavailable
+  dbInstance = (databaseId && databaseId !== '(default)')
+    ? getFirestore(app, databaseId)
+    : getFirestore(app);
+}
+export const db = dbInstance;
 export const googleProvider = new GoogleAuthProvider();
 
 export { signInWithPopup, signOut, onAuthStateChanged };
