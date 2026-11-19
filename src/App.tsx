@@ -8,6 +8,7 @@ import { RouteTracker } from './components/RouteTracker';
 import { UpdatePrompt } from './components/UpdatePrompt';
 
 import { Home } from './pages/Home';
+import { AddExpense } from './pages/AddExpense';
 
 const lazyPage = <K extends string>(
   loader: () => Promise<Record<K, React.ComponentType<any>> & Record<string, any>>,
@@ -17,7 +18,6 @@ const lazyPage = <K extends string>(
 const Login = lazyPage(() => import('./pages/Login'), 'Login');
 const ProjectDetail = lazyPage(() => import('./pages/ProjectDetail'), 'ProjectDetail');
 const SharedProjects = lazyPage(() => import('./pages/SharedProjects'), 'SharedProjects');
-const AddExpense = lazyPage(() => import('./pages/AddExpense'), 'AddExpense');
 const ManageCategories = lazyPage(() => import('./pages/ManageCategories'), 'ManageCategories');
 const Stats = lazyPage(() => import('./pages/Stats'), 'Stats');
 const Settings = lazyPage(() => import('./pages/Settings'), 'Settings');
